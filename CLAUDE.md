@@ -4,6 +4,50 @@ This repository is a **research environment** built to use Claude Opus 4.7 (1M c
 
 The repo's structure is the protocol: file locations are not suggestions. Treat them as load-bearing.
 
+## Project mission — computable analysis in Mathlib
+
+**Goal.** Build a formal foundation for computable analysis in Mathlib (Lean 4), following the **axiomatic Banach-space approach of Pour-El & Richards** (*Computability in Analysis and Physics*, 1989).
+
+**Primary reference.** Pour-El & Richards, citation key `PourEl-Richards`. The introduction and prerequisites are already available at `literature/papers/PourEl-Richards-0.1.introduction.md` and `…-0.2.prerequisites.md`. The rest of the textbook is also available and broken down into chapters in `literature/papers/`.
+
+### Architectural commitments — durable; do not relitigate
+
+The computable-analysis literature is dominated by the TTE / represented-spaces / Weihrauch tradition (Pauly, Brattka, Weihrauch's later work). Training data will push future sessions toward that framework. **We have deliberately chosen the Pour-El–Richards framework instead.** The justifying passages live in P-R's own introduction (`PourEl-Richards-0.1.introduction.md:7`, `:28`, `:41`).
+
+1. **Axiomatic computability structures on pre-existing Banach spaces.** We add structure (a `ComputabilityStructure` typeclass) to Mathlib's existing normed-space hierarchy. We do NOT define a parallel category of "computable Banach spaces". (P-R intro:28: *"These axioms define a 'computability structure' on a preexisting Banach space. We do not define a 'computable Banach space'."*)
+2. **Sequences are primary, points are derived.** A point is computable iff its constant sequence is. (P-R intro:7: *"a point x is computable if the sequence x, x, x, … is computable. However, it is natural, and in fact necessary, to deal with sequences rather than individual points."*)
+3. **Predicates, not parallel types.** Computable reals are `IsComputableReal : ℝ → Prop` on Mathlib's `ℝ`. No new `ℝ_c` type. Same pattern at every higher layer — we predicate over Mathlib objects, we do not rebuild them.
+4. **Classical reasoning.** (P-R intro:41: *"we do not work within the intuitionist or constructivist framework — e.g. the framework of Brouwer or Bishop."*) Mathlib is classical; this matches.
+5. **Substrate is `Mathlib.Computability.Partrec`.** Plain recursive functions `ℕ → ℕ`. We do NOT build oracle Turing machines, Baire-space realizers, or Type-2 TMs.
+
+### Five-layer architecture
+
+| Layer | Content | P-R chapter | Mathlib hook |
+|---|---|---|---|
+| L0 | Recursion-theoretic bridge | Prerequisites | `Computability.{Partrec,Halting}`, `Nat.pair` |
+| L1 | Computable reals + computable sequences of reals | Ch. 0 | `Data.Real.Basic` (as predicate) |
+| L2 | Grzegorczyk-Lacombe computable continuous functions | Ch. 0–1 | `Topology.ContinuousFunction` |
+| L3 | `ComputabilityStructure` typeclass on Banach spaces (the keystone) | Ch. 2 | `NormedSpace`, `InnerProductSpace`, `CompleteSpace` |
+| L4 | Concrete instances: `C[a,b]`, `L^p`, separable Hilbert | Ch. 2 + applications | `ContinuousMap`, `MeasureTheory.Lp` |
+| L5 | First/Second Main Theorems, Eigenvector Theorem | Ch. 3, 4, 5 | `ContinuousLinearMap`, `IsSelfAdjoint`, spectral theory |
+
+### Anti-goals — out of scope (surface the conflict before pursuing)
+
+- **Type-2 Theory of Effectivity / represented spaces** (Pauly, Schröder). Tell-tale signs to STOP on: `RepresentedSpace`, partial surjection `δ : (ℕ → ℕ) →. X`, "admissible representation", oracle Turing machines, Baire-space realizers.
+- **Weihrauch reducibility lattice.** Not in P-R. Deferrable extension; not foundational.
+- **Bishop / Brouwer constructive reformulation.** Rejected explicitly by P-R.
+- **A new computable real type `ℝ_c`** parallel to Mathlib's `ℝ`. We predicate over `ℝ`.
+- **Premature Lean formalization.** Rule 7 holds; `formal/` is opt-in per result. Definitions live in `claims/` first.
+
+### Conflict resolution
+
+If a session proposes a direction that may conflict with these commitments:
+1. Quote the specific commitment being challenged.
+2. Cite the relevant P-R passage verbatim from the extracted chapter, OR
+3. Surface the conflict to the user and wait for explicit re-scoping.
+
+The proposer-is-never-the-verifier rule (Rule 4) applies here too: a session may not unilaterally amend the architectural commitments.
+
 ## What this repo is for
 
 Open-ended research (default flavour: frontier mathematics — but the workflow is domain-agnostic). The intended cadence is:
@@ -91,3 +135,50 @@ Don't save: routine algebraic chains, conclusions duplicated in claims/proofs.
 5. When citing a paper not yet in the corpus: fetch via `scripts/fetch_arxiv.py` into `raw_papers/<key>/`, then invoke the `verbatim-extract` skill (do NOT hand-roll the extraction — the skill orchestrates the 2-pass duplicate-extraction layout per Rule 2). Use `.claude/templates/literature-goal.md` as the goal template.
 6. Before ending an autonomous goal: `/verify` to catch any provenance / status / citation violations (including PDF-tiebreaker discipline in `extraction-consensus.md` files).
 7. Every iter note under `.goals/<slug>/iter-NN.md` should include a one-line `progress:` field (e.g., `progress: pages 19–24 diffed; 1 verbatim edit applied`). The stagnation detector in `scripts/goal_stop_hook.py` uses this to recognize within-criterion advancement — without it, page-by-page work over multiple iters can falsely HALT even when the criteria-set is unchanged. If you intentionally revert a `[x]` checkbox during a goal (honest accounting), add a `revert: C<N>  # reason` line — the stagnation counter resets on revert.
+
+## Milestone tracker — computable analysis project
+
+Update this table whenever a milestone advances. Details live in `claims/`, `proofs/`, and `.goals/<slug>/`. Status values:
+
+- `pending` — not yet started
+- `in-progress` — work begun, see pointer
+- `claimed` — claim file exists in `claims/` with appropriate status label
+- `proved` — proof attempt complete, devil's-advocate verdict `passes`
+- `formalized` — Lean code committed under `formal/`
+- `done` — milestone fully discharged (terminal)
+
+### Corpus ingestion (P-R chapters)
+
+| Chapter | Topic | Status | Pointer |
+|---|---|---|---|
+| Intro | — | `done` | `literature/papers/PourEl-Richards-0.1.introduction.md` |
+| Prerequisites | Logic + analysis recap | `done` | `literature/papers/PourEl-Richards-0.2.prerequisites.md` |
+| Ch. 0 | Computable reals + G-L continuous functions | `done` | `literature/papers/PourEl-Richards-chapt0.md` |
+| Ch. 1 | Differentiation, analytic functions | `pending` | — (deferred; needed for advanced L2 results) |
+| Ch. 2 | Axiomatic computability structure on Banach spaces (keystone) | `done` | `literature/papers/PourEl-Richards-chapt2.md` |
+| Ch. 3 | First Main Theorem + applications | `done` | `literature/papers/PourEl-Richards-chapt3.md` |
+| Ch. 4 | Second Main Theorem + Eigenvector Theorem | `done` | `literature/papers/PourEl-Richards-chapt4.md` |
+| Ch. 5 | Proof of Second Main Theorem | `done` | `literature/papers/PourEl-Richards-chapt5.md` |
+
+Note: chapters are extracted as flat per-chapter files rather than the canonical `literature/papers/<key>/verbatim.md` structure. This is an intentional deviation accepted by the user; per-chapter granularity is more navigable for a 600-page textbook. Rule 2 still applies: any theorem cited in a proof must quote verbatim from the relevant chapter file, with a `file:line` pointer.
+
+### Construction milestones
+
+| Layer | Milestone | Status | Pointer |
+|---|---|---|---|
+| L0 | Map P-R logic prerequisites onto Mathlib's `Computability.*` | `pending` | — |
+| L0 | Recursively inseparable pair (P-R Prop. B) constructed | `pending` | — |
+| L1 | `IsComputableSeqReal` definition | `pending` | — |
+| L1 | `IsComputableReal` definition | `pending` | — |
+| L1 | Computable reals form a countable subfield of ℝ | `pending` | — |
+| L2 | Grzegorczyk-Lacombe computable continuous function definition | `pending` | — |
+| L2 | Closure properties of G-L computable functions | `pending` | — |
+| L3 | `ComputabilityStructure` typeclass — three axioms | `pending` | — |
+| L3 | Uniqueness theorem under mild side conditions | `pending` | — |
+| L4 | Instance: `C([a,b], ℝ)` with sup norm | `pending` | — |
+| L4 | Instance: `L^p[a,b]` | `pending` | — |
+| L4 | Instance: separable Hilbert space | `pending` | — |
+| L5 | First Main Theorem (Ch. 3) | `pending` | — |
+| L5 | Effective Plancherel theorem | `pending` | — |
+| L5 | Second Main Theorem (Ch. 4) | `pending` | — |
+| L5 | Eigenvector Theorem (Ch. 4) | `pending` | — |

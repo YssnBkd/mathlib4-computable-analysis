@@ -189,11 +189,11 @@ sorry-free) → `done` (Lean type-checks AND theorems sorry-free; terminal).
 
 | Layer | Milestone | Status | Lean target | Pointer |
 |---|---|---|---|---|
-| L0 | Map P-R logic prerequisites onto Mathlib's `Computability.*` | `stub` | `formal/ComputableAnalysis/L0/Bridge.lean` | Lean file (1 sorry on `cantorPair_computable`) |
-| L0 | Recursively inseparable pair (P-R Prop. B) | `stub` | `formal/ComputableAnalysis/L0/PropB.lean` | Lean file (4 sorries on the four lemmas) |
-| L0 | Analysis prerequisites pointer (Banach/Hilbert/Lp/etc) | `stub` | `formal/ComputableAnalysis/L0/AnalysisBridge.lean` | Lean file (no sorries; pure #check pointers) |
-| L1 | `IsComputableSeqReal` definition | `claimed` | `formal/ComputableAnalysis/L1/ComputableSeqReal.lean` | `claims/l1-computable-reals/is-computable-seq-real.md` |
-| L1 | `IsComputableSeqComplex` definition | `claimed` | `formal/ComputableAnalysis/L1/ComputableSeqComplex.lean` | `claims/l1-computable-reals/is-computable-seq-real.md` |
+| L0 | Map P-R logic prerequisites onto Mathlib's `Computability.*` | `done` | `formal/ComputableAnalysis/L0/Bridge.lean` | Lean file (0 sorries; `cantorPair_computable` closed via `Primrec₂` composition) |
+| L0 | Recursively inseparable pair (P-R Prop. B) | `done` | `formal/ComputableAnalysis/L0/PropB.lean` | Lean file (0 sorries; all 4 lemmas proven; `no_separator` via `Code.fixed_point₂`) |
+| L0 | Analysis prerequisites pointer (Banach/Hilbert/Lp/etc) | `done` | `formal/ComputableAnalysis/L0/AnalysisBridge.lean` | Lean file (0 sorries; smoke-test `L^p` example now takes abstract measure to avoid Lebesgue import) |
+| L1 | `IsComputableSeqReal` definition | `formalized` | `formal/ComputableAnalysis/L1/ComputableSeqReal.lean` | Lean file (predicates sorry-free; 2 sorries on constant-sequence helper theorems) |
+| L1 | `IsComputableSeqComplex` definition | `claimed` | `formal/ComputableAnalysis/L1/ComputableSeqComplex.lean` | `claims/l1-computable-reals/is-computable-seq-real.md` (deferred — out of scope for `execute-docs-next-session-md`) |
 | L1 | `IsComputableReal` definition | `pending` | `formal/ComputableAnalysis/L1/ComputableReal.lean` | — |
 | L1 | Computable reals form a countable subfield of ℝ | `pending` | `formal/ComputableAnalysis/L1/SubfieldStructure.lean` | — |
 | L2 | Grzegorczyk-Lacombe computable continuous function definition | `pending` | `formal/ComputableAnalysis/L2/GrzegorczykLacombe.lean` | — |

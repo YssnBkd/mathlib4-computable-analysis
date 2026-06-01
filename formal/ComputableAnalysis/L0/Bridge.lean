@@ -120,12 +120,23 @@ def cantorPair (x y : ℕ) : ℕ :=
 /-- `cantorPair` is two-argument computable.
 
 It is primitive recursive — composition of `Nat.add`, `Nat.mul`, `Nat.div` — so
-`Primrec₂.to_comp` (Computable from Primrec) closes the goal. -/
+`Primrec.to_comp` (Computable from Primrec) closes the goal once we exhibit a
+`Primrec` witness for the explicit formula. -/
 theorem cantorPair_computable : Computable₂ cantorPair := by
-  -- TODO(/formalize L0 Bridge): standard composition of Mathlib's `Computable.add`,
-  -- `.mul`, `.div`. Tactic sketch: unfold cantorPair, then chain `.comp` /
-  -- `Primrec₂.to_comp` against the primrec witnesses.
-  sorry
+  show Computable fun p : ℕ × ℕ => (p.1 + p.2) * (p.1 + p.2 + 1) / 2 + p.1
+  refine Primrec.to_comp ?_
+  -- Build the witness layer by layer using `Primrec₂.comp` against
+  -- `Primrec₂.nat_add/mul/div` and `Primrec.fst/snd`. Each `Primrec₂.comp`
+  -- substitutes two `Primrec : ℕ × ℕ → ℕ` subexpressions into a binary primrec.
+  exact Primrec₂.comp Primrec.nat_add
+    (Primrec₂.comp Primrec.nat_div
+      (Primrec₂.comp Primrec.nat_mul
+        (Primrec₂.comp Primrec.nat_add Primrec.fst Primrec.snd)
+        (Primrec₂.comp Primrec.nat_add
+          (Primrec₂.comp Primrec.nat_add Primrec.fst Primrec.snd)
+          (Primrec.const 1)))
+      (Primrec.const 2))
+    Primrec.fst
 
 /-! ## §4 — Characteristic function (analyst's convention)
 

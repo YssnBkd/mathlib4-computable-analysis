@@ -46,6 +46,8 @@ space. Compare P-R intro:28 ("we add structure to a preexisting Banach space")
 — this is the Mathlib substrate.
 -/
 
+open scoped ZeroAtInfty
+
 namespace ComputableAnalysis.L0
 
 /-! ## Smoke checks — Mathlib symbols exist at the imports declared above -/
@@ -79,10 +81,13 @@ example (a b : ℝ) :
   let _X : Type := C(Set.Icc a b, ℝ)
   trivial
 
-/-- `L^p[a, b]` exists as a Mathlib object. -/
-example (a b : ℝ) (p : ENNReal) :
+/-- `L^p` exists as a Mathlib object (with an abstract base measure). The
+P-R / Mathlib correspondence for `L^p[a,b]` uses `μ := volume.restrict (Set.Icc a b)`,
+which requires `Mathlib.MeasureTheory.Measure.Lebesgue.Basic` — deferred to the
+L4 `Instances/Lp.lean` file that actually constructs the instance. -/
+example {α : Type*} [MeasurableSpace α] (μ : MeasureTheory.Measure α) (p : ENNReal) :
     True := by
-  let _Y := MeasureTheory.Lp ℝ p ((MeasureTheory.volume).restrict (Set.Icc a b))
+  let _Y := MeasureTheory.Lp ℝ p μ
   trivial
 
 /-- `ℓ^p` exists. -/

@@ -3,6 +3,10 @@ Copyright (c) 2026 The mathlib-computable-analysis contributors. All rights rese
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: The mathlib-computable-analysis contributors
 -/
+import ComputableAnalysis.L0.Bridge
+import ComputableAnalysis.L0.PropB
+import ComputableAnalysis.L0.AnalysisBridge
+import ComputableAnalysis.L1.ComputableSeqReal
 
 /-!
 # Computable analysis in Mathlib4
@@ -17,7 +21,3 @@ progression.
 This file is the umbrella import; downstream consumers (or `#check` callers)
 should `import ComputableAnalysis` rather than reaching into individual modules.
 -/
-
-import ComputableAnalysis.L0.Bridge
-import ComputableAnalysis.L0.PropB
-import ComputableAnalysis.L0.AnalysisBridge

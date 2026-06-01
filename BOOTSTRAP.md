@@ -33,6 +33,18 @@ Let `<slug>` be the active goal slug, and `<topic>` the topic it works on (typic
 - All of `archive/` (session JSONL files; only inspected during `/record`).
 - All of `thinking/` for unrelated topics (anchors reasoning on prior threads).
 
+## When a Lean target is in scope — use `/formalize`
+
+If the active `/goal` has a Lean criterion (a claim with `lean_target: formal/L<N>/...` whose target file does not yet type-check), invoke `/formalize <claim-id>` rather than hand-rolling Lean code. The skill:
+
+1. Runs `scripts/formalize_env_check.py` (watermark-cached env preflight).
+2. Loads the PhD-prodigy persona from `.claude/templates/lean-prodigy-persona.md`.
+3. Has on-demand access to `.claude/templates/lean-toolkit.md` (search engines, tactic ladder, Mathlib naming bible, computable-analysis area map).
+4. Stubs the Lean file with `sorry`-free definitions and theorems-with-sorry, then iterates fills under the three-attempt rule.
+5. Hands off to `/devils-advocate` for paper + Lean review (CLAUDE.md §"Devil's-advocate review under Lean").
+
+First-time setup (only once per machine): `python3 scripts/formalize_env_check.py --init` scaffolds `formal/lakefile.toml`, `formal/lean-toolchain`, `formal/ComputableAnalysis.lean`. After that, `cd formal && lake update && lake exe cache get && lake build` populates the watermark.
+
 ## Sanity check before starting work
 
 After loading, you should be able to answer:

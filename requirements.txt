@@ -1,0 +1,10 @@
+sympy>=1.13
+numpy>=2.0
+scipy>=1.13
+mpmath>=1.3
+networkx>=3.3
+arxiv>=2.1
+pymupdf>=1.24
+requests>=2.32
+python-dateutil>=2.9
+pyyaml>=6.0

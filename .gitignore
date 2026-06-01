@@ -1,0 +1,28 @@
+.venv/
+**/__pycache__/
+*.pyc
+*.pyo
+
+# LaTeX build artifacts
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+*.fdb_latexmk
+*.fls
+*.bbl
+*.blg
+
+# Lean build artifacts (when formal/ is initialized)
+formal/**/.lake/
+formal/**/build/
+
+# OS
+.DS_Store
+
+# Local-only session JSONL copies
+archive/raw/*.jsonl.tmp
+
+# Local-only Claude Code overrides (commit settings.json, not the .local override)
+.claude/settings.local.json

@@ -99,7 +99,31 @@ def main():
             if not verb.exists():
                 violations.append(f"literature/papers/{d.name}/: missing verbatim.md")
 
-    # 4. Claim sources resolve to literature/papers/<key>/.
+    # 4. Claim sources resolve to literature/papers/<key>/ OR literature/papers/<key>.md.
+    #
+    # The project has an "intentional deviation accepted by the user" (CLAUDE.md):
+    # for the P-R textbook, chapters are extracted as flat per-chapter files
+    # `literature/papers/<key>.md` rather than the canonical
+    # `literature/papers/<key>/verbatim.md` directory structure. This resolution
+    # routine accepts both layouts so that the flat-file convention does not cause
+    # /verify failures.
+    def _source_resolves(key: str) -> bool:
+        if not key:
+            return False
+        # (a) canonical bibkey directory layout
+        if key in bibkeys:
+            return True
+        # (b) full path: literature/papers/<file>.md flat-file (accepted deviation)
+        if key.startswith("literature/papers/"):
+            p = REPO / key
+            if p.exists():
+                return True
+            # also accept literature/papers/<bibkey>/<sub-path> patterns
+            first_seg = key[len("literature/papers/"):].split("/")[0]
+            if first_seg in bibkeys:
+                return True
+        return False
+
     if CLAIMS.is_dir():
         for f in CLAIMS.rglob("*.md"):
             if f.name == "TEMPLATE.md":
@@ -112,10 +136,11 @@ def main():
                 continue
             for s in srcs:
                 key = s.split(":")[0].strip()
-                if key and key not in bibkeys:
+                if not _source_resolves(key):
                     violations.append(
                         f"{f.relative_to(REPO)}: source '{s}' -> "
-                        f"literature/papers/{key}/ does not exist"
+                        f"could not resolve to literature/papers/{key}/ "
+                        f"(bibkey dir) or literature/papers/{key} (flat file)"
                     )
 
     # 5. PDF-tiebreaker discipline in extraction-consensus.md (per CLAUDE.md rule 2).

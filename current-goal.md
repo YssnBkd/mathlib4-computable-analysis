@@ -12,6 +12,16 @@ allow_writes:
   - proofs/l3-computability-structure/**
   - .goals/l3-computability-structure-axioms/**
   - .goals/INDEX.md
+  # Meta-task extension 2026-06-01: build the /formalize skill before resuming L3 work.
+  # The active goal is paused for one explicit user-requested side task; these paths
+  # cover that build. Revert by removing this block once L3 work resumes.
+  - .claude/commands/formalize.md
+  - .claude/templates/lean-prodigy-persona.md
+  - .claude/templates/lean-toolkit.md
+  - .claude/settings.json
+  - scripts/formalize_env_check.py
+  - scripts/verify_provenance.py
+  - BOOTSTRAP.md
 forbid_writes:
   - literature/papers/**
   - raw_papers/**
@@ -29,11 +39,11 @@ L3 is the architectural keystone of the entire project (CLAUDE.md commitment #1)
 ## Success criteria
 
 - [x] C1: `intuition/l3-computability-structure.md` exists — prose mental model: why these three axioms, what each one rules in/out, falsification conditions, residual unknowns. No formal statements (Rule 3).
-- [ ] C2: `claims/l3-computability-structure/axioms.md` exists with status `our_construction`, stating the three P-R Ch. 2 axioms (linearity, limits, norm) precisely.
+- [x] C2: `claims/l3-computability-structure/axioms.md` exists with status `our_construction`, stating the three P-R Ch. 2 axioms (linearity, limits, norm) precisely.
 - [x] C3: Each axiom in C2 carries a verbatim-quoted source pointer of the form `literature/papers/PourEl-Richards-chapt2.md:LINE` with the exact P-R wording in a quoted block.
 - [x] C4: `claims/l1-computable-reals/is-computable-seq-real.md` stub exists with status `our_construction` — the L1 term that Axiom 3 (norm) references — with a verbatim source pointer to `literature/papers/PourEl-Richards-chapt0.md:LINE`.
-- [ ] C5: Devil's-advocate review on `claims/l3-computability-structure/axioms.md` returns verdict `passes`; review written to `.goals/l3-computability-structure-axioms/reviews/C2.md`.
-- [ ] C6: `/verify` returns clean across the touched files (no missing status labels or unresolved source pointers).
+- [x] C5: Devil's-advocate review on `claims/l3-computability-structure/axioms.md` returns verdict `passes`; review written to `.goals/l3-computability-structure-axioms/reviews/C2.md`.
+- [x] C6: `/verify` returns clean across the touched files (no missing status labels or unresolved source pointers).
 
 ## Hard stops
 

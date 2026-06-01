@@ -112,7 +112,17 @@ them as "intentionally deferred"). -/
 /-- Sanity: every constant rational sequence is computable.
 TODO(/formalize L1): proof — exhibit `a := numerator, b := denominator, s` from
 the sign of `q` (or rather, since `(-1)^0 = 1` and `q = q/1`, splitting on
-`q ≥ 0`). -/
+`q ≥ 0`).
+
+*Attempted in iter-02 of `l3-computability-structure-lean` round, 2026-06-01*:
+the witness `(a, b, s) := (q.num.natAbs, q.den, if q.num < 0 then 1 else 0)`
+all `Computable.const` works; the obstruction is the cast asymmetry between
+`(q.num.natAbs : ℤ) = |q.num|` (a norm_cast simp lemma in ℤ) and the
+ℕ → ℚ direct cast `(q.num.natAbs : ℚ)`, which `push_cast`/`norm_cast` does
+*not* simplify symmetrically. Three attempts using `exact_mod_cast`, an
+explicit ℤ-bridge, and goal/hypothesis `push_cast` all hit the same wall.
+Recommend revisiting with `Int.cast_natAbs` (likely in
+`Mathlib.Algebra.Order.Ring.Abs` — needs an additional import). -/
 theorem isComputableSeqRat_const (q : ℚ) : IsComputableSeqRat (fun _ => q) := by
   -- TODO(/formalize L1 ComputableSeqReal): constant sequence — pick a, b, s as
   -- the (signed) numerator/denominator data from `Rat.num` / `Rat.den`,
@@ -122,7 +132,9 @@ theorem isComputableSeqRat_const (q : ℚ) : IsComputableSeqRat (fun _ => q) := 
 
 /-- Sanity: a real-valued constant sequence sitting on a rational is computable.
 TODO(/formalize L1): proof via `isComputableSeqRat_const` and the constant
-double sequence `r (n, k) := q`. -/
+double sequence `r (n, k) := q`. Once that helper closes, this proof is a
+3-liner: `refine ⟨fun _ => q, isComputableSeqRat_const q, fun _ _ => ?_⟩;
+simp`. -/
 theorem isComputableSeqReal_const_rat (q : ℚ) :
     IsComputableSeqReal (fun _ => (q : ℝ)) := by
   -- TODO(/formalize L1 ComputableSeqReal): use the constant double sequence;

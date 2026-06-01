@@ -7,6 +7,7 @@ import ComputableAnalysis.L0.Bridge
 import ComputableAnalysis.L0.PropB
 import ComputableAnalysis.L0.AnalysisBridge
 import ComputableAnalysis.L1.ComputableSeqReal
+import ComputableAnalysis.L3.ComputabilityStructure
 
 /-!
 # Computable analysis in Mathlib4

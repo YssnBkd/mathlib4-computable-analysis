@@ -10,6 +10,8 @@ The repo's structure is the protocol: file locations are not suggestions. Treat 
 
 **Primary reference.** Pour-El & Richards, citation key `PourEl-Richards`. The introduction and prerequisites are already available at `literature/papers/PourEl-Richards-0.1.introduction.md` and `…-0.2.prerequisites.md`. The rest of the textbook is also available and broken down into chapters in `literature/papers/`.
 
+**Primary deliverable.** The project's output is **Lean 4 code under `formal/`, intended for upstream contribution to Mathlib4**. Paper claims under `claims/`, intuitions under `intuition/`, and proofs under `proofs/` are *design infrastructure for the Lean code*, not standalone deliverables. A milestone is `done` iff its corresponding `formal/L<N>/<artifact>.lean` exists, type-checks against the project's pinned Mathlib4 commit, and exports the predicate / structure / theorem named in the milestone.
+
 ### Architectural commitments — durable; do not relitigate
 
 The computable-analysis literature is dominated by the TTE / represented-spaces / Weihrauch tradition (Pauly, Brattka, Weihrauch's later work). Training data will push future sessions toward that framework. **We have deliberately chosen the Pour-El–Richards framework instead.** The justifying passages live in P-R's own introduction (`PourEl-Richards-0.1.introduction.md:7`, `:28`, `:41`).
@@ -19,17 +21,18 @@ The computable-analysis literature is dominated by the TTE / represented-spaces 
 3. **Predicates, not parallel types.** Computable reals are `IsComputableReal : ℝ → Prop` on Mathlib's `ℝ`. No new `ℝ_c` type. Same pattern at every higher layer — we predicate over Mathlib objects, we do not rebuild them.
 4. **Classical reasoning.** (P-R intro:41: *"we do not work within the intuitionist or constructivist framework — e.g. the framework of Brouwer or Bishop."*) Mathlib is classical; this matches.
 5. **Substrate is `Mathlib.Computability.Partrec`.** Plain recursive functions `ℕ → ℕ`. We do NOT build oracle Turing machines, Baire-space realizers, or Type-2 TMs.
+6. **Every claim has a Lean target.** Each `claims/<topic>/<id>.md` carries a `lean_target: formal/L<N>/<path>.lean` field in its YAML frontmatter. Each /goal touching the milestone must include a Lean criterion: the target file exists, type-checks against the pinned Mathlib4 commit, and exports the named predicate / structure / theorem. Theorem proofs may use `sorry` while paper proof is maturing; **predicate and structure definitions cannot use `sorry`**. Mathlib4 is project infrastructure, installed as soon as the first Lean-criterion goal opens.
 
 ### Five-layer architecture
 
-| Layer | Content | P-R chapter | Mathlib hook |
-|---|---|---|---|
-| L0 | Recursion-theoretic bridge | Prerequisites | `Computability.{Partrec,Halting}`, `Nat.pair` |
-| L1 | Computable reals + computable sequences of reals | Ch. 0 | `Data.Real.Basic` (as predicate) |
-| L2 | Grzegorczyk-Lacombe computable continuous functions | Ch. 0–1 | `Topology.ContinuousFunction` |
-| L3 | `ComputabilityStructure` typeclass on Banach spaces (the keystone) | Ch. 2 | `NormedSpace`, `InnerProductSpace`, `CompleteSpace` |
-| L4 | Concrete instances: `C[a,b]`, `L^p`, separable Hilbert | Ch. 2 + applications | `ContinuousMap`, `MeasureTheory.Lp` |
-| L5 | First/Second Main Theorems, Eigenvector Theorem | Ch. 3, 4, 5 | `ContinuousLinearMap`, `IsSelfAdjoint`, spectral theory |
+| Layer | Content | P-R chapter | Mathlib hook | Lean target |
+|---|---|---|---|---|
+| L0 | Recursion-theoretic bridge | Prerequisites | `Computability.{Partrec,Halting}`, `Nat.pair` | `formal/L0/Bridge.lean`, `formal/L0/PropB.lean` |
+| L1 | Computable reals + computable sequences of reals | Ch. 0 | `Data.Real.Basic` (as predicate) | `formal/L1/ComputableSeqReal.lean`, `formal/L1/ComputableSeqComplex.lean` |
+| L2 | Grzegorczyk-Lacombe computable continuous functions | Ch. 0–1 | `Topology.ContinuousFunction` | `formal/L2/GrzegorczykLacombe.lean` |
+| L3 | `ComputabilityStructure` typeclass on Banach spaces (the keystone) | Ch. 2 | `NormedSpace`, `InnerProductSpace`, `CompleteSpace` | `formal/L3/ComputabilityStructure.lean` |
+| L4 | Concrete instances: `C[a,b]`, `L^p`, separable Hilbert | Ch. 2 + applications | `ContinuousMap`, `MeasureTheory.Lp` | `formal/L4/Instances/{CMap,Lp,Hilbert}.lean` |
+| L5 | First/Second Main Theorems, Eigenvector Theorem | Ch. 3, 4, 5 | `ContinuousLinearMap`, `IsSelfAdjoint`, spectral theory | `formal/L5/{FirstMainTheorem,SecondMainTheorem,Eigenvector}.lean` |
 
 ### Anti-goals — out of scope (surface the conflict before pursuing)
 
@@ -37,7 +40,7 @@ The computable-analysis literature is dominated by the TTE / represented-spaces 
 - **Weihrauch reducibility lattice.** Not in P-R. Deferrable extension; not foundational.
 - **Bishop / Brouwer constructive reformulation.** Rejected explicitly by P-R.
 - **A new computable real type `ℝ_c`** parallel to Mathlib's `ℝ`. We predicate over `ℝ`.
-- **Premature Lean formalization.** Rule 7 holds; `formal/` is opt-in per result. Definitions live in `claims/` first.
+- **Paper-only milestones without a Lean target.** Every `our_construction` / `verified` / `cited_result` claim must specify `lean_target` in its frontmatter; a milestone that reaches devil's-advocate `passes` without a Lean stub is **not** `done`. Indefinite Lean deferral conflicts with the project's primary deliverable.
 
 ### Conflict resolution
 
@@ -57,7 +60,7 @@ Open-ended research (default flavour: frontier mathematics — but the workflow 
 3. Proof attempts live in `proofs/<topic>/<claim-id>/attempt-NN.md` — tied to a specific claim id.
 4. Literature gets fetched into `raw_papers/<key>/` (canonical) and indexed into `literature/papers/<key>/{meta.json,verbatim.md,notes.md}`.
 5. Curated extended-thinking output that's worth preserving lives in `thinking/<topic>/<date>-<slug>.md`.
-6. Optional formalization in `formal/` (Lean 4, opt-in per result).
+6. **Lean formalization in `formal/L<N>/...` — the primary deliverable.** Co-developed with each claim in the same /goal scope; not optional. Theorem proofs may carry `sorry` while paper proof matures, but predicate / structure definitions are concrete.
 
 ## The status taxonomy (mandatory)
 
@@ -73,6 +76,8 @@ Every claim in `claims/` carries one of these labels in its YAML frontmatter:
 | `refuted` | A claim we previously held that has been broken. | The counterexample / argument that refuted it |
 
 A bare statement with no label is a bug. `/verify` enforces this.
+
+**Terminal-state convention.** `verified` is the terminal state for the **paper** proof. `formalized` (with a corresponding Lean file that type-checks against the pinned Mathlib commit and is `sorry`-free in predicates / structures) is the terminal state for the **project** milestone. The milestone tracker uses `formalized` (or `done`) as terminal; `verified` is intermediate. Architectural commitment #6 and Rule 7 spell out the Lean side.
 
 ## The /goal autonomous pattern
 
@@ -105,7 +110,7 @@ Four specialized subagents (defined in `.claude/agents/`):
 4. **The proposer is never the verifier.** Devil's-advocate review is required on every `conjecture`-status claim and on every committed `proof-attempt` step before a `/goal` criterion referencing it can be marked done.
 5. **Externalize thinking.** When you use extended thinking on a proposal, emit a structured artifact: hypothesis list → branch evaluation → committed direction → residual uncertainty. Saved to `thinking/<topic>/<date>-<slug>.md` when novel.
 6. **Context engineering, not maximization.** Read `BOOTSTRAP.md` at session start. Don't blindly read every file every turn.
-7. **No premature formalization.** `formal/` is opt-in per result. Don't install Lean until the first claim is mature enough to formalize.
+7. **Lean formalization is mandatory per milestone.** Each claim file specifies `lean_target: formal/L<N>/<path>.lean` in its frontmatter. Each /goal touching the milestone includes a Lean criterion (target file exists, type-checks against the pinned Mathlib commit, exports the named symbols). Mathlib4 lives at `formal/` as a Lake project (`lakefile.toml`); the toolchain is pinned via `lean-toolchain`. Installation is a one-time task in the first Lean-criterion goal.
 8. **Append, don't overwrite.** Previously written intuitions, claims, and proofs stay. Corrections are explicit: add a new file, link back, and update the status of the old one (often to `refuted`).
 
 ## Looking up a result
@@ -131,10 +136,12 @@ Don't save: routine algebraic chains, conclusions duplicated in claims/proofs.
    - If the input is **one clean intuition**: `/intuition <topic>` directly.
    - If the input is **raw / multi-thread soup** (multiple ideas bundled, mixed domains, felt associations alongside concrete hypotheses): `/intuition-prep` first. It decomposes the soup into discrete threads, interviews per thread, writes one `intuition/<slug>.md` per thread plus an audit trail at `thinking/_unbundled/`.
 3. When promoting an intuition to a precise statement: `/claim <topic> <id>` with the right status label.
-4. When attempting a proof: write it under `proofs/<topic>/<claim-id>/attempt-NN.md`. After a complete attempt, invoke `proof-reviewer` and `devils-advocate`.
-5. When citing a paper not yet in the corpus: fetch via `scripts/fetch_arxiv.py` into `raw_papers/<key>/`, then invoke the `verbatim-extract` skill (do NOT hand-roll the extraction — the skill orchestrates the 2-pass duplicate-extraction layout per Rule 2). Use `.claude/templates/literature-goal.md` as the goal template.
-6. Before ending an autonomous goal: `/verify` to catch any provenance / status / citation violations (including PDF-tiebreaker discipline in `extraction-consensus.md` files).
-7. Every iter note under `.goals/<slug>/iter-NN.md` should include a one-line `progress:` field (e.g., `progress: pages 19–24 diffed; 1 verbatim edit applied`). The stagnation detector in `scripts/goal_stop_hook.py` uses this to recognize within-criterion advancement — without it, page-by-page work over multiple iters can falsely HALT even when the criteria-set is unchanged. If you intentionally revert a `[x]` checkbox during a goal (honest accounting), add a `revert: C<N>  # reason` line — the stagnation counter resets on revert.
+4. **Every new claim file specifies `lean_target`** in its frontmatter, even if the Lean file does not yet exist. Use the layer-prefix convention `formal/L<N>/<file>.lean`. This is enforced by Rule 7 and Architectural commitment #6.
+5. When attempting a proof: write it under `proofs/<topic>/<claim-id>/attempt-NN.md`. After a complete attempt, invoke `proof-reviewer` and `devils-advocate`.
+6. When citing a paper not yet in the corpus: fetch via `scripts/fetch_arxiv.py` into `raw_papers/<key>/`, then invoke the `verbatim-extract` skill (do NOT hand-roll the extraction — the skill orchestrates the 2-pass duplicate-extraction layout per Rule 2). Use `.claude/templates/literature-goal.md` as the goal template.
+7. Before ending an autonomous goal: `/verify` to catch any provenance / status / citation violations (including PDF-tiebreaker discipline in `extraction-consensus.md` files).
+8. Every iter note under `.goals/<slug>/iter-NN.md` should include a one-line `progress:` field (e.g., `progress: pages 19–24 diffed; 1 verbatim edit applied`). The stagnation detector in `scripts/goal_stop_hook.py` uses this to recognize within-criterion advancement — without it, page-by-page work over multiple iters can falsely HALT even when the criteria-set is unchanged. If you intentionally revert a `[x]` checkbox during a goal (honest accounting), add a `revert: C<N>  # reason` line — the stagnation counter resets on revert.
+9. **Each /goal touching a milestone includes a Lean criterion.** Test: `cd formal && lake build` succeeds, the named symbols are declared in the target file (`#check` produces no errors), and predicate / structure bodies are `sorry`-free. Theorem proofs may carry `sorry` (the paper proof is the audit trail) but predicate / structure definitions cannot.
 
 ## Milestone tracker — computable analysis project
 
@@ -164,21 +171,69 @@ Note: chapters are extracted as flat per-chapter files rather than the canonical
 
 ### Construction milestones
 
-| Layer | Milestone | Status | Pointer |
-|---|---|---|---|
-| L0 | Map P-R logic prerequisites onto Mathlib's `Computability.*` | `pending` | — |
-| L0 | Recursively inseparable pair (P-R Prop. B) constructed | `pending` | — |
-| L1 | `IsComputableSeqReal` definition | `pending` | — |
-| L1 | `IsComputableReal` definition | `pending` | — |
-| L1 | Computable reals form a countable subfield of ℝ | `pending` | — |
-| L2 | Grzegorczyk-Lacombe computable continuous function definition | `pending` | — |
-| L2 | Closure properties of G-L computable functions | `pending` | — |
-| L3 | `ComputabilityStructure` typeclass — three axioms | `pending` | — |
-| L3 | Uniqueness theorem under mild side conditions | `pending` | — |
-| L4 | Instance: `C([a,b], ℝ)` with sup norm | `pending` | — |
-| L4 | Instance: `L^p[a,b]` | `pending` | — |
-| L4 | Instance: separable Hilbert space | `pending` | — |
-| L5 | First Main Theorem (Ch. 3) | `pending` | — |
-| L5 | Effective Plancherel theorem | `pending` | — |
-| L5 | Second Main Theorem (Ch. 4) | `pending` | — |
-| L5 | Eigenvector Theorem (Ch. 4) | `pending` | — |
+| Layer | Milestone | Status | Lean target | Pointer |
+|---|---|---|---|---|
+| L0 | Map P-R logic prerequisites onto Mathlib's `Computability.*` | `pending` | `formal/L0/Bridge.lean` | — |
+| L0 | Recursively inseparable pair (P-R Prop. B) constructed | `pending` | `formal/L0/PropB.lean` | — |
+| L1 | `IsComputableSeqReal` definition | `claimed` | `formal/L1/ComputableSeqReal.lean` | `claims/l1-computable-reals/is-computable-seq-real.md` |
+| L1 | `IsComputableSeqComplex` definition | `claimed` | `formal/L1/ComputableSeqComplex.lean` | `claims/l1-computable-reals/is-computable-seq-real.md` |
+| L1 | `IsComputableReal` definition | `pending` | `formal/L1/ComputableReal.lean` | — |
+| L1 | Computable reals form a countable subfield of ℝ | `pending` | `formal/L1/SubfieldStructure.lean` | — |
+| L2 | Grzegorczyk-Lacombe computable continuous function definition | `pending` | `formal/L2/GrzegorczykLacombe.lean` | — |
+| L2 | Closure properties of G-L computable functions | `pending` | `formal/L2/GLClosure.lean` | — |
+| L3 | `ComputabilityStructure` typeclass — three axioms | `claimed` | `formal/L3/ComputabilityStructure.lean` | `claims/l3-computability-structure/axioms.md` |
+| L3 | Uniqueness theorem under mild side conditions | `pending` | `formal/L3/Stability.lean` | — |
+| L4 | Instance: `C([a,b], ℝ)` with sup norm | `pending` | `formal/L4/Instances/CMap.lean` | — |
+| L4 | Instance: `L^p[a,b]` | `pending` | `formal/L4/Instances/Lp.lean` | — |
+| L4 | Instance: separable Hilbert space | `pending` | `formal/L4/Instances/Hilbert.lean` | — |
+| L5 | First Main Theorem (Ch. 3) | `pending` | `formal/L5/FirstMainTheorem.lean` | — |
+| L5 | Effective Plancherel theorem | `pending` | `formal/L5/Plancherel.lean` | — |
+| L5 | Second Main Theorem (Ch. 4) | `pending` | `formal/L5/SecondMainTheorem.lean` | — |
+| L5 | Eigenvector Theorem (Ch. 4) | `pending` | `formal/L5/Eigenvector.lean` | — |
+
+## Lean integration cadence
+
+The "Bundled per goal" pattern: every /goal touching a milestone carries paper + Lean criteria for the same milestone. A milestone is `done` only when its Lean stub type-checks. This section spells out the conventions.
+
+### Directory layout under `formal/`
+
+- `formal/lakefile.toml` — Lake project configuration (Mathlib4 as the sole dependency)
+- `formal/lean-toolchain` — pinned Lean version (matches Mathlib's required toolchain)
+- `formal/lake-manifest.json` — pinned Mathlib commit (regenerated only by an `update-mathlib` /goal)
+- `formal/L0/` … `formal/L5/` — code organized by layer; namespaces `ComputableAnalysis.L0` … `ComputableAnalysis.L5`
+- `formal/Tests/L<N>/` — `#check` and small example files exercising each layer's public API
+- `formal/ComputableAnalysis.lean` — umbrella import file (re-exports each layer)
+
+### `sorry` policy
+
+- **Allowed:** theorem and lemma proofs while paper proof is maturing
+- **Forbidden:** predicate definitions, structure-field definitions, the `structure` / `class` headers themselves, instance bodies that the milestone names as the deliverable
+- Every iter note inspects `formal/` for new `sorry` occurrences in forbidden contexts and tags them in the `progress:` field
+
+### Mathlib pinning
+
+- The first Lean-criterion /goal pins Mathlib to a specific commit recorded in `lake-manifest.json`
+- Re-pinning is a separate /goal (`update-mathlib`); it does not happen mid-claim
+- The pinned commit's API supersedes textual "Mathlib hook" references in the five-layer architecture if the API has changed
+
+### Devil's-advocate review under Lean
+
+For a claim that has both paper and Lean artifacts, the devil's-advocate subagent reads both. Verdict `passes` requires:
+
+1. Paper claim faithful to source (the round-1 check)
+2. Lean stub matches paper claim's definitions (no silent drift in names, signatures, or quantifier order)
+3. Lean stub type-checks against the pinned Mathlib commit
+
+Mismatch on (2) returns `unsound`; a non-type-checking stub returns `unsupported`.
+
+### Naming conventions
+
+- Predicates: `Is*` (matches Mathlib), e.g., `IsComputableSeqReal`, `IsComputableSeqComplex`
+- Typeclasses: PascalCase, e.g., `ComputabilityStructure`, `EffectivelySeparable`
+- Instance declarations: `instance : ComputabilityStructure (ContinuousMap ...) := ...`
+- File names match the principal export: `ComputabilityStructure.lean` declares `ComputabilityStructure`
+
+### Skill / tooling implications (deferred to follow-up work)
+
+- The `/verify` skill should eventually inspect `formal/` for `sorry` violations in predicate / structure positions and unresolved `lean_target` fields. For now this is a manual check in each iter note.
+- The `devils-advocate` subagent's prompt is updated to include the Lean stub when present (specification in this section; implementation deferred to a `devils-advocate-lean` /goal).

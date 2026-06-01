@@ -19,12 +19,13 @@ Let `<slug>` be the active goal slug, and `<topic>` the topic it works on (typic
 8. All claims under `claims/<topic>/` — current formal-statement state.
 9. Recent attempts: latest file in each `proofs/<topic>/<claim-id>/` directory.
 10. The most recent `thinking/<topic>/*.md` (if any) — preserved reasoning.
+11. **The Lean target file(s) for the active milestone**: `formal/L<N>/<artifact>.lean` — when a Lean-criterion /goal is open, this shows the current type-checking state. Run `cd formal && lake build` to verify before marking a Lean criterion done. The path is in the claim file's `lean_target` frontmatter field (Architectural commitment #6).
 
 ## On demand (when relevant)
 
-11. `literature/INDEX.md` and `literature/papers/<key>/verbatim.md` — only fetch when actually citing.
-12. `raw_papers/<key>/` PDFs — only when verbatim.md is insufficient and the source is needed.
-13. Other topic threads under `intuition/`, `claims/`, `proofs/` — when cross-thread connections matter.
+12. `literature/INDEX.md` and `literature/papers/<key>/verbatim.md` — only fetch when actually citing.
+13. `raw_papers/<key>/` PDFs — only when verbatim.md is insufficient and the source is needed.
+14. Other topic threads under `intuition/`, `claims/`, `proofs/` — when cross-thread connections matter.
 
 ## What NOT to load by default
 

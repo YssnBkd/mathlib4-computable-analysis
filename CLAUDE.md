@@ -192,7 +192,7 @@ sorry-free) → `done` (Lean type-checks AND theorems sorry-free; terminal).
 | L0 | Map P-R logic prerequisites onto Mathlib's `Computability.*` | `done` | `formal/ComputableAnalysis/L0/Bridge.lean` | Lean file (0 sorries; `cantorPair_computable` closed via `Primrec₂` composition) |
 | L0 | Recursively inseparable pair (P-R Prop. B) | `done` | `formal/ComputableAnalysis/L0/PropB.lean` | Lean file (0 sorries; all 4 lemmas proven; `no_separator` via `Code.fixed_point₂`) |
 | L0 | Analysis prerequisites pointer (Banach/Hilbert/Lp/etc) | `done` | `formal/ComputableAnalysis/L0/AnalysisBridge.lean` | Lean file (0 sorries; smoke-test `L^p` example now takes abstract measure to avoid Lebesgue import) |
-| L1 | `IsComputableSeqReal` definition | `formalized` | `formal/ComputableAnalysis/L1/ComputableSeqReal.lean` | Lean file (predicates sorry-free; 2 sorries on constant-sequence helper theorems) |
+| L1 | `IsComputableSeqReal` definition | `done` | `formal/ComputableAnalysis/L1/ComputableSeqReal.lean` | Lean file (0 sorries; constant-sequence helpers `isComputableSeqRat_const` / `isComputableSeqReal_const_rat` closed via `Nat.cast_natAbs` + `Int.cast_abs` + sign case-split; `conv_lhs` to avoid `Rat.num_div_den` rewriting under projections) |
 | L1 | `IsComputableSeqComplex` definition | `claimed` | `formal/ComputableAnalysis/L1/ComputableSeqComplex.lean` | `claims/l1-computable-reals/is-computable-seq-real.md` (deferred — out of scope for `execute-docs-next-session-md`) |
 | L1 | `IsComputableReal` definition | `pending` | `formal/ComputableAnalysis/L1/ComputableReal.lean` | — |
 | L1 | Computable reals form a countable subfield of ℝ | `pending` | `formal/ComputableAnalysis/L1/SubfieldStructure.lean` | — |
@@ -200,7 +200,7 @@ sorry-free) → `done` (Lean type-checks AND theorems sorry-free; terminal).
 | L2 | Closure properties of G-L computable functions | `pending` | `formal/ComputableAnalysis/L2/GLClosure.lean` | — |
 | L3 | `ComputabilityStructure` typeclass — three axioms | `formalized` | `formal/ComputableAnalysis/L3/ComputabilityStructure.lean` | Lean file (0 sorries; class with 5 fields encoding A1/A2/A3 + NV; auxiliary `ScalarComputableSeq` typeclass with ℝ instance via L1) |
 | L3 | Uniqueness theorem under mild side conditions | `pending` | `formal/ComputableAnalysis/L3/Stability.lean` | — |
-| L4 | Instance: `C([a,b], ℝ)` with sup norm | `pending` | `formal/ComputableAnalysis/L4/Instances/CMap.lean` | — |
+| L4 | Instance: `C([a,b], ℝ)` with sup norm | `stub` | `formal/ComputableAnalysis/L4/Instances/CMap.lean` | Lean file (def/instance bodies sorry-free; predicate via P-R Ch. 2:141 polynomial-approximation form; `zero_seq` proven; A1/A2/A3 theorem-body sorries with `-- TODO(/formalize L4 CMap):` and explicit P-R citation in each TODO) |
 | L4 | Instance: `L^p[a,b]` | `pending` | `formal/ComputableAnalysis/L4/Instances/Lp.lean` | — |
 | L4 | Instance: separable Hilbert space | `pending` | `formal/ComputableAnalysis/L4/Instances/Hilbert.lean` | — |
 | L5 | First Main Theorem (Ch. 3) | `pending` | `formal/ComputableAnalysis/L5/FirstMainTheorem.lean` | — |

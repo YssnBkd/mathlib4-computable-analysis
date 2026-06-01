@@ -110,36 +110,37 @@ proofs are out of scope for this milestone (the existing L1 design doc records
 them as "intentionally deferred"). -/
 
 /-- Sanity: every constant rational sequence is computable.
-TODO(/formalize L1): proof — exhibit `a := numerator, b := denominator, s` from
-the sign of `q` (or rather, since `(-1)^0 = 1` and `q = q/1`, splitting on
-`q ≥ 0`).
 
-*Attempted in iter-02 of `l3-computability-structure-lean` round, 2026-06-01*:
-the witness `(a, b, s) := (q.num.natAbs, q.den, if q.num < 0 then 1 else 0)`
-all `Computable.const` works; the obstruction is the cast asymmetry between
-`(q.num.natAbs : ℤ) = |q.num|` (a norm_cast simp lemma in ℤ) and the
-ℕ → ℚ direct cast `(q.num.natAbs : ℚ)`, which `push_cast`/`norm_cast` does
-*not* simplify symmetrically. Three attempts using `exact_mod_cast`, an
-explicit ℤ-bridge, and goal/hypothesis `push_cast` all hit the same wall.
-Recommend revisiting with `Int.cast_natAbs` (likely in
-`Mathlib.Algebra.Order.Ring.Abs` — needs an additional import). -/
+Witness: `(a, b, s) := (q.num.natAbs, q.den, if q.num < 0 then 1 else 0)`, all
+constant (hence `Computable.const _`). The arithmetic identity
+`q = (-1)^s · (a/b)` reduces, after rewriting `(q.num.natAbs : ℚ)` via
+`Nat.cast_natAbs ∘ Int.cast_abs` to `|((q.num : ℤ) : ℚ)|`, to a sign case-split
+that closes by `Rat.num_div_den`. -/
 theorem isComputableSeqRat_const (q : ℚ) : IsComputableSeqRat (fun _ => q) := by
-  -- TODO(/formalize L1 ComputableSeqReal): constant sequence — pick a, b, s as
-  -- the (signed) numerator/denominator data from `Rat.num` / `Rat.den`,
-  -- guarded by `Computable.const`. The arithmetic
-  -- `(-1)^{s} · (a / b) = q` follows from the definition of `Rat`.
-  sorry
+  refine ⟨fun _ => q.num.natAbs, fun _ => q.den,
+    fun _ => (if q.num < 0 then 1 else 0),
+    Computable.const _, Computable.const _, Computable.const _,
+    fun _ => q.den_ne_zero, fun _ => ?_⟩
+  rw [Nat.cast_natAbs, Int.cast_abs]
+  -- Rewrite the bare `q` on the LHS, not the `q`-inside-`q.num`/`q.den` on the RHS.
+  conv_lhs => rw [← Rat.num_div_den q]
+  by_cases hneg : q.num < 0
+  · rw [if_pos hneg, pow_one,
+      abs_of_neg (show ((q.num : ℤ) : ℚ) < 0 by exact_mod_cast hneg)]
+    ring
+  · rw [if_neg hneg, pow_zero, one_mul,
+      abs_of_nonneg (show (0 : ℚ) ≤ ((q.num : ℤ) : ℚ) by
+        exact_mod_cast (not_lt.mp hneg))]
 
 /-- Sanity: a real-valued constant sequence sitting on a rational is computable.
-TODO(/formalize L1): proof via `isComputableSeqRat_const` and the constant
-double sequence `r (n, k) := q`. Once that helper closes, this proof is a
-3-liner: `refine ⟨fun _ => q, isComputableSeqRat_const q, fun _ _ => ?_⟩;
-simp`. -/
+
+Witness: the constant double sequence `r (n, k) := q`. Computability of `r`
+reduces to `isComputableSeqRat_const q` (the `Nat.unpair`-reindexing is still
+constant). The bound `|q − q| = 0 ≤ 1/2^k` is immediate. -/
 theorem isComputableSeqReal_const_rat (q : ℚ) :
     IsComputableSeqReal (fun _ => (q : ℝ)) := by
-  -- TODO(/formalize L1 ComputableSeqReal): use the constant double sequence;
-  -- the bound `|q - q| = 0 ≤ 1/2^k` is immediate.
-  sorry
+  refine ⟨fun _ => q, isComputableSeqRat_const q, fun _ _ => ?_⟩
+  simp
 
 /-! ## §4 — Smoke checks -/
 

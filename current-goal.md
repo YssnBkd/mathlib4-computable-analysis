@@ -13,8 +13,9 @@ devils_advocate_required_for:
 
 No active goal. Run `/goal <slug>` to start one.
 
-The most recent completed goal was `l3-computability-structure-lean` (success,
-2/50 iterations, ~30 min). See `.goals/l3-computability-structure-lean/final.md`
-for the full report — L3 ComputabilityStructure typeclass landed and
-type-checks, build clean, Zulip pitches drafted-but-deferred, 2 L1 helper
-sorries retained with TODO after the 3-attempt cap.
+The most recent completed goal was `next-session-2026-06-01b` (success, 2/50
+iterations, ~30 min). See `.goals/next-session-2026-06-01b/final.md` for the full
+report — L1 helper sorries closed (root cause: lemma name was `Nat.cast_natAbs`,
+not `Int.cast_natAbs` as the prior session guessed), L4 `C([a, b], ℝ)` instance
+shipped as `stub` with `zero_seq` proven and A1/A2/A3 theorem-body sorries
+documented + cited.

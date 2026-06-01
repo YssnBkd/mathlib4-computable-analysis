@@ -1,0 +1,17 @@
+name = "ComputableAnalysis"
+defaultTargets = ["ComputableAnalysis"]
+
+# Mathlib4 — tracked at master until we cut a release.
+# Pin to a specific commit via `rev = "..."` once L0 builds reliably.
+[[require]]
+name = "mathlib"
+git = "https://github.com/leanprover-community/mathlib4.git"
+
+[[lean_lib]]
+name = "ComputableAnalysis"
+
+# Project-wide Lean options — match Mathlib4 style.
+[leanOptions]
+autoImplicit = false
+relaxedAutoImplicit = false
+pp.unicode.fun = true

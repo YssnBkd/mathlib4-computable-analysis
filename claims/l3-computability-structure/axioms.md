@@ -2,7 +2,7 @@
 id: axioms
 topic: l3-computability-structure
 status: our_construction
-lean_target: formal/L3/ComputabilityStructure.lean
+lean_target: formal/ComputableAnalysis/L3/ComputabilityStructure.lean
 created: 2026-06-01
 sources:
   - literature/papers/PourEl-Richards-chapt2.md

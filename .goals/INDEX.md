@@ -4,4 +4,4 @@ Registry of all `/goal` rounds. Status is `active`, `success`, `partial`, `aband
 
 | slug | status | started | ended | iterations | mode |
 |---|---|---|---|---|---|
-| l3-computability-structure-axioms | active | 2026-06-01 | — | 0/8 | explore |
+| l3-computability-structure-axioms | success | 2026-06-01 | 2026-06-01 | 8/8 | explore |

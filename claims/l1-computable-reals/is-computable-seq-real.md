@@ -3,8 +3,8 @@ id: is-computable-seq-real
 topic: l1-computable-reals
 status: our_construction
 lean_target:
-  - formal/L1/ComputableSeqReal.lean
-  - formal/L1/ComputableSeqComplex.lean
+  - formal/ComputableAnalysis/L1/ComputableSeqReal.lean
+  - formal/ComputableAnalysis/L1/ComputableSeqComplex.lean
 created: 2026-06-01
 sources:
   - literature/papers/PourEl-Richards-chapt0.md

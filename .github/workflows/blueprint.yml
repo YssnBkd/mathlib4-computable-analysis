@@ -67,6 +67,15 @@ jobs:
       - name: Install leanblueprint
         run: pip install leanblueprint
 
+      - name: Debug — dump blueprint/src/ contents (delete after CI green)
+        run: |
+          echo "=== PWD ===" && pwd
+          echo "=== blueprint/src/ ===" && ls -la blueprint/src/
+          echo "=== blueprint/src/macros/ ===" && ls -la blueprint/src/macros/ 2>&1 || echo "MACROS DIR MISSING"
+          echo "=== head common.tex ===" && head -5 blueprint/src/macros/common.tex 2>&1 || echo "NOT FOUND"
+          echo "=== head web.tex ===" && head -5 blueprint/src/web.tex 2>&1 || echo "NOT FOUND"
+          echo "=== plastex.cfg ===" && cat blueprint/src/plastex.cfg 2>&1 || echo "NOT FOUND"
+
       - name: Build blueprint HTML (plasTeX → blueprint/web/)
         run: leanblueprint web
 

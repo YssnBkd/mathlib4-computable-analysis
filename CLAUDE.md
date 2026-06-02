@@ -127,24 +127,34 @@ See `docs/SETUP.md` for first-time install steps (elan + lake update + cache get
   ready and the file isn't committable).
 - Every `sorry` carries a `-- TODO(/formalize L<N>):` comment naming the
   obstruction.
+- **Blueprint consistency.** `\leanok` in `blueprint/src/*.tex` may only mark
+  a node whose `\lean{decl}` target has no `sorry` transitively. `verify` enforces this; `#print axioms <decl>` showing `sorryAx` is a refusal.
 
-## Status taxonomy (claim files)
+## Status (carried by blueprint)
 
-Every `claims/<topic>/<id>.md` carries one label in YAML frontmatter:
+The dep graph at `blueprint/web/dep_graph_document.html` is the source of truth
+for "what's stated / proved / formalized" (post-2026-06-02 transition to
+Patrick Massot's `leanblueprint` framework — see `claims/INDEX.md` for the
+mapping from the old 7-label YAML taxonomy).
 
-| Label | Meaning |
-|---|---|
-| `intuition` | Informal idea. Not a claim of truth. |
-| `conjecture` | Precise statement we believe but cannot yet prove. |
-| `our_construction` | Definition or object we introduce. |
-| `cited_result` | Theorem from the literature. Source pointer required. |
-| `verified` | Complete paper proof, audited. *Intermediate.* |
-| `formalized` | Lean file type-checks; predicate/structure bodies sorry-free. **Terminal.** |
-| `refuted` | Previously held; now broken. Counterexample required. |
+Color mapping in the graph:
 
-`formalized` is the terminal state for milestones. `verified` (paper-only) is
-intermediate. A milestone with only a paper proof and no Lean stub is **not**
-done.
+| Color | Marker in `blueprint/src/*.tex` | Meaning |
+|---|---|---|
+| Green ellipse | `\leanok` + `\lean{<Decl>}` | Theorem stated and proved in Lean. |
+| Green filled box | `\leanok` + `\lean{<Decl>}` | Definition concrete in Lean. |
+| Dark green | `\mathlibok` | Lives in Mathlib upstream. |
+| Blue / white-bordered | (stated env, no `\lean{}`) | Stated formally; Lean target not declared yet. |
+| Orange (`#FFAA33`) | `\notready` | Statement not ready for formalization. |
+
+For non-blueprint artifacts (pre-formal mental models under `intuition/`),
+status is implicitly `intuition` and they do not appear in the dep graph until
+a corresponding LaTeX node is added.
+
+Rationale satellites under `claims/` may retain legacy YAML `status: ...`
+fields during transition; they are no longer authoritative. New claim files
+follow `claims/TEMPLATE.md` (satellite form with `blueprint:` field pointing at
+the `\label{...}`).
 
 ## Mathlib community engagement (do this!)
 
@@ -168,13 +178,19 @@ done.
    relevant file, with a `file:line` pointer.**
 3. Lean files cite via comment: `-- ref: literature/papers/<key>:LINE`.
 
-## Milestone tracker
+## Construction milestone tracker
 
-Status values: `pending` (not started) → `in-progress` (work begun) → `stub`
-(Lean file exists with sorries) → `formalized` (Lean type-checks; predicates
-sorry-free) → `done` (Lean type-checks AND theorems sorry-free; terminal).
+**The dep graph at `blueprint/web/dep_graph_document.html` is the milestone
+tracker.** Each definition/lemma/theorem appears as a node; color denotes
+formalization state (see "Status (carried by blueprint)" above). Build it with
+`PATH="$PWD/.venv/bin:$PATH" .venv/bin/leanblueprint web`; live URL will be
+added here once GitHub Pages is enabled.
 
 ### Corpus ingestion (P-R chapters)
+
+The corpus ingestion table tracks paper-extract progress, NOT Lean progress.
+It stays as a hand-maintained markdown table because it lives outside the
+blueprint's scope.
 
 | Chapter | Topic | Status | Pointer |
 |---|---|---|---|
@@ -187,25 +203,14 @@ sorry-free) → `done` (Lean type-checks AND theorems sorry-free; terminal).
 | Ch. 4 | Second Main Theorem + Eigenvector Theorem | `done` | `literature/papers/PourEl-Richards-chapt4.md` |
 | Ch. 5 | Proof of Second Main Theorem | `done` | `literature/papers/PourEl-Richards-chapt5.md` |
 
-### Construction milestones
+### Construction milestones — see blueprint dep graph
 
-| Layer | Milestone | Status | Lean target | Pointer |
-|---|---|---|---|---|
-| L0 | Map P-R logic prerequisites onto Mathlib's `Computability.*` | `done` | `ComputableAnalysis/L0/Bridge.lean` | Lean file (0 sorries; `cantorPair_computable` closed via `Primrec₂` composition) |
-| L0 | Recursively inseparable pair (P-R Prop. B) | `done` | `ComputableAnalysis/L0/PropB.lean` | Lean file (0 sorries; all 4 lemmas proven; `no_separator` via `Code.fixed_point₂`) |
-| L0 | Analysis prerequisites pointer (Banach/Hilbert/Lp/etc) | `done` | `ComputableAnalysis/L0/AnalysisBridge.lean` | Lean file (0 sorries; smoke-test `L^p` example now takes abstract measure to avoid Lebesgue import) |
-| L1 | `IsComputableSeqReal` definition | `done` | `ComputableAnalysis/L1/ComputableSeqReal.lean` | Lean file (0 sorries; constant-sequence helpers `isComputableSeqRat_const` / `isComputableSeqReal_const_rat` closed via `Nat.cast_natAbs` + `Int.cast_abs` + sign case-split; `conv_lhs` to avoid `Rat.num_div_den` rewriting under projections) |
-| L1 | `IsComputableSeqComplex` definition | `claimed` | `ComputableAnalysis/L1/ComputableSeqComplex.lean` | `claims/l1-computable-reals/is-computable-seq-real.md` (deferred — out of scope for `execute-docs-next-session-md`) |
-| L1 | `IsComputableReal` definition | `pending` | `ComputableAnalysis/L1/ComputableReal.lean` | — |
-| L1 | Computable reals form a countable subfield of ℝ | `pending` | `ComputableAnalysis/L1/SubfieldStructure.lean` | — |
-| L2 | Grzegorczyk-Lacombe computable continuous function definition | `pending` | `ComputableAnalysis/L2/GrzegorczykLacombe.lean` | — |
-| L2 | Closure properties of G-L computable functions | `pending` | `ComputableAnalysis/L2/GLClosure.lean` | — |
-| L3 | `ComputabilityStructure` typeclass — three axioms | `formalized` | `ComputableAnalysis/L3/ComputabilityStructure.lean` | Lean file (0 sorries; class with 5 fields encoding A1/A2/A3 + NV; auxiliary `ScalarComputableSeq` typeclass with ℝ instance via L1) |
-| L3 | Uniqueness theorem under mild side conditions | `pending` | `ComputableAnalysis/L3/Stability.lean` | — |
-| L4 | Instance: `C([a,b], ℝ)` with sup norm | `stub` | `ComputableAnalysis/L4/Instances/CMap.lean` | Lean file (def/instance bodies sorry-free; predicate via P-R Ch. 2:141 polynomial-approximation form; `zero_seq` proven; A1/A2/A3 theorem-body sorries with `-- TODO(/formalize L4 CMap):` and explicit P-R citation in each TODO). **Round `l4-cmap-axiom-linearity` (2026-06-02, budget-exhausted): shipped `private theorem isComputableSeqRat_add` (~80 lines, fully proved) inline at top of file — closure of `IsComputableSeqRat` under pointwise addition, with `-- TODO(refactor → L1):` for a future move. A1 itself still sorry (needs `_mul`/`_reindex`/`_finsetSum` + witness assembly).** |
-| L4 | Instance: `L^p[a,b]` | `pending` | `ComputableAnalysis/L4/Instances/Lp.lean` | — |
-| L4 | Instance: separable Hilbert space | `pending` | `ComputableAnalysis/L4/Instances/Hilbert.lean` | — |
-| L5 | First Main Theorem (Ch. 3) | `pending` | `ComputableAnalysis/L5/FirstMainTheorem.lean` | — |
-| L5 | Effective Plancherel theorem | `pending` | `ComputableAnalysis/L5/Plancherel.lean` | — |
-| L5 | Second Main Theorem (Ch. 4) | `pending` | `ComputableAnalysis/L5/SecondMainTheorem.lean` | — |
-| L5 | Eigenvector Theorem (Ch. 4) | `pending` | `ComputableAnalysis/L5/Eigenvector.lean` | — |
+This table was retired on 2026-06-02 in favor of the auto-generated blueprint
+dep graph (`blueprint/web/dep_graph_document.html`). The graph supersedes the
+hand-maintained table and stays in sync with the actual Lean state via
+`leanblueprint checkdecls`.
+
+The five-layer scaffold (L0…L5) is captured both by
+`ComputableAnalysis/L<N>/*.lean` (Lean source) and `blueprint/src/L<N>.tex`
+(LaTeX dispatcher chapters). Layer status is read off the dep graph's node
+colors per the "Status (carried by blueprint)" section above.

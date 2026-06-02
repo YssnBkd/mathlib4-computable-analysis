@@ -1,0 +1,16 @@
+ComputableAnalysis.L0.IsRecursive
+ComputableAnalysis.L0.IsRecursivelyEnumerable
+ComputableAnalysis.L0.IsRecursiveSet
+ComputableAnalysis.L0.cantorPair
+ComputableAnalysis.L0.cantorPair_computable
+ComputableAnalysis.L0.haltingSetAt
+ComputableAnalysis.L0.haltingSetAt_re
+ComputableAnalysis.L0.haltingSetAt_not_recursive
+ComputableAnalysis.L0.prop_A_exists_re_not_recursive
+ComputableAnalysis.L0.insepA
+ComputableAnalysis.L0.insepB
+ComputableAnalysis.L0.insepA_re
+ComputableAnalysis.L0.insepB_re
+ComputableAnalysis.L0.insepA_insepB_disjoint
+ComputableAnalysis.L0.insepA_insepB_no_separator
+ComputableAnalysis.L0.prop_B

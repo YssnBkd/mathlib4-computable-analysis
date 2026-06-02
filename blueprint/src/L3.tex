@@ -1,0 +1,17 @@
+\chapter{L3 — The \texttt{ComputabilityStructure} typeclass (keystone)}
+
+% P-R reference: Chapter 2, "Axiomatic computability structure", literature/papers/PourEl-Richards-chapt2.md.
+% Layer status: typeclass formalized (0 sorries; 5 fields encoding A1/A2/A3 + NV).
+% Statement migration pending; LaTeX content will be filled in a follow-up round.
+
+\begin{definition}
+  \label{def:l3_computabilityStructure}
+  \notready
+  Typeclass \texttt{ComputabilityStructure}~$\Bbbk$~$E$ on a Banach space $[NormedAddCommGroup\,E]$ $[NormedSpace\,\Bbbk\,E]$ $[CompleteSpace\,E]$, with three axioms:
+  \begin{itemize}
+    \item \textbf{A1 (linearity).} Computable sequences are closed under rational linear combinations.
+    \item \textbf{A2 (effective limit).} An effective Cauchy sequence of computable sequences has a computable limit.
+    \item \textbf{A3 (computable norm).} The norm of a computable sequence is a computable sequence of reals.
+  \end{itemize}
+  P-R Ch.\,2:18--22.
+\end{definition}

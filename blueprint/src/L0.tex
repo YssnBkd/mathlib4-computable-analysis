@@ -1,0 +1,124 @@
+\chapter{L0 — Recursion-theoretic prerequisites and Proposition B}
+
+% P-R reference: §0.2 "Prerequisites from logic and analysis",
+% literature/papers/PourEl-Richards-0.2.prerequisites.md.
+%
+% Layer status: \texttt{done}. All three Lean files are 0-sorry. This chapter
+% serves as the proof-of-concept that every entry-point pattern (\lean{} +
+% \leanok{}, \uses{}, definitions, lemmas, theorems) renders cleanly.
+
+\section{Recursion-theoretic bridge}
+
+P-R uses only two nontrivial facts from recursion theory: the existence of a
+recursively enumerable nonrecursive set (Proposition A, this section) and the
+existence of a recursively inseparable pair (Proposition B, next section). Both
+are stated against Mathlib's \texttt{Computability.Primrec} / \texttt{Partrec}
+machinery rather than against the partial-recursive grammar P-R describes
+informally.
+
+\begin{definition}
+  \label{def:isRecursive}
+  \lean{ComputableAnalysis.L0.IsRecursive, ComputableAnalysis.L0.IsRecursivelyEnumerable, ComputableAnalysis.L0.IsRecursiveSet}
+  \leanok
+  For \texttt{Primcodable} types $\alpha, \beta$:
+  \begin{itemize}
+    \item \textbf{IsRecursive} $f$ abbreviates \texttt{Computable}~$f$ (a total recursive function $\alpha \to \beta$).
+    \item \textbf{IsRecursivelyEnumerable} $A$ abbreviates \texttt{REPred} $(\lambda x.\,x \in A)$ (semi-decidable membership).
+    \item \textbf{IsRecursiveSet} $A$ abbreviates \texttt{ComputablePred} $(\lambda x.\,x \in A)$ (decidable membership).
+  \end{itemize}
+  These are pure aliases of Mathlib symbols introduced to keep P-R Ch.\,0.2 vocabulary visible inside the project. See \texttt{literature/papers/PourEl-Richards-0.2.prerequisites.md:5-12}.
+\end{definition}
+
+\begin{definition}
+  \label{def:cantorPair}
+  \lean{ComputableAnalysis.L0.cantorPair}
+  \leanok
+  The Cantor pairing function \texttt{cantorPair}\,$: \mathbb{N} \to \mathbb{N} \to \mathbb{N}$ alias of Mathlib's \texttt{Nat.pair}. P-R Ch.\,0.2 implicitly assumes a primitive-recursive bijection $\mathbb{N}^2 \to \mathbb{N}$; \texttt{Nat.pair} is the canonical choice.
+\end{definition}
+
+\begin{lemma}
+  \label{lem:cantorPair_computable}
+  \lean{ComputableAnalysis.L0.cantorPair_computable}
+  \leanok
+  \uses{def:cantorPair}
+  \texttt{cantorPair} is \texttt{Computable}$_2$. The proof composes \texttt{Primrec}$_2$ projections, addition, multiplication, and quotient-by-two via \texttt{Primrec.nat\_mul.comp} / \texttt{Primrec.nat\_div2}, then lifts via \texttt{.to\_comp}. See \texttt{ComputableAnalysis/L0/Bridge.lean:125}.
+\end{lemma}
+
+\begin{definition}
+  \label{def:haltingSetAt}
+  \lean{ComputableAnalysis.L0.haltingSetAt}
+  \leanok
+  For a fixed input $n \in \mathbb{N}$, \texttt{haltingSetAt}~$n$ is the set of \texttt{Nat.Partrec.Code} indices whose interpretation halts on input $n$. This is Mathlib's $K_n$-style halting set at $n$.
+\end{definition}
+
+\begin{lemma}
+  \label{lem:haltingSetAt_re}
+  \lean{ComputableAnalysis.L0.haltingSetAt_re}
+  \leanok
+  \uses{def:isRecursive, def:haltingSetAt}
+  \texttt{haltingSetAt}~$n$ is recursively enumerable.
+\end{lemma}
+
+\begin{lemma}
+  \label{lem:haltingSetAt_not_recursive}
+  \lean{ComputableAnalysis.L0.haltingSetAt_not_recursive}
+  \leanok
+  \uses{def:isRecursive, def:haltingSetAt}
+  \texttt{haltingSetAt}~$n$ is not recursive. The proof reduces the halting problem to membership.
+\end{lemma}
+
+\begin{theorem}[Proposition A]
+  \label{thm:propA}
+  \lean{ComputableAnalysis.L0.prop_A_exists_re_not_recursive}
+  \leanok
+  \uses{lem:haltingSetAt_re, lem:haltingSetAt_not_recursive}
+  There exists a recursively enumerable set $A \subseteq \mathbb{N}$ that is not recursive. P-R Ch.\,0.2:12.
+\end{theorem}
+
+\section{Proposition B — a recursively inseparable r.e. pair}
+
+\begin{definition}
+  \label{def:insepAB}
+  \lean{ComputableAnalysis.L0.insepA, ComputableAnalysis.L0.insepB}
+  \leanok
+  \texttt{insepA} and \texttt{insepB} are subsets of \texttt{Nat.Partrec.Code}: \texttt{insepA} is the set of codes that, when applied to their own index, halt with output $0$; \texttt{insepB} the same but with output $1$. P-R Ch.\,0.2:35.
+\end{definition}
+
+\begin{lemma}
+  \label{lem:insep_re}
+  \lean{ComputableAnalysis.L0.insepA_re, ComputableAnalysis.L0.insepB_re}
+  \leanok
+  \uses{def:insepAB, def:isRecursive}
+  Both \texttt{insepA} and \texttt{insepB} are recursively enumerable.
+\end{lemma}
+
+\begin{lemma}
+  \label{lem:insep_disjoint}
+  \lean{ComputableAnalysis.L0.insepA_insepB_disjoint}
+  \leanok
+  \uses{def:insepAB}
+  \texttt{insepA} $\cap$ \texttt{insepB} $= \emptyset$. Immediate from the contradictory output condition.
+\end{lemma}
+
+\begin{theorem}
+  \label{thm:insep_no_separator}
+  \lean{ComputableAnalysis.L0.insepA_insepB_no_separator}
+  \leanok
+  \uses{def:insepAB, def:isRecursive}
+  No recursive set $C$ satisfies \texttt{insepA} $\subseteq C$ and $C \cap$ \texttt{insepB} $= \emptyset$. The proof is by \texttt{Nat.Partrec.Code.fixed\_point}$_2$ applied to the candidate separator's characteristic function.
+\end{theorem}
+
+\begin{theorem}[Proposition B]
+  \label{thm:propB}
+  \lean{ComputableAnalysis.L0.prop_B}
+  \leanok
+  \uses{lem:insep_re, lem:insep_disjoint, thm:insep_no_separator}
+  There exist disjoint recursively enumerable sets $A, B \subseteq \mathbb{N}$ such that no recursive set separates them. P-R Ch.\,0.2:35.
+\end{theorem}
+
+\section{Analysis prerequisites pointer}
+
+\begin{remark}
+  \label{rem:analysisBridge}
+  The file \texttt{ComputableAnalysis/L0/AnalysisBridge.lean} contains \texttt{\#check} and \texttt{example} pointers into Mathlib's analysis hierarchy: \texttt{NormedSpace}, \texttt{InnerProductSpace}, \texttt{lp}, \texttt{MeasureTheory.Lp}, \texttt{ContinuousMap}, \texttt{ContDiff}. There are no theorems or definitions to mark \texttt{\textbackslash leanok} — the file's role is to surface the Mathlib paths L3/L4/L5 will need. See P-R Ch.\,0.2:13--34 for the analysis prerequisites P-R itself lists.
+\end{remark}

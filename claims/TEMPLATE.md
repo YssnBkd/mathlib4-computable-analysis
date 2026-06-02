@@ -1,30 +1,44 @@
 ---
 id: <topic>-<short-slug>
-status: intuition | conjecture | our_construction | cited_result | verified | refuted
+blueprint: blueprint:<label>          # the \label{...} in blueprint/src/*.tex this satellites
 created: <ISO 8601>
-dependencies: []
-sources: []   # required if status is cited_result or verified; format: <bibkey>:<locator>
+sources: []                           # required if cited from literature; format: <bibkey>:<locator>
+dependencies: []                      # other claim ids this builds on
+da_status: pending                    # pending | passes | unsupported | unsound
 ---
+
+> **Blueprint:** `[[blueprint:<label>]]` — formal statement and formalization
+> state (`\leanok` / `\notready` / `\mathlibok`) live there. This file holds
+> design rationale only.
 
 # <one-line statement>
 
-## Formal statement
+## Why this construction
 
-\begin{<theorem|conjecture|definition>}
-Let ... . Assume ... . Then ... .
-\end{...}
+<2-3 sentences: why this particular phrasing / typeclass / predicate shape,
+rather than alternatives. What constraint pinned it.>
 
-## Informal restatement
-<one paragraph in plain language. Reader should be able to remember the statement after reading this.>
+## Alternatives considered
 
-## Why we believe it (or believed it)
-<provenance: prior result, computational evidence, analogy with cited construction, etc.>
+- <alternative 1> — rejected because <one line>.
+- <alternative 2> — rejected because <one line>.
 
-## Dependencies
-- depends on: <claim-id> — <how it is used>
-- generalizes / specializes / refutes: <claim-id>
+## Mathlib-idiom mapping
+
+<which Mathlib types / typeclasses / namespaces this hooks into; if the answer
+is "creates a new abstraction", note why an existing one was insufficient.>
+
+## Sources
+
+- P-R Ch.X:Y — <verbatim quote or paraphrase> (see `literature/papers/PourEl-Richards-chapt<N>.md:<line>`)
+- <other-paper>:<page> — <relevance>
 
 ## Devil's-advocate verdict
+
 - Last reviewed: <date or "never">
-- Verdict: passes | unsound | unsupported | (none yet)
+- Verdict: <passes | unsupported | unsound | (none yet)>
 - Open weaknesses: <one line each>
+
+## Notes for future revisions
+
+- <hint a future revisitor would value: "if Mathlib eventually exports `Foo.bar`, this could be simplified to just an alias">

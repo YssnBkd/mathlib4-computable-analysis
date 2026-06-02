@@ -1,7 +1,10 @@
 # Fast blueprint workflow — every push to master, ~3-5 min.
-# Builds the Lean project and the blueprint web output; deploys to Pages.
-# Does NOT build Mathlib API docs (that's docs.yml, on tags only).
-# See docs/CI.md for the full rationale.
+# Builds the Lean project + blueprint web output; deploys to Pages.
+# Skips the slow Mathlib API doc-gen (that's docs.yml, on tags only).
+# Uses `leanprover-community/docgen-action` for the same docker-based
+# plasTeX pipeline as PFR / FLT / sphere-eversion (a hand-rolled
+# pip+plastex step on bare Ubuntu does NOT correctly resolve
+# `\input{subdir/file}` — see docs/CI.md troubleshooting).
 
 name: Blueprint (fast — every push)
 
@@ -25,7 +28,7 @@ permissions:
 jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
-    name: Build blueprint + deploy to Pages
+    name: Build Lean + blueprint + deploy to Pages
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -46,50 +49,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Build Lean project (lake build only — no lint, no mk_all-check, no docs)
-        uses: leanprover/lean-action@434f25c2f80ded67bba02502ad3a86f25db50709 # 2025-07-02
-        with:
-          build: true
-          lint: false
-          mk_all-check: false
-          use-mathlib-cache: auto
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install system packages required by leanblueprint
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y graphviz libgraphviz-dev pkg-config
-
-      - name: Install leanblueprint
-        run: pip install leanblueprint
-
-      - name: Debug — dump blueprint/src/ contents (delete after CI green)
-        run: |
-          echo "=== PWD ===" && pwd
-          echo "=== blueprint/src/ ===" && ls -la blueprint/src/
-          echo "=== blueprint/src/macros/ ===" && ls -la blueprint/src/macros/ 2>&1 || echo "MACROS DIR MISSING"
-          echo "=== head common.tex ===" && head -5 blueprint/src/macros/common.tex 2>&1 || echo "NOT FOUND"
-          echo "=== head web.tex ===" && head -5 blueprint/src/web.tex 2>&1 || echo "NOT FOUND"
-          echo "=== plastex.cfg ===" && cat blueprint/src/plastex.cfg 2>&1 || echo "NOT FOUND"
-
-      - name: Build blueprint HTML (plasTeX → blueprint/web/)
-        run: leanblueprint web
-
-      - name: Validate every \lean{...} resolves
-        run: leanblueprint checkdecls
-
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload blueprint as Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: blueprint/web
-
-      - name: Deploy to GitHub Pages
+      - name: Build Lean + blueprint (no API docs, no Jekyll)
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: leanprover-community/docgen-action@deed0cdc44dd8e5de07a300773eb751d33e32fc8 # 2025-10-26
+        with:
+          blueprint: true
+          api-docs: false   # skip ~15-min Mathlib doc-gen; tag a release for docs
+          build-page: false # our `docs/` is internal markdown, not a Jekyll source

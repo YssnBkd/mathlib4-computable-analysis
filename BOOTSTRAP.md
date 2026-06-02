@@ -19,7 +19,7 @@ Let `<slug>` be the active goal slug, and `<topic>` the topic it works on (typic
 8. All claims under `claims/<topic>/` — current formal-statement state.
 9. Recent attempts: latest file in each `proofs/<topic>/<claim-id>/` directory.
 10. The most recent `thinking/<topic>/*.md` (if any) — preserved reasoning.
-11. **The Lean target file(s) for the active milestone**: `formal/L<N>/<artifact>.lean` — when a Lean-criterion /goal is open, this shows the current type-checking state. Run `cd formal && lake build` to verify before marking a Lean criterion done. The path is in the claim file's `lean_target` frontmatter field (Architectural commitment #6).
+11. **The Lean target file(s) for the active milestone**: `ComputableAnalysis/L<N>/<artifact>.lean` — when a Lean-criterion /goal is open, this shows the current type-checking state. Run `lake build` (from repo root) to verify before marking a Lean criterion done. The path is in the claim file's `lean_target` frontmatter field (Architectural commitment #6).
 
 ## On demand (when relevant)
 
@@ -35,7 +35,7 @@ Let `<slug>` be the active goal slug, and `<topic>` the topic it works on (typic
 
 ## When a Lean target is in scope — use `/formalize`
 
-If the active `/goal` has a Lean criterion (a claim with `lean_target: formal/L<N>/...` whose target file does not yet type-check), invoke `/formalize <claim-id>` rather than hand-rolling Lean code. The skill:
+If the active `/goal` has a Lean criterion (a claim with `lean_target: ComputableAnalysis/L<N>/...` whose target file does not yet type-check), invoke `/formalize <claim-id>` rather than hand-rolling Lean code. The skill:
 
 1. Runs `scripts/formalize_env_check.py` (watermark-cached env preflight).
 2. Loads the PhD-prodigy persona from `.claude/templates/lean-prodigy-persona.md`.
@@ -43,7 +43,7 @@ If the active `/goal` has a Lean criterion (a claim with `lean_target: formal/L<
 4. Stubs the Lean file with `sorry`-free definitions and theorems-with-sorry, then iterates fills under the three-attempt rule.
 5. Hands off to `/devils-advocate` for paper + Lean review (CLAUDE.md §"Devil's-advocate review under Lean").
 
-First-time setup (only once per machine): `python3 scripts/formalize_env_check.py --init` scaffolds `formal/lakefile.toml`, `formal/lean-toolchain`, `formal/ComputableAnalysis.lean`. After that, `cd formal && lake update && lake exe cache get && lake build` populates the watermark.
+First-time setup (only once per machine): `python3 scripts/formalize_env_check.py --init` scaffolds `lakefile.toml`, `lean-toolchain`, `ComputableAnalysis.lean` at git root. After that, `lake update && lake exe cache get && lake build` populates the watermark.
 
 ## Sanity check before starting work
 

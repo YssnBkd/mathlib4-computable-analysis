@@ -60,7 +60,8 @@ literature/   parsed/extracted statements from sources
 raw_papers/   canonical PDFs and source bundles
 thinking/     curated extended-thinking traces
 .goals/       per-goal logs (iter-NN.md, reviews/, final.md)
-formal/       OPT-IN Lean 4 (install on demand)
+lakefile.toml + ComputableAnalysis/ + .lake/    Lean 4 project at git root (was nested under formal/ pre-2026-06-02)
+blueprint/    leanblueprint LaTeX sources (added 2026-06-02 transition)
 scripts/      hooks + verifiers + fetcher (stdlib-only hooks)
 archive/      session JSONL + checkpoint ledger (via /record)
 ```

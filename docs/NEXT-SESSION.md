@@ -8,8 +8,8 @@ You are continuing work on the **mathlib-computable-analysis** project: a Lean 4
 
 ## TL;DR
 
-1. `cd formal && lake build` — should produce **0 errors, 1 sorry-warning** at `ComputableAnalysis/L4/Instances/CMap.lean:261:23` (the L4 `C[α,β]` instance grouping A1/A2/A3 theorem-body sorries).
-2. **A real new artifact landed last round**: `private theorem isComputableSeqRat_add` in `formal/ComputableAnalysis/L4/Instances/CMap.lean` (~80 lines, fully proved). Closure of L1's `IsComputableSeqRat` under pointwise addition, marked `TODO(refactor → L1):` for a future architectural move.
+1. `lake build` — should produce **0 errors, 1 sorry-warning** at `ComputableAnalysis/L4/Instances/CMap.lean:261:23` (the L4 `C[α,β]` instance grouping A1/A2/A3 theorem-body sorries).
+2. **A real new artifact landed last round**: `private theorem isComputableSeqRat_add` in `ComputableAnalysis/L4/Instances/CMap.lean` (~80 lines, fully proved). Closure of L1's `IsComputableSeqRat` under pointwise addition, marked `TODO(refactor → L1):` for a future architectural move.
 3. **L4 A1 (`axiom_linearity`) still has a `sorry` body.** Prior round (`l4-cmap-axiom-linearity`, 2026-06-02) closed `budget-exhausted` (5/6 iters, ~198 min vs 120 budget); shipped `_add` but not the three additional closure helpers + witness assembly needed for A1.
 4. **Recommended next direction**: pivot to L1 — lift `_add` to its proper home, ship `_mul`/`_reindex`/`_finsetSum`, define `IsComputableReal`. Closure-first round before resuming L4 axiom proofs.
 
@@ -27,7 +27,7 @@ Trajectory:
 
 What changed on disk:
 
-- **`formal/ComputableAnalysis/L4/Instances/CMap.lean`**: added private theorem `isComputableSeqRat_add` (~80 lines) at the top of the file, between the namespace open and `section CMap`. Has a "## L1 closure helpers" section header docstring explaining the temporary L4 location.
+- **`ComputableAnalysis/L4/Instances/CMap.lean`**: added private theorem `isComputableSeqRat_add` (~80 lines) at the top of the file, between the namespace open and `section CMap`. Has a "## L1 closure helpers" section header docstring explaining the temporary L4 location.
 - **CLAUDE.md** L4 CMap row annotation updated to note `_add` landed.
 - **`.goals/l4-cmap-axiom-linearity/`**: full round artifacts including `final.md`.
 - **`thinking/l4-cmap-axiom-linearity/`**: iter-02 orientation, iter-03 strategy with full paper-form A1 proof + verbatim citations, iter-04 Lean draft (now subsumed by the actual code).
@@ -37,7 +37,7 @@ What changed on disk:
 ### Action 1 — verify the build (first command)
 
 ```bash
-cd formal && lake build 2>&1 | tail -10
+lake build 2>&1 | tail -10
 ```
 
 Expected: 0 errors, **exactly 1 sorry-warning** (`ComputableAnalysis/L4/Instances/CMap.lean:261:23` for the L4 instance). If you see anything else, see `docs/SETUP.md`.
@@ -51,14 +51,14 @@ Suggested round setup:
 - **Slug**: `l1-arithmetic-closure-and-real`
 - **Mode**: `proof-attempt`
 - **Budget**: 12 iters / 180 min (3× the prior round's budget, calibrated to the discovered cost)
-- **Allow_writes**: `formal/ComputableAnalysis/L1/**`, `formal/ComputableAnalysis/L4/Instances/CMap.lean` (to lift `_add` and remove its TODO comment), `CLAUDE.md`, `claims/l1-arithmetic-closure-and-real/**`, `.goals/l1-arithmetic-closure-and-real/**`, `.goals/INDEX.md`, `thinking/l1-arithmetic-closure-and-real/**`.
-- **Forbid_writes**: `formal/ComputableAnalysis/L0/**`, `formal/ComputableAnalysis/L3/**`, `formal/ComputableAnalysis.lean`, `literature/papers/**/verbatim.md`.
+- **Allow_writes**: `ComputableAnalysis/L1/**`, `ComputableAnalysis/L4/Instances/CMap.lean` (to lift `_add` and remove its TODO comment), `CLAUDE.md`, `claims/l1-arithmetic-closure-and-real/**`, `.goals/l1-arithmetic-closure-and-real/**`, `.goals/INDEX.md`, `thinking/l1-arithmetic-closure-and-real/**`.
+- **Forbid_writes**: `ComputableAnalysis/L0/**`, `ComputableAnalysis/L3/**`, `ComputableAnalysis.lean`, `literature/papers/**/verbatim.md`.
 - **Criteria sketch**:
   - C1: `lake build` green; the L4 instance sorry-warning is the only residual.
   - C2: `isComputableSeqRat_add` lifted from `L4/Instances/CMap.lean` to `L1/ComputableSeqReal.lean` (or a new `L1/RatClosure.lean`) under its proper public name; CMap.lean references the L1 version.
   - C3: `isComputableSeqRat_mul` shipped (fully proved). The simpler sibling of `_add` — sign XOR, no truncated-subtraction bookkeeping.
   - C4: At least one of `isComputableSeqRat_reindex` or `isComputableSeqRat_finsetSum` shipped (whichever lands first).
-  - C5: `IsComputableReal : ℝ → Prop` defined in `formal/ComputableAnalysis/L1/ComputableReal.lean` (~1-line definition + 1-2 sanity lemmas, P-R Ch. 0:55 citation in docstring).
+  - C5: `IsComputableReal : ℝ → Prop` defined in `ComputableAnalysis/L1/ComputableReal.lean` (~1-line definition + 1-2 sanity lemmas, P-R Ch. 0:55 citation in docstring).
   - C6: CLAUDE.md L1 tracker rows updated.
 
 ### Action 3 — alternative directions
@@ -162,11 +162,11 @@ Unchanged from prior session. Technically capable; explicit authorization for bo
 - `CLAUDE.md` — slim constitution. Read first.
 - `docs/SETUP.md` — Lean install + first build.
 - `docs/NEXT-SESSION.md` — this file.
-- `formal/ComputableAnalysis/L0/{Bridge,PropB,AnalysisBridge}.lean` — L0, `done`.
-- `formal/ComputableAnalysis/L1/ComputableSeqReal.lean` — L1 `IsComputableSeqRat`/`IsComputableSeqReal`, **`done`** (0 sorries). **NB**: explicit "What this file is NOT" section at lines 56-64 lists arithmetic closure as deferred — that gap is what the next round closes.
-- `formal/ComputableAnalysis/L3/ComputabilityStructure.lean` — **L3 keystone, `formalized`** (0 sorries).
-- `formal/ComputableAnalysis/L4/Instances/CMap.lean` — **L4 first instance, `stub`** (def/instance bodies sorry-free; A1/A2/A3 theorem-body sorries grouped under the instance at line 261; **new this round**: `private theorem isComputableSeqRat_add` ~80 lines at the top, marked `TODO(refactor → L1):` — the candidate lift target).
-- `formal/ComputableAnalysis.lean` — umbrella import.
+- `ComputableAnalysis/L0/{Bridge,PropB,AnalysisBridge}.lean` — L0, `done`.
+- `ComputableAnalysis/L1/ComputableSeqReal.lean` — L1 `IsComputableSeqRat`/`IsComputableSeqReal`, **`done`** (0 sorries). **NB**: explicit "What this file is NOT" section at lines 56-64 lists arithmetic closure as deferred — that gap is what the next round closes.
+- `ComputableAnalysis/L3/ComputabilityStructure.lean` — **L3 keystone, `formalized`** (0 sorries).
+- `ComputableAnalysis/L4/Instances/CMap.lean` — **L4 first instance, `stub`** (def/instance bodies sorry-free; A1/A2/A3 theorem-body sorries grouped under the instance at line 261; **new this round**: `private theorem isComputableSeqRat_add` ~80 lines at the top, marked `TODO(refactor → L1):` — the candidate lift target).
+- `ComputableAnalysis.lean` — umbrella import.
 - `claims/l3-computability-structure/axioms.md` — L3 design doc.
 - `claims/l1-computable-reals/is-computable-seq-real.md` — L1 design doc.
 - `literature/papers/PourEl-Richards-*.md` — per-chapter verbatim extracts.

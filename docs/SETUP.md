@@ -1,6 +1,7 @@
 # docs/SETUP.md — first-time Lean toolchain setup
 
-This project ships pre-written Lean code under `formal/`. To compile it you need
+This project ships pre-written Lean code at the repo root (`lakefile.toml` +
+`ComputableAnalysis/` umbrella + tree). To compile it you need
 elan (Lean 4 toolchain manager) and Mathlib4's compiled cache.
 
 ## 1. Install elan
@@ -24,13 +25,13 @@ which elan && which lake && which lean
 elan --version
 ```
 
-The first `lake` / `lean` invocation in `formal/` will auto-install the Lean
-version pinned in `formal/lean-toolchain` (currently `leanprover/lean4:v4.31.0-rc1`).
+The first `lake` / `lean` invocation at the repo root will auto-install the Lean
+version pinned in `lean-toolchain` (currently `leanprover/lean4:v4.31.0-rc1`).
 
 ## 2. First build
 
 ```bash
-cd formal
+# from repo root:
 lake update              # resolve Mathlib4 dependency; writes lake-manifest.json
 lake exe cache get       # download Mathlib's pre-compiled cache (≈10 min, saves 10–30 min build)
 lake build               # compile our L0 stubs (≈1–2 min once Mathlib cache is in place)
@@ -70,7 +71,7 @@ When in doubt, search the symbol on
 For day-to-day work:
 
 ```bash
-cd formal
+# from repo root:
 
 # full build (after `lake exe cache get`):
 lake build
@@ -97,7 +98,7 @@ lake build                # rebuild
 ```
 
 If `lake update` complains the lean-toolchain pin doesn't match Mathlib's
-requirement, edit `formal/lean-toolchain` to match Mathlib's value (visible at
+requirement, edit `lean-toolchain` to match Mathlib's value (visible at
 the top of any error message), then `elan toolchain install <version>` and
 retry.
 

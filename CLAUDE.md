@@ -6,7 +6,7 @@ Build a Lean 4 formalization of Pour-El & Richards-style computable analysis
 (*Computability in Analysis and Physics*, Cambridge UP 1989), intended for
 upstream contribution to Mathlib4 under `Mathlib.Computability.Analysis.*`.
 
-**Primary deliverable: Lean code under `formal/`.** Paper artifacts (`intuition/`,
+**Primary deliverable: Lean code at the repo root** (`lakefile.toml` + `ComputableAnalysis/`). Paper artifacts (`intuition/`,
 `claims/`, `proofs/`, `literature/`) are *design infrastructure for the Lean
 code* — useful when they accelerate getting working Lean, otherwise skip them.
 The Lean type-checker is the final arbiter; Mathlib community review (Zulip) is
@@ -62,9 +62,9 @@ commitments above.
 
 For prerequisites and standard textbook content:
 
-1. Write the Lean file at `formal/ComputableAnalysis/L<N>/<name>.lean` with a
+1. Write the Lean file at `ComputableAnalysis/L<N>/<name>.lean` with a
    header docstring that quotes P-R verbatim and gives rationale.
-2. `cd formal && lake build`. Fix until it compiles. The single-file check
+2. `lake build` (from repo root). Fix until it compiles. The single-file check
    `lake env lean ComputableAnalysis/L<N>/<name>.lean` is faster than full build.
 3. **Optional**: add a short `claims/<topic>/<id>.md` summary if the design is
    non-obvious. For pure aliases / namespace bridges, the Lean docstring
@@ -87,17 +87,17 @@ DA paper review. Default to lean-first.
 
 | Layer | Content | P-R chapter | Lean target |
 |---|---|---|---|
-| L0 | Recursion bridge + analysis-prerequisites pointer | Ch. 0.2 | `formal/ComputableAnalysis/L0/{Bridge,PropB,AnalysisBridge}.lean` |
-| L1 | Computable reals + computable sequences | Ch. 0 | `formal/ComputableAnalysis/L1/{ComputableSeqReal,ComputableSeqComplex,ComputableReal}.lean` |
-| L2 | Grzegorczyk-Lacombe computable continuous functions | Ch. 0–1 | `formal/ComputableAnalysis/L2/GrzegorczykLacombe.lean` |
-| L3 | `ComputabilityStructure` typeclass on Banach spaces | Ch. 2 | `formal/ComputableAnalysis/L3/ComputabilityStructure.lean` |
-| L4 | Instances: `C[a,b]`, `L^p`, separable Hilbert | Ch. 2+ | `formal/ComputableAnalysis/L4/Instances/*.lean` |
-| L5 | First/Second Main Theorems, Eigenvector Theorem | Ch. 3–5 | `formal/ComputableAnalysis/L5/*.lean` |
+| L0 | Recursion bridge + analysis-prerequisites pointer | Ch. 0.2 | `ComputableAnalysis/L0/{Bridge,PropB,AnalysisBridge}.lean` |
+| L1 | Computable reals + computable sequences | Ch. 0 | `ComputableAnalysis/L1/{ComputableSeqReal,ComputableSeqComplex,ComputableReal}.lean` |
+| L2 | Grzegorczyk-Lacombe computable continuous functions | Ch. 0–1 | `ComputableAnalysis/L2/GrzegorczykLacombe.lean` |
+| L3 | `ComputabilityStructure` typeclass on Banach spaces | Ch. 2 | `ComputableAnalysis/L3/ComputabilityStructure.lean` |
+| L4 | Instances: `C[a,b]`, `L^p`, separable Hilbert | Ch. 2+ | `ComputableAnalysis/L4/Instances/*.lean` |
+| L5 | First/Second Main Theorems, Eigenvector Theorem | Ch. 3–5 | `ComputableAnalysis/L5/*.lean` |
 
 ## Lake project layout
 
 ```
-formal/
+(repo root)
   lakefile.toml              ← Mathlib4 git dependency, autoImplicit false
   lean-toolchain             ← matches Mathlib4 master (currently v4.31.0-rc1)
   lake-manifest.json         ← pinned Mathlib commit (auto-written by `lake update`)
@@ -109,11 +109,13 @@ formal/
     L3/…
     L4/Instances/…
     L5/…
+  blueprint/                 ← leanblueprint sources (added 2026-06-02 transition)
+    src/{content,L0,L1,…}.tex
 ```
 
 Lake convention: module `ComputableAnalysis.L0.Bridge` ↔ file
-`formal/ComputableAnalysis/L0/Bridge.lean`. The `[[lean_lib]]` name `ComputableAnalysis`
-is the directory root under `formal/`, with the umbrella `.lean` sitting next to it.
+`ComputableAnalysis/L0/Bridge.lean`. The `[[lean_lib]]` name `ComputableAnalysis`
+is the directory root at git root (sibling to `lakefile.toml`), with the umbrella `.lean` next to it. *Hoisted from `formal/` on 2026-06-02 to satisfy `leanblueprint`'s lakefile-at-git-root assumption.*
 
 See `docs/SETUP.md` for first-time install steps (elan + lake update + cache get).
 
@@ -189,21 +191,21 @@ sorry-free) → `done` (Lean type-checks AND theorems sorry-free; terminal).
 
 | Layer | Milestone | Status | Lean target | Pointer |
 |---|---|---|---|---|
-| L0 | Map P-R logic prerequisites onto Mathlib's `Computability.*` | `done` | `formal/ComputableAnalysis/L0/Bridge.lean` | Lean file (0 sorries; `cantorPair_computable` closed via `Primrec₂` composition) |
-| L0 | Recursively inseparable pair (P-R Prop. B) | `done` | `formal/ComputableAnalysis/L0/PropB.lean` | Lean file (0 sorries; all 4 lemmas proven; `no_separator` via `Code.fixed_point₂`) |
-| L0 | Analysis prerequisites pointer (Banach/Hilbert/Lp/etc) | `done` | `formal/ComputableAnalysis/L0/AnalysisBridge.lean` | Lean file (0 sorries; smoke-test `L^p` example now takes abstract measure to avoid Lebesgue import) |
-| L1 | `IsComputableSeqReal` definition | `done` | `formal/ComputableAnalysis/L1/ComputableSeqReal.lean` | Lean file (0 sorries; constant-sequence helpers `isComputableSeqRat_const` / `isComputableSeqReal_const_rat` closed via `Nat.cast_natAbs` + `Int.cast_abs` + sign case-split; `conv_lhs` to avoid `Rat.num_div_den` rewriting under projections) |
-| L1 | `IsComputableSeqComplex` definition | `claimed` | `formal/ComputableAnalysis/L1/ComputableSeqComplex.lean` | `claims/l1-computable-reals/is-computable-seq-real.md` (deferred — out of scope for `execute-docs-next-session-md`) |
-| L1 | `IsComputableReal` definition | `pending` | `formal/ComputableAnalysis/L1/ComputableReal.lean` | — |
-| L1 | Computable reals form a countable subfield of ℝ | `pending` | `formal/ComputableAnalysis/L1/SubfieldStructure.lean` | — |
-| L2 | Grzegorczyk-Lacombe computable continuous function definition | `pending` | `formal/ComputableAnalysis/L2/GrzegorczykLacombe.lean` | — |
-| L2 | Closure properties of G-L computable functions | `pending` | `formal/ComputableAnalysis/L2/GLClosure.lean` | — |
-| L3 | `ComputabilityStructure` typeclass — three axioms | `formalized` | `formal/ComputableAnalysis/L3/ComputabilityStructure.lean` | Lean file (0 sorries; class with 5 fields encoding A1/A2/A3 + NV; auxiliary `ScalarComputableSeq` typeclass with ℝ instance via L1) |
-| L3 | Uniqueness theorem under mild side conditions | `pending` | `formal/ComputableAnalysis/L3/Stability.lean` | — |
-| L4 | Instance: `C([a,b], ℝ)` with sup norm | `stub` | `formal/ComputableAnalysis/L4/Instances/CMap.lean` | Lean file (def/instance bodies sorry-free; predicate via P-R Ch. 2:141 polynomial-approximation form; `zero_seq` proven; A1/A2/A3 theorem-body sorries with `-- TODO(/formalize L4 CMap):` and explicit P-R citation in each TODO). **Round `l4-cmap-axiom-linearity` (2026-06-02, budget-exhausted): shipped `private theorem isComputableSeqRat_add` (~80 lines, fully proved) inline at top of file — closure of `IsComputableSeqRat` under pointwise addition, with `-- TODO(refactor → L1):` for a future move. A1 itself still sorry (needs `_mul`/`_reindex`/`_finsetSum` + witness assembly).** |
-| L4 | Instance: `L^p[a,b]` | `pending` | `formal/ComputableAnalysis/L4/Instances/Lp.lean` | — |
-| L4 | Instance: separable Hilbert space | `pending` | `formal/ComputableAnalysis/L4/Instances/Hilbert.lean` | — |
-| L5 | First Main Theorem (Ch. 3) | `pending` | `formal/ComputableAnalysis/L5/FirstMainTheorem.lean` | — |
-| L5 | Effective Plancherel theorem | `pending` | `formal/ComputableAnalysis/L5/Plancherel.lean` | — |
-| L5 | Second Main Theorem (Ch. 4) | `pending` | `formal/ComputableAnalysis/L5/SecondMainTheorem.lean` | — |
-| L5 | Eigenvector Theorem (Ch. 4) | `pending` | `formal/ComputableAnalysis/L5/Eigenvector.lean` | — |
+| L0 | Map P-R logic prerequisites onto Mathlib's `Computability.*` | `done` | `ComputableAnalysis/L0/Bridge.lean` | Lean file (0 sorries; `cantorPair_computable` closed via `Primrec₂` composition) |
+| L0 | Recursively inseparable pair (P-R Prop. B) | `done` | `ComputableAnalysis/L0/PropB.lean` | Lean file (0 sorries; all 4 lemmas proven; `no_separator` via `Code.fixed_point₂`) |
+| L0 | Analysis prerequisites pointer (Banach/Hilbert/Lp/etc) | `done` | `ComputableAnalysis/L0/AnalysisBridge.lean` | Lean file (0 sorries; smoke-test `L^p` example now takes abstract measure to avoid Lebesgue import) |
+| L1 | `IsComputableSeqReal` definition | `done` | `ComputableAnalysis/L1/ComputableSeqReal.lean` | Lean file (0 sorries; constant-sequence helpers `isComputableSeqRat_const` / `isComputableSeqReal_const_rat` closed via `Nat.cast_natAbs` + `Int.cast_abs` + sign case-split; `conv_lhs` to avoid `Rat.num_div_den` rewriting under projections) |
+| L1 | `IsComputableSeqComplex` definition | `claimed` | `ComputableAnalysis/L1/ComputableSeqComplex.lean` | `claims/l1-computable-reals/is-computable-seq-real.md` (deferred — out of scope for `execute-docs-next-session-md`) |
+| L1 | `IsComputableReal` definition | `pending` | `ComputableAnalysis/L1/ComputableReal.lean` | — |
+| L1 | Computable reals form a countable subfield of ℝ | `pending` | `ComputableAnalysis/L1/SubfieldStructure.lean` | — |
+| L2 | Grzegorczyk-Lacombe computable continuous function definition | `pending` | `ComputableAnalysis/L2/GrzegorczykLacombe.lean` | — |
+| L2 | Closure properties of G-L computable functions | `pending` | `ComputableAnalysis/L2/GLClosure.lean` | — |
+| L3 | `ComputabilityStructure` typeclass — three axioms | `formalized` | `ComputableAnalysis/L3/ComputabilityStructure.lean` | Lean file (0 sorries; class with 5 fields encoding A1/A2/A3 + NV; auxiliary `ScalarComputableSeq` typeclass with ℝ instance via L1) |
+| L3 | Uniqueness theorem under mild side conditions | `pending` | `ComputableAnalysis/L3/Stability.lean` | — |
+| L4 | Instance: `C([a,b], ℝ)` with sup norm | `stub` | `ComputableAnalysis/L4/Instances/CMap.lean` | Lean file (def/instance bodies sorry-free; predicate via P-R Ch. 2:141 polynomial-approximation form; `zero_seq` proven; A1/A2/A3 theorem-body sorries with `-- TODO(/formalize L4 CMap):` and explicit P-R citation in each TODO). **Round `l4-cmap-axiom-linearity` (2026-06-02, budget-exhausted): shipped `private theorem isComputableSeqRat_add` (~80 lines, fully proved) inline at top of file — closure of `IsComputableSeqRat` under pointwise addition, with `-- TODO(refactor → L1):` for a future move. A1 itself still sorry (needs `_mul`/`_reindex`/`_finsetSum` + witness assembly).** |
+| L4 | Instance: `L^p[a,b]` | `pending` | `ComputableAnalysis/L4/Instances/Lp.lean` | — |
+| L4 | Instance: separable Hilbert space | `pending` | `ComputableAnalysis/L4/Instances/Hilbert.lean` | — |
+| L5 | First Main Theorem (Ch. 3) | `pending` | `ComputableAnalysis/L5/FirstMainTheorem.lean` | — |
+| L5 | Effective Plancherel theorem | `pending` | `ComputableAnalysis/L5/Plancherel.lean` | — |
+| L5 | Second Main Theorem (Ch. 4) | `pending` | `ComputableAnalysis/L5/SecondMainTheorem.lean` | — |
+| L5 | Eigenvector Theorem (Ch. 4) | `pending` | `ComputableAnalysis/L5/Eigenvector.lean` | — |

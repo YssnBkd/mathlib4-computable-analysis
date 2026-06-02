@@ -6,9 +6,9 @@ Runs at the start of every /formalize invocation. Verifies that the Lean 4
 toolchain, Lake, and the Mathlib dependency are healthy enough that the agent
 can read goal states, type-check files, and reach Mathlib symbols.
 
-A SHA256 watermark over `formal/{lean-toolchain, lake-manifest.json,
-lakefile.toml}` lets us *skip* the slow build path when nothing relevant has
-changed since the last green check. The watermark file `formal/.formalize-env-ok`
+A SHA256 watermark over `{lean-toolchain, lake-manifest.json, lakefile.toml}`
+at the repo root lets us *skip* the slow build path when nothing relevant has
+changed since the last green check. The watermark file `.formalize-env-ok`
 records that hash plus the timestamp of the last successful smoke test.
 
 Stdlib only — same discipline as `scripts/goal_stop_hook.py`. Never depends on
@@ -20,14 +20,14 @@ Exit codes
 1   No Lean toolchain found (elan/lake/lean absent on PATH)
 2   `lake build` failed (Mathlib or our code did not compile)
 3   Smoke test failed (`lake env lean Tests/_smoke.lean` did not exit 0)
-4   Needs init — `formal/lakefile.toml` missing; re-run with --init
-5   Init requested but `formal/lakefile.toml` already exists (refusing to clobber)
+4   Needs init — `lakefile.toml` missing; re-run with --init
+5   Init requested but `lakefile.toml` already exists (refusing to clobber)
 6   Init: wrote scaffold; user must run `lake update` then re-invoke without --init
 
 Flags
 -----
---init             Scaffold `formal/{lakefile.toml, lean-toolchain,
-                   ComputableAnalysis.lean}`. Refuses to overwrite.
+--init             Scaffold `{lakefile.toml, lean-toolchain,
+                   ComputableAnalysis.lean}` at git root. Refuses to overwrite.
 --force            Ignore watermark; always rebuild.
 --quiet            Suppress diagnostic prose; print only the final status line.
 --json             Print the final status as a single JSON line.
@@ -48,7 +48,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 REPO = Path(os.environ.get("CLAUDE_PROJECT_DIR", os.getcwd())).resolve()
-FORMAL = REPO / "formal"
+# FORMAL was REPO/"formal" before the 2026-06-02 hoist to git root. Kept as
+# FORMAL to minimize refactor churn — semantically this is the Lake project root.
+FORMAL = REPO
 WATERMARK = FORMAL / ".formalize-env-ok"
 SMOKE_DIR = FORMAL / "Tests"
 SMOKE_FILE = SMOKE_DIR / "_smoke.lean"
@@ -169,7 +171,7 @@ def run_smoke(lake: str, *, quiet: bool) -> tuple[bool, str]:
 def cmd_init(args: argparse.Namespace) -> int:
     quiet = args.quiet
     if (FORMAL / "lakefile.toml").exists():
-        log("formal/lakefile.toml already exists. Refusing to overwrite.", quiet)
+        log("lakefile.toml already exists. Refusing to overwrite.", quiet)
         log("Remove it or move it aside if you really want to re-init.", quiet)
         emit_status("INIT_REFUSED", {"reason": "lakefile_exists"}, json_mode=args.json)
         return 5
@@ -229,15 +231,15 @@ def cmd_init(args: argparse.Namespace) -> int:
     ensure_smoke_file()
 
     log("Scaffolded:", quiet)
-    log("  formal/lakefile.toml", quiet)
-    log(f"  formal/lean-toolchain     ({toolchain})", quiet)
-    log("  formal/ComputableAnalysis.lean  (umbrella, empty imports)", quiet)
-    log("  formal/Tests/_smoke.lean        (kernel reach test)", quiet)
+    log("  lakefile.toml", quiet)
+    log(f"  lean-toolchain     ({toolchain})", quiet)
+    log("  ComputableAnalysis.lean  (umbrella, empty imports)", quiet)
+    log("  Tests/_smoke.lean        (kernel reach test)", quiet)
     log("", quiet)
     log("Next steps (one-time, takes several minutes the first time):", quiet)
-    log("  cd formal && lake update          # fetches Mathlib, pins lake-manifest.json", quiet)
-    log("  cd formal && lake exe cache get   # downloads Mathlib oleans from CI cache", quiet)
-    log("  cd formal && lake build           # compiles the umbrella + smoke", quiet)
+    log("  lake update          # fetches Mathlib, pins lake-manifest.json", quiet)
+    log("  lake exe cache get   # downloads Mathlib oleans from CI cache", quiet)
+    log("  lake build           # compiles the umbrella + smoke", quiet)
     log("Then re-invoke `scripts/formalize_env_check.py` (no --init) to lock in the watermark.", quiet)
     emit_status("INIT_DONE", {"toolchain": toolchain}, json_mode=args.json)
     return 6
@@ -245,7 +247,7 @@ def cmd_init(args: argparse.Namespace) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--init", action="store_true", help="scaffold formal/ Lake project")
+    parser.add_argument("--init", action="store_true", help="scaffold Lake project at repo root")
     parser.add_argument("--force", action="store_true", help="ignore watermark; always rebuild")
     parser.add_argument("--quiet", action="store_true", help="suppress diagnostic prose")
     parser.add_argument("--json", action="store_true", help="emit final status as JSON")
@@ -277,19 +279,19 @@ def main(argv: list[str] | None = None) -> int:
 
     # ---- 1. lakefile present? ----
     if not (FORMAL / "lakefile.toml").exists():
-        log("formal/lakefile.toml missing — the formal/ project is not initialized.", quiet)
+        log("lakefile.toml missing — the Lake project is not initialized.", quiet)
         log("Run `python3 scripts/formalize_env_check.py --init` to scaffold.", quiet)
         emit_status("NEEDS_INIT", {"reason": "no_lakefile"}, json_mode=args.json)
         return 4
 
     if not (FORMAL / "lean-toolchain").exists():
-        log("formal/lean-toolchain missing — cannot determine Lean version.", quiet)
+        log("lean-toolchain missing — cannot determine Lean version.", quiet)
         emit_status("NEEDS_INIT", {"reason": "no_toolchain"}, json_mode=args.json)
         return 4
 
     if not (FORMAL / "lake-manifest.json").exists():
-        log("formal/lake-manifest.json missing — `lake update` has not been run.", quiet)
-        log("Run: `cd formal && lake update && lake exe cache get && lake build`.", quiet)
+        log("lake-manifest.json missing — `lake update` has not been run.", quiet)
+        log("Run: `lake update && lake exe cache get && lake build`.", quiet)
         log("This downloads and builds Mathlib (~10–30 min the first time).", quiet)
         emit_status("NEEDS_INIT", {"reason": "no_manifest", "next": "lake_update"}, json_mode=args.json)
         return 4

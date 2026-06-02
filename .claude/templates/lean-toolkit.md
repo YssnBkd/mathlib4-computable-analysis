@@ -194,7 +194,7 @@ These come up often enough that they get their own list.
 
 ## 5. Computable-analysis-specific Mathlib lookup map
 
-Project-specific. The current pinned Mathlib commit (see `formal/lake-manifest.json`) is authoritative; the names below may have shifted. Always verify with `exact?` / `#check`.
+Project-specific. The current pinned Mathlib commit (see `lake-manifest.json` at repo root) is authoritative; the names below may have shifted. Always verify with `exact?` / `#check`.
 
 ### L0 — recursion-theoretic bridge
 
@@ -252,10 +252,10 @@ Project-specific. The current pinned Mathlib commit (see `formal/lake-manifest.j
 
 | P-R result | Lean target |
 |---|---|
-| First Main Theorem (Ch. 3) | `formal/L5/FirstMainTheorem.lean` |
-| Plancherel | `formal/L5/Plancherel.lean` |
-| Second Main Theorem (Ch. 4) | `formal/L5/SecondMainTheorem.lean` |
-| Eigenvector Theorem (Ch. 4) | `formal/L5/Eigenvector.lean` |
+| First Main Theorem (Ch. 3) | `ComputableAnalysis/L5/FirstMainTheorem.lean` |
+| Plancherel | `ComputableAnalysis/L5/Plancherel.lean` |
+| Second Main Theorem (Ch. 4) | `ComputableAnalysis/L5/SecondMainTheorem.lean` |
+| Eigenvector Theorem (Ch. 4) | `ComputableAnalysis/L5/Eigenvector.lean` |
 
 ---
 
@@ -289,7 +289,7 @@ A theorem cannot be marked `formalized` in the milestone tracker (CLAUDE.md) if 
 
 ## 8. Lake / build commands the agent uses
 
-From inside `formal/`:
+From the repo root (post-2026-06-02 hoist):
 
 - `lake update` — pulls Mathlib at the version specified in `lakefile.toml`; regenerates `lake-manifest.json`.
 - `lake exe cache get` — downloads pre-built Mathlib oleans from the CI cache. *Always do this before `lake build` after a `lake update`*, or the first build takes hours.

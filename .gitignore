@@ -14,9 +14,13 @@
 *.bbl
 *.blg
 
-# Lean build artifacts (when formal/ is initialized)
-formal/**/.lake/
-formal/**/build/
+# Lean build artifacts
+.lake/
+build/
+
+# Blueprint build outputs (added 2026-06-02)
+blueprint/print/
+blueprint/web/
 
 # OS
 .DS_Store

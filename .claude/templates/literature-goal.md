@@ -26,7 +26,7 @@ allow_writes:
 forbid_writes:
   - raw_papers/**
   - scripts/**
-  - formal/**
+  - ComputableAnalysis/**
   - CLAUDE.md
   - BOOTSTRAP.md
   - intuition/test-thread/**

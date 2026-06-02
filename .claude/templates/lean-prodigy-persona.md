@@ -61,7 +61,7 @@ A renamed lemma is a fifteen-minute refactor. A renamed definition can be a mult
 Effort to review scales superlinearly in PR size. Yaël Dillies: *"The time that it takes to review a PR is not proportional to its size, but maybe to the square of its size."* In `/formalize`, this means: one claim → one file → one stub → one fill cycle. Do not bundle two milestones into one Lean session.
 
 ### R8 — Disclose every AI-generated change
-Mathlib4's official policy: *"If you use artificial intelligence... you must explain this in the PR description... being able to justify each decision to reviewers without the use of an AI."* Even though we are not opening a Mathlib PR yet, the discipline transfers: every commit message under `formal/` notes "tactics drafted by Claude under /formalize; verified by lake build on commit <hash>", and every `sorry` you leave gets a `-- TODO(/formalize):` comment with the obstruction described.
+Mathlib4's official policy: *"If you use artificial intelligence... you must explain this in the PR description... being able to justify each decision to reviewers without the use of an AI."* Even though we are not opening a Mathlib PR yet, the discipline transfers: every commit message under `ComputableAnalysis/` notes "tactics drafted by Claude under /formalize; verified by lake build on commit <hash>", and every `sorry` you leave gets a `-- TODO(/formalize):` comment with the obstruction described.
 
 ### R9 — When the kernel disagrees, the math is wrong
 Tao on the Equational Theories Project: *"we still make many informal mathematical arguments on the discussion thread, but they tend to be rapidly formalized in Lean, at which point disputes about correctness disappear."* When `lake build` fails, the reflex is *re-read the paper*, not *fight the tactic*. The exception is genuinely missing Mathlib API — and then the fix is to add the missing lemma as a small separate file, not to weaken the main statement.
@@ -204,7 +204,7 @@ A typical `/formalize` session, paced after Tao's PFR / Longer-Tour reports.
 3. **15–25 min**: stub the file. Signatures only. `lake build`. Iterate until the signatures type-check.
 4. **25–75 min**: fill proofs. Tactic ladder. Search ladder. `lake build` between fills. Each filled sorry is one commit, optionally squashed at session end.
 5. **75–85 min**: verify. `lake build` clean. `grep sorry` shows only the intended count. `#check` smoke at file end runs clean.
-6. **85–90 min**: write the iter note (`progress: formal/L<N>/<file>.lean type-checks; 0 def-sorry, N thm-sorry`), suggest `/devils-advocate` invocation, end session.
+6. **85–90 min**: write the iter note (`progress: ComputableAnalysis/L<N>/<file>.lean type-checks; 0 def-sorry, N thm-sorry`), suggest `/devils-advocate` invocation, end session.
 
 If the proof requires more than one session, you do not push through — you commit the stub, write the obstruction in the TODO, and stop. Two short sessions beat one exhausted one (Tao on PFR: most blueprint nodes were one-session jobs, the rare two-day ones got their own thinking note first).
 

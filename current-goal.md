@@ -13,9 +13,12 @@ devils_advocate_required_for:
 
 No active goal. Run `/goal <slug>` to start one.
 
-The most recent completed goal was `next-session-2026-06-01b` (success, 2/50
-iterations, ~30 min). See `.goals/next-session-2026-06-01b/final.md` for the full
-report — L1 helper sorries closed (root cause: lemma name was `Nat.cast_natAbs`,
-not `Int.cast_natAbs` as the prior session guessed), L4 `C([a, b], ℝ)` instance
-shipped as `stub` with `zero_seq` proven and A1/A2/A3 theorem-body sorries
-documented + cited.
+The most recent completed goal was `l4-cmap-axiom-linearity`
+(budget-exhausted, 5/6 iters, ~198 min). See
+`.goals/l4-cmap-axiom-linearity/final.md` for the full report. Main
+deliverable: `isComputableSeqRat_add` (private theorem, ~80 lines) in
+`formal/ComputableAnalysis/L4/Instances/CMap.lean` — fully proved closure
+of L1's `IsComputableSeqRat` under pointwise addition, reusable for L4
+A1/A2/A3 and a candidate refactor target for L1 proper. A1 itself
+remains a `sorry` (3 more closure helpers + ~50 lines of witness
+assembly needed).

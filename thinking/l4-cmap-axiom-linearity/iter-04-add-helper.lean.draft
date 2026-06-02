@@ -1,0 +1,165 @@
+-- iter-04 deliverable: DRAFT of `isComputableSeqRat_add`.
+-- NOT a real .lean module. Ports into CMap.lean only when fully proven.
+-- The draft commits to: (i) the witness construction at ℕ-level (no ℤ/ℚ
+-- Primrec needed), (ii) the Computability scaffolding using Mathlib's
+-- nat_add/nat_sub/nat_mul/nat_le/ite primitives, (iii) the 4-case rational
+-- identity at the end.
+
+-- Mathlib symbols this proof depends on (all verified to exist in this
+-- session via grep against formal/.lake/packages/mathlib/):
+--
+--   Primrec₂.nat_add   : Primrec₂ ((· + ·) : ℕ → ℕ → ℕ)
+--     -- Mathlib/Computability/Primrec/Basic.lean:593
+--   Primrec₂.nat_sub   : Primrec₂ ((· - ·) : ℕ → ℕ → ℕ)  -- truncated
+--     -- Mathlib/Computability/Primrec/Basic.lean:596
+--   Primrec₂.nat_mul   : Primrec₂ ((· * ·) : ℕ → ℕ → ℕ)
+--     -- Mathlib/Computability/Primrec/Basic.lean:599
+--   Primrec₂.nat_le    : PrimrecRel ((· ≤ ·) : ℕ → ℕ → Prop)
+--     -- Mathlib/Computability/Primrec/Basic.lean:610
+--   Primrec.ite        : conditional with Decidable predicate
+--     -- Mathlib/Computability/Primrec/Basic.lean:606
+--   Primrec.cond       : Bool conditional
+--     -- Mathlib/Computability/Primrec/Basic.lean:602
+--   <Primrec/Computable>.{comp, pair, fst, snd, id, const, .to_comp}
+--
+-- Sticking points found during draft (resolution candidates noted):
+--
+--   (S1) Lifting Primrec₂ to "Computable f for f : ℕ → ℕ where f k = g (h k) (i k)
+--        for Computable h, i" — Mathlib pattern: `(hg.comp (h.pair i)).somehow`.
+--        The exact composition spelling needs verifying live in Lean.
+--   (S2) The PrimrecPred → Decidable lift for `ite` when the predicate is on
+--        ℕ — `nat_le.comp f g` should produce the PrimrecPred we need.
+--   (S3) Coercion (a₁ k : ℚ) / (b₁ k : ℚ) parses as ℕ-cast then ℚ-divide.
+--        Inside the identity proof, push_cast unwraps these.
+
+namespace ComputableAnalysis.L4
+
+open ComputableAnalysis.L1
+
+/-- **iter-05 target — TODO(refactor → L1)**.
+Closure of `IsComputableSeqRat` under pointwise addition.
+
+The witness for `r₁ + r₂` is constructed at the ℕ-level using truncated
+subtraction (`nat_sub`) and a 4-case dispatch on sign-parities. The key
+simplification: rather than carrying the canonical (num/den) form through
+ℚ-arithmetic Primrec (which Mathlib does not export), we read off the new
+(a, b, s) representation directly from a case-split on the sign-parity
+combination and the comparison `a₁·b₂` ≥ `a₂·b₁`.
+
+ref: P-R Ch. 0:46 (rational-sequence definition);
+     `claims/l1-computable-reals/is-computable-seq-real.md`. -/
+private theorem isComputableSeqRat_add
+    {r₁ r₂ : ℕ → ℚ}
+    (h₁ : IsComputableSeqRat r₁) (h₂ : IsComputableSeqRat r₂) :
+    IsComputableSeqRat (fun k => r₁ k + r₂ k) := by
+  obtain ⟨a₁, b₁, s₁, ha₁, hb₁, hs₁, hne₁, heq₁⟩ := h₁
+  obtain ⟨a₂, b₂, s₂, ha₂, hb₂, hs₂, hne₂, heq₂⟩ := h₂
+  -- Cross-products at the ℕ level.
+  let p₁ : ℕ → ℕ := fun k => a₁ k * b₂ k
+  let p₂ : ℕ → ℕ := fun k => a₂ k * b₁ k
+  -- Computable predicates:
+  -- (sameSign k = true) iff s₁ k and s₂ k have the same parity.
+  -- (pGE k = true) iff p₁ k ≥ p₂ k.
+  --
+  -- 4-case dispatch:
+  --   (s₁ %2 = 0, s₂ %2 = 0): r₁+r₂ ≥ 0 always. newA = p₁ + p₂. newS = 0.
+  --   (s₁ %2 = 1, s₂ %2 = 1): r₁+r₂ ≤ 0 always. newA = p₁ + p₂. newS = 1.
+  --   (s₁ %2 = 0, s₂ %2 = 1) ∨ (s₁ %2 = 1, s₂ %2 = 0):
+  --     Subdivide by pGE:
+  --       pGE: signs cancel with positive part winning.
+  --         newA = p₁ - p₂ (ℕ-truncated sub OK since p₁ ≥ p₂).
+  --         newS = (s₁ k % 2)  -- whichever side won, that's the surviving sign.
+  --       ¬pGE: negative part wins.
+  --         newA = p₂ - p₁.
+  --         newS = 1 - (s₁ k % 2)  -- opposite sign.
+  let newA : ℕ → ℕ := fun k =>
+    if s₁ k % 2 = s₂ k % 2 then p₁ k + p₂ k
+    else if p₁ k ≥ p₂ k then p₁ k - p₂ k else p₂ k - p₁ k
+  let newB : ℕ → ℕ := fun k => b₁ k * b₂ k
+  let newS : ℕ → ℕ := fun k =>
+    if s₁ k % 2 = s₂ k % 2 then s₁ k
+    else if p₁ k ≥ p₂ k then s₁ k else s₂ k
+  refine ⟨newA, newB, newS, ?_, ?_, ?_, ?_, ?_⟩
+  · -- Computable newA
+    -- newA k = ite (s₁ k % 2 = s₂ k % 2) (p₁ k + p₂ k)
+    --                                    (ite (p₁ k ≥ p₂ k) (p₁ k - p₂ k) (p₂ k - p₁ k))
+    -- Build by Primrec.ite layering. The decidable predicates compose via
+    -- Primrec equality on ℕ and nat_le.
+    sorry  -- TODO(iter-05): ~15 lines of Primrec/Computable composition.
+  · -- Computable newB
+    -- newB k = b₁ k * b₂ k
+    -- = Primrec₂.nat_mul.comp (hb₁.pair hb₂) lifted to Computable.
+    sorry  -- TODO(iter-05): ~3 lines.
+  · -- Computable newS
+    -- Similar pattern to newA; conditional on parity and pGE.
+    sorry  -- TODO(iter-05): ~10 lines.
+  · -- newB k ≠ 0
+    intro k
+    exact Nat.mul_ne_zero (hne₁ k) (hne₂ k)
+  · -- Identity: r₁ k + r₂ k = (-1)^(newS k) * (newA k / newB k) as ℚ
+    intro k
+    rw [heq₁ k, heq₂ k]
+    -- Goal: (-1)^(s₁ k) * (a₁ k / b₁ k) + (-1)^(s₂ k) * (a₂ k / b₂ k)
+    --       = (-1)^(newS k) * (newA k / newB k)
+    --
+    -- Strategy: case-split on parities of s₁ k, s₂ k (since (-1)^n = (-1)^(n%2),
+    -- this reduces to 4 cases). In each case, ring + field_simp closes.
+    --
+    -- Each case requires:
+    --   1. Rewrite (-1 : ℚ)^(s_i k) using Nat.parity or pow_natCast modulo 2.
+    --   2. Combine the two fractions over the common denominator b₁·b₂.
+    --   3. Subcase on pGE (only nontrivial in the mixed-sign cases).
+    --   4. Close with `field_simp` + `ring` or explicit rewrites.
+    sorry  -- TODO(iter-05/06): 4 cases × 5-10 lines each = ~30-40 lines.
+
+end ComputableAnalysis.L4
+
+-- =============================================================================
+-- iter-05 work order
+-- =============================================================================
+--
+-- Step 1: prove `Computable newB`. Easiest of the three. Pattern:
+--   have : Primrec (fun k => b₁ k * b₂ k) :=
+--     Primrec₂.nat_mul.comp hb₁.somethingPrimrec hb₂.somethingPrimrec
+--   exact this.to_comp
+-- BUT: `hb₁ : Computable b₁`, not Primrec. So need to lift Computable to Primrec
+-- via the ℕ-encoding, or use Computable.comp₂ for combining via nat_mul.to_comp.
+-- This needs live Lean iteration; likely 5-15 lines once the pattern clicks.
+--
+-- Step 2: prove `Computable newA`. Two-level `Primrec.ite`. The decidable
+-- predicates:
+--   (s₁ k % 2 = s₂ k % 2) — uses Primrec on `Nat.mod` and equality.
+--   (p₁ k ≥ p₂ k) — uses nat_le.
+-- Then `Primrec.ite` combines.
+--
+-- Step 3: prove `Computable newS`. Similar to newA but simpler RHS values.
+--
+-- Step 4: 4-case rational identity. The math is straightforward; the Lean
+-- bookkeeping is the work. Key intermediate lemma needed:
+--   (-1 : ℚ)^n = if n % 2 = 0 then 1 else -1
+-- (probably already in Mathlib as `Int.neg_one_pow_eq_one_iff_even` or similar).
+--
+-- Total estimated iter-05 work: 80-120 lines of Lean. Plausible in 1 iter
+-- if the Computable patterns click; otherwise spills into iter-06.
+--
+-- =============================================================================
+-- iter-06 plan (contingent on iter-05 outcome)
+-- =============================================================================
+--
+-- Best case (iter-05 finishes `isComputableSeqRat_add`):
+--   iter-06: prove `_mul` (probably ~60 lines, structurally similar — the
+--   product of two rationals is a simpler case-split: sign XOR, numerator
+--   multiply, denominator multiply, no truncated-sub needed). If time, start
+--   `_reindex` and `_finsetSum`. A1 itself almost certainly not closed.
+--
+-- Realistic case (iter-05 lands `Computable newA/newB/newS` but the 4-case
+-- identity spills):
+--   iter-06: finish the identity. Then commit `isComputableSeqRat_add` to
+--   CMap.lean as the round's main contribution. Mark round `partial`.
+--
+-- Worst case (iter-05 doesn't compile cleanly):
+--   iter-06: salvage what's there into a more thoroughly-explained design
+--   doc + extended thinking notes. Round ends `stagnated` or `abandoned`.
+--   Pivot recommendation: either widen allow_writes to include L1 for the
+--   NEXT round (so closure can live in proper L1), or pivot to Direction B
+--   (l1-is-computable-real) which doesn't need rational closure.

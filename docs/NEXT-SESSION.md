@@ -8,111 +8,154 @@ You are continuing work on the **mathlib-computable-analysis** project: a Lean 4
 
 ## TL;DR
 
-1. `cd formal && lake build` — should produce **0 errors, 1 sorry-warning** (one *declaration* uses sorry: the L4 CMap instance, grouping the 3 axiom theorem-body sorries A1/A2/A3 into one warning).
-2. **L1 is `done`** — both helper sorries closed last session (the cast-asymmetry obstruction turned out to be a name guess: the lemma is `Nat.cast_natAbs`, already in scope, not `Int.cast_natAbs` as previously conjectured).
-3. **L4 `C([a, b], ℝ)` instance is `stub`.** File at `formal/ComputableAnalysis/L4/Instances/CMap.lean`. Predicate via P-R Ch. 2:141 polynomial-approximation form. Instance declared, `zero_seq` proven, A1/A2/A3 theorem-body sorries with `-- TODO(/formalize L4 CMap):` + verbatim P-R citations.
-4. **Two Zulip pitches still drafted, still deferred.** L0 → `#new contributors`, L3 → `#Mathlib4`. Decision recorded at `docs/zulip-drafts/2026-06-01b-decision.md`.
+1. `cd formal && lake build` — should produce **0 errors, 1 sorry-warning** at `ComputableAnalysis/L4/Instances/CMap.lean:261:23` (the L4 `C[α,β]` instance grouping A1/A2/A3 theorem-body sorries).
+2. **A real new artifact landed last round**: `private theorem isComputableSeqRat_add` in `formal/ComputableAnalysis/L4/Instances/CMap.lean` (~80 lines, fully proved). Closure of L1's `IsComputableSeqRat` under pointwise addition, marked `TODO(refactor → L1):` for a future architectural move.
+3. **L4 A1 (`axiom_linearity`) still has a `sorry` body.** Prior round (`l4-cmap-axiom-linearity`, 2026-06-02) closed `budget-exhausted` (5/6 iters, ~198 min vs 120 budget); shipped `_add` but not the three additional closure helpers + witness assembly needed for A1.
+4. **Recommended next direction**: pivot to L1 — lift `_add` to its proper home, ship `_mul`/`_reindex`/`_finsetSum`, define `IsComputableReal`. Closure-first round before resuming L4 axiom proofs.
 
-## Context — what happened in the prior session (2026-06-01, `next-session-2026-06-01b`)
+## Context — what happened in the prior session (`l4-cmap-axiom-linearity`, 2026-06-02)
 
-This was a `/goal` autonomous run (mode=explore, success in 2 iterations / ~30 min). All 6 success criteria met. Full report at `.goals/next-session-2026-06-01b/final.md`.
+This was a `proof-attempt` `/goal` round. Mode `proof-attempt`, budget 6 iters / 120 min. Full report at `.goals/l4-cmap-axiom-linearity/final.md`.
 
-What changed:
+Trajectory:
 
-- **L1 `done`.** `isComputableSeqRat_const` and `isComputableSeqReal_const_rat` in `formal/ComputableAnalysis/L1/ComputableSeqReal.lean` are CLOSED (0 sorries). The proof routes via `rw [Nat.cast_natAbs, Int.cast_abs]` + `conv_lhs => rw [← Rat.num_div_den q]` + sign case-split. **Key gotcha (now documented in the closure's docstring):** `rw [← Rat.num_div_den q]` *without* `conv_lhs` rewrites every literal `q` in the goal — including the `q`s inside `q.num`/`q.den` field projections on the RHS — and explodes the goal. Use `conv_lhs` to target only one side.
-- **L4 CMap `stub`.** New file `formal/ComputableAnalysis/L4/Instances/CMap.lean` (~150 lines including docstring). Defines `polyApproxCMap` (noncomputable continuous map) and `IsComputableSeqCMap : (ℕ → C(Set.Icc α β, ℝ)) → Prop` (P-R Ch. 2:141 polynomial form). `noncomputable instance instComputabilityStructureCMap` declared with all four axiom fields. `zero_seq` is proved (all-zero coefficient triple sequence). A1 / A2 / A3 are theorem-body sorries with explicit `-- TODO(/formalize L4 CMap):` comments and P-R citations (Ch. 2:129 for A1 "trivial"; Ch. 0 Thm 4 for A2; Ch. 0 Thm 7 for A3).
-- **Umbrella import** at `formal/ComputableAnalysis.lean` extended with the L4 line.
-- **CLAUDE.md milestone tracker**: L1 row → `done`; L4 CMap row → `stub`.
-- **Zulip decision recorded** at `docs/zulip-drafts/2026-06-01b-decision.md` — defer both posts (user choice).
+- **iter-02 (orient)**: Confirmed C1 (build green). Discovered the central finding: L1's `IsComputableSeqRat` lacks arithmetic closure (intentionally deferred per `ComputableSeqReal.lean:56-64`), and A1 under the polynomial form (P-R Ch. 2:141) genuinely needs these closures. NEXT-SESSION.md's prior "no new L1 lemmas needed" was wrong.
+- **iter-03 (strategy)**: Mathlib reconnaissance — `Primcodable ℤ/ℚ` automatic via Denumerable, `Primrec.nat_add/sub/mul/le` exist, `Primrec.ite/cond` exist, but **no direct `Primrec₂` for ℤ-arithmetic or ℚ-arithmetic**. Drafted full paper-form A1 proof with verbatim P-R citations.
+- **iter-04 (Lean draft)**: Wrote `isComputableSeqRat_add` skeleton in `thinking/` not committed to CMap.lean, with concrete idiom hints and 4-case dispatch.
+- **iter-05 (breakthrough)**: Ported the draft to `CMap.lean` and proved it completely. Build clean.
+- **iter-06 (didn't happen)**: budget exhausted.
+
+What changed on disk:
+
+- **`formal/ComputableAnalysis/L4/Instances/CMap.lean`**: added private theorem `isComputableSeqRat_add` (~80 lines) at the top of the file, between the namespace open and `section CMap`. Has a "## L1 closure helpers" section header docstring explaining the temporary L4 location.
+- **CLAUDE.md** L4 CMap row annotation updated to note `_add` landed.
+- **`.goals/l4-cmap-axiom-linearity/`**: full round artifacts including `final.md`.
+- **`thinking/l4-cmap-axiom-linearity/`**: iter-02 orientation, iter-03 strategy with full paper-form A1 proof + verbatim citations, iter-04 Lean draft (now subsumed by the actual code).
 
 ## Your task this session
 
 ### Action 1 — verify the build (first command)
 
 ```bash
-cd formal && lake build 2>&1 | tail -20
+cd formal && lake build 2>&1 | tail -10
 ```
 
-Expected: 0 errors, **1 sorry warning** (`ComputableAnalysis/L4/Instances/CMap.lean:104:23: declaration uses sorry` — this is ONE warning for the L4 instance grouping 3 internal theorem-body sorries at lines 117/128/139). If you see anything else, see §Triage below.
+Expected: 0 errors, **exactly 1 sorry-warning** (`ComputableAnalysis/L4/Instances/CMap.lean:261:23` for the L4 instance). If you see anything else, see `docs/SETUP.md`.
 
-### Action 2 — choose a direction (open)
+### Action 2 — recommended direction: L1 closure-first
 
-The L1 work is fully done. L3 is stable. L4 CMap.lean compiles. Three orthogonal directions, ranked by value:
+**Why this and not "resume A1 directly"**: A1 under polynomial form needs three more closure helpers (`_mul`, `_reindex`, `_finsetSum`) plus ~50 lines of witness assembly. The prior round shipped one helper in 5 iters. Continuing in L4 with the `_add` helper now living inline in `CMap.lean` adds technical debt (it belongs in L1). Better path: open a round dedicated to L1 closures (proper home), then resume L4 A1 with the toolkit ready.
 
-#### Direction A — fill an L4 axiom proof (heaviest, highest payoff)
+Suggested round setup:
 
-The three open axioms in `formal/ComputableAnalysis/L4/Instances/CMap.lean`:
+- **Slug**: `l1-arithmetic-closure-and-real`
+- **Mode**: `proof-attempt`
+- **Budget**: 12 iters / 180 min (3× the prior round's budget, calibrated to the discovered cost)
+- **Allow_writes**: `formal/ComputableAnalysis/L1/**`, `formal/ComputableAnalysis/L4/Instances/CMap.lean` (to lift `_add` and remove its TODO comment), `CLAUDE.md`, `claims/l1-arithmetic-closure-and-real/**`, `.goals/l1-arithmetic-closure-and-real/**`, `.goals/INDEX.md`, `thinking/l1-arithmetic-closure-and-real/**`.
+- **Forbid_writes**: `formal/ComputableAnalysis/L0/**`, `formal/ComputableAnalysis/L3/**`, `formal/ComputableAnalysis.lean`, `literature/papers/**/verbatim.md`.
+- **Criteria sketch**:
+  - C1: `lake build` green; the L4 instance sorry-warning is the only residual.
+  - C2: `isComputableSeqRat_add` lifted from `L4/Instances/CMap.lean` to `L1/ComputableSeqReal.lean` (or a new `L1/RatClosure.lean`) under its proper public name; CMap.lean references the L1 version.
+  - C3: `isComputableSeqRat_mul` shipped (fully proved). The simpler sibling of `_add` — sign XOR, no truncated-subtraction bookkeeping.
+  - C4: At least one of `isComputableSeqRat_reindex` or `isComputableSeqRat_finsetSum` shipped (whichever lands first).
+  - C5: `IsComputableReal : ℝ → Prop` defined in `formal/ComputableAnalysis/L1/ComputableReal.lean` (~1-line definition + 1-2 sanity lemmas, P-R Ch. 0:55 citation in docstring).
+  - C6: CLAUDE.md L1 tracker rows updated.
 
-- **A1 (`axiom_linearity`)** — P-R Ch. 2:129 says "trivial" for the G-L predicate, but under our polynomial-approximation form (Ch. 2:141) it requires ~80-120 Lean lines of rational arithmetic: explicit rational-approximation of scalar coefficients α/β to precision `2^{-m}`, sum over `k ∈ Finset.range (d n + 1)` of the rational-polynomial combinations, plus a 2x-precision pad. Each polynomial-combination's coefficients are a finite sum of rational products → rational. Degree bound = `max_k (d^x (k, m'), d^y (k, m'))`. Witness data flattens to a quadruple-sequence via three `Nat.pair` calls.
-- **A2 (`axiom_limits`)** — P-R says A2 = Ch. 0 Theorem 4. Diagonalize: given the double sequence `f_{n, k} → f_n` effectively with modulus `e`, take `a'_{n, N, j} := a_{n, e(n, N+1), N+1, j}`, `d'_{n, N} := d_{n, e(n, N+1), N+1}`. Triangle inequality gives the `2^{-N+1}` bound. Need composition lemmas on `Computable`.
-- **A3 (`axiom_norms`)** — P-R says A3 = Ch. 0 Theorem 7. Hardest of the three: sup-norm computability requires evaluating polynomials on a rational grid + L1 closure under finite `max` + absolute-value. Likely needs an L1 closure lemma (`IsComputableSeqReal` closure under `max`) that is itself deferred work.
+### Action 3 — alternative directions
 
-**Recommended target:** A1 first. It's the most self-contained — the proof never leaves the polynomial form, doesn't need new L1 lemmas, and the bound bookkeeping (while tedious) is mechanical.
+If the user has different priorities:
 
-Suggested goal slug: `l4-cmap-axiom-linearity`. Mode: `proof-attempt`. Budget: 6 iters / 120 min.
+- **Just define `IsComputableReal`** (narrow, low-stakes): NEXT-SESSION.md's original Direction B at the previous session, now still applicable but doesn't unblock L4. Slug `l1-is-computable-real`, mode `explore`, 6 iters / 90 min.
+- **Resume L4 A1 directly** (stack-deeper, risk of repeating the budget overrun): slug `l4-cmap-axiom-linearity-cont`, mode `proof-attempt`, 6 iters / 180 min. Keep `_add` inline (or lift it first), then ship `_mul`/`_reindex`/`_finsetSum` + A1 witness assembly. Same allow_writes as the prior round PLUS L1.
+- **Post the deferred Zulip pitches** (human-in-loop): the L0 + L3 pitches at `docs/zulip-drafts/2026-06-01-l0-pitch.md` + `docs/zulip-drafts/2026-06-01-l3-pitch.md` are still drafted, still deferred. Decision recipe at `docs/zulip-drafts/2026-06-01b-decision.md`. ~30 min.
 
-#### Direction B — L1 `IsComputableReal` (point-form predicate; lighter)
+## Critical knowledge — Mathlib symbols verified this session
 
-The L1 row in the CLAUDE.md tracker for `IsComputableReal : ℝ → Prop` is still `pending`. By P-R Ch. 0 commitment, a single real `x : ℝ` is computable iff the constant sequence `(x, x, x, …)` is in `IsComputableSeqReal`. This is a one-line definition + a few sanity lemmas (closure under `+`, `*`, etc.) that route through the L1 sequence-closure machinery (also pending).
+Augmentations to the prior tables; all entries verified against Mathlib master 2026-06-02.
 
-This is the natural prerequisite for **A3** above. If A1 lands cleanly and you want to keep stacking L4 progress, doing L1 `IsComputableReal` and L1 closure lemmas first unblocks A3.
-
-Suggested goal slug: `l1-is-computable-real`. Mode: `explore`. Budget: 12 iters / 90 min.
-
-#### Direction C — post the deferred Zulip pitches
-
-Two drafts ready, both currently with `## Status` deferral notes:
-- `docs/zulip-drafts/2026-06-01-l0-pitch.md` (`#new contributors`)
-- `docs/zulip-drafts/2026-06-01-l3-pitch.md` (`#Mathlib4`)
-
-The decision-recipe (post L0 first, wait, fill in L3's URL placeholder, post L3) is in `docs/zulip-drafts/2026-06-01b-decision.md`. This is ~30 min of human-in-loop bookkeeping but high-leverage for L4/L5 design feedback from Brattka, Pauly, Schröder. Always ask the user before posting.
-
-### Action 3 — if no direction is chosen, default to Direction A
-
-The user's prior round opened "ambitious — L4 instance formalized". With the instance now `stub`, the natural continuation is filling an axiom. A1 is the cleanest.
-
-## Critical knowledge — Mathlib4 symbols (verified against master 2026-06-01)
-
-All entries from the prior sessions' tables remain valid. Augmentations from this session:
-
-| Concept | Exact Mathlib symbol | Import | Note |
+| Concept | Exact symbol | Import / location | Note |
 |---|---|---|---|
-| `(↑n.natAbs : α) = ↑\|n\|` (abs in ℤ then cast) | `Nat.cast_natAbs` (in `_root_` namespace) | `Mathlib.Algebra.Order.Ring.Int` (transitively in scope under default L1 imports) | NOT `Int.cast_natAbs` — that was a prior-session name guess. The `@[simp]` simp lemma the prior session was looking for. |
-| `(↑\|n\| : α) = \|↑n\|` (cast then abs in α) | `Int.cast_abs` | transitively in scope | Bridges from the form `Nat.cast_natAbs` produces (abs in ℤ then cast) to the form most arguments need (cast then abs in α). |
-| `(q.num : ℚ) / (q.den : ℚ) = q` | `Rat.num_div_den` | `Mathlib.Algebra.Ring.Rat` (transitively in scope) | **Gotcha**: `rw [← Rat.num_div_den q]` rewrites every literal `q` in the goal, including the `q`s inside `q.num`/`q.den` field projections — use `conv_lhs` (or `conv_rhs` / `nth_rewrite`) to target one side only. |
-| `C(Set.Icc α β, ℝ)` sup-norm instances | auto via `ContinuousMap.instNormedAddCommGroup` etc. | `Mathlib.Topology.ContinuousMap.Compact` + `.Bounded.Normed` | `NormedAddCommGroup`, `NormedSpace ℝ`, `CompleteSpace` all auto-inferred. The space is `noncomputable` (ℝ's field structure), so the L4 instance is `noncomputable instance`. |
-| Building a continuous polynomial in `x.val` | `ContinuousMap.mk (fun x => ...) (by continuity)` | same | The `continuity` tactic closes the continuity-obligation for polynomial expressions in `x.val^j`. |
+| `Primrec₂.nat_add/sub/mul/le` | `Primrec.nat_add` etc. | `Mathlib/Computability/Primrec/Basic.lean:593,596,599,610` | The ℕ-level arithmetic building blocks. `nat_sub` is **truncated** (0 if negative). |
+| `Primrec.nat_mod / nat_bodd` | both | `Mathlib/Computability/Primrec/Basic.lean:728,733` | Use `nat_bodd` (Bool-valued: odd? true : false) over `% 2` when the result needs to be Computable. |
+| `Primrec.ite / .cond` | both | `Mathlib/Computability/Primrec/Basic.lean:602,606` | `.cond` is Bool-conditional; `.ite` is Prop-conditional with `[DecidablePred c]`. |
+| `Computable.cond` (Bool conditional on Computable) | yes | `Mathlib/Computability/Partrec.lean:594` | `cond hc hf hg : Computable (fun a => bif (c a) then (f a) else (g a))`. |
+| `Computable₂.comp` | yes | `Mathlib/Computability/Partrec.lean:477` | `(hf : Computable₂ f).comp (hg : Computable g) (hh : Computable h) : Computable (fun a => f (g a) (h a))`. **Critical**: takes two separate args, NOT a paired one. |
+| `Primrec₂.to_comp` | yes | `Mathlib/Computability/Partrec.lean:252` | Lifts Primrec₂ to Computable₂. Use as `Primrec.nat_mul.to_comp.comp hb₁ hb₂`. |
+| `PrimrecRel.decide` | yes | `Mathlib/Computability/Primrec/Basic.lean:426` | Converts a `PrimrecRel R` (like `nat_le`) to `Primrec₂ (fun a b => decide (R a b))`. Use `.swap.decide` to flip arg order. |
+| `Primcodable ℤ/ℚ` (via `Denumerable`) | auto | `Mathlib/Computability/Primrec/Basic.lean:139` priority-10 | `instDenumerableInt` at `Mathlib/Logic/Denumerable.lean:158`; `instDenumerableRat` at `Mathlib/Data/Rat/Denumerable.lean:30`. **BUT** no Mathlib-exported `Primrec₂` for ℤ-arithmetic or ℚ-arithmetic — those have to be built. |
 
-## Critical knowledge — Lean 4 / Mathlib gotchas surfaced this session
+## Critical knowledge — Lean 4 / Mathlib idioms that worked
 
-- **`Nat.cast_natAbs` is the lemma name** (not `Int.cast_natAbs`). Confirmed at `Mathlib/Algebra/Order/Ring/Int.lean:50`. `@[simp]`, in `_root_` namespace.
-- **The `Nat.cast_natAbs ∘ Int.cast_abs` two-step** is the canonical way to convert `((n.natAbs : ℕ) : α)` to `|((n : ℤ) : α)|` for an `α` with `Abs`. Direct `push_cast` / `norm_cast` won't do this in one step — they only know the ℤ-direction.
-- **`rw` rewrites ALL literal occurrences of the pattern in the goal**, including ones inside field projections. If a lemma has `q` on one side, `rw [← lemma q]` will rewrite the `q`s inside `q.num`/`q.den` on the OTHER side too. Use `conv_lhs` / `conv_rhs` / `nth_rewrite` to constrain.
-- **`noncomputable instance` for ℝ-valued normed types** — when defining an `instance` on a type involving ℝ (or any noncomputable field), prefix with `noncomputable`. Lean's elaborator will complain otherwise about `Real.normedField` being noncomputable.
-- **The `continuity` tactic handles polynomial expressions in `x.val^j`** when `x : Set.Icc α β` (or any subtype-of-ℝ where `Continuous Subtype.val` is auto). No manual continuity proof needed.
+These patterns worked cleanly in `isComputableSeqRat_add`; copy them for the upcoming `_mul`/`_reindex`/`_finsetSum`:
 
-## Triage — if `lake build` fails
+### Computable composition pattern
 
-Same as prior sessions — Mathlib master rename, missing `elan` / `lake`, missing cache. See `docs/SETUP.md`.
+```lean
+have hp₁ : Computable (fun k => a₁ k * b₂ k) :=
+  Primrec.nat_mul.to_comp.comp ha₁ hb₂
+```
 
-If the cast lemmas were renamed: grep `/Users/yassineboulkaid/Projets/Claude/mathlib-computable-analysis/formal/.lake/packages/mathlib/Mathlib/` for the new home. The names we relied on this session:
+`Primrec.nat_mul` is `Primrec₂`. `.to_comp` lifts to `Computable₂`. `Computable₂.comp ha₁ hb₂` takes **two separate** `Computable` args. **NOT** `(ha₁.pair hb₂)`.
 
-- `Nat.cast_natAbs` (at `Mathlib/Algebra/Order/Ring/Int.lean:50`)
-- `Int.cast_abs` (implicit-arg form; transitively in scope)
-- `Rat.num_div_den` (at `Mathlib/Algebra/Ring/Rat.lean:78`)
+### Computable conditional pattern
+
+For a function `fun k => if (Prop predicate on k) then X else Y`:
+
+```lean
+have hge : Computable (fun k => decide (a₁ k * b₂ k ≥ a₂ k * b₁ k)) := by
+  have : Primrec₂ (fun p q : ℕ => decide (p ≥ q)) := Primrec.nat_le.swap.decide
+  exact this.to_comp.comp hp₁ hp₂
+have htotal := Computable.cond hge hX hY
+-- htotal is in `cond` form. Now convert to `ite` form:
+refine htotal.of_eq fun k => ?_
+by_cases h : (predicate)
+· simp [h]
+· simp [h]
+```
+
+### `(-1 : ℚ)^n` parity reduction
+
+```lean
+have pow_red : ∀ n : ℕ, (-1 : ℚ) ^ n = (-1) ^ (n % 2) := by
+  intro n
+  conv_lhs => rw [← Nat.div_add_mod n 2, pow_add, pow_mul]
+  simp
+```
+
+After this, `pow_red (s k)` rewrites `(-1)^(s k)` to `(-1)^(s k % 2)`. Combine with `rcases Nat.mod_two_eq_zero_or_one (s k) with h | h` for case analysis.
+
+### Ring identity with truncated ℕ-subtraction
+
+```lean
+rw [Nat.cast_sub hle]  -- ↑(a - b) → ↑a - ↑b when h : b ≤ a in ℕ
+push_cast               -- distributes other ℕ-casts
+field_simp              -- clears denominators using available `hb : (b : ℚ) ≠ 0`
+try ring                -- closes leaf; `try` because field_simp may already close
+```
+
+The `try ring` is essential — `field_simp` closes some cases entirely; `ring` would then error "No goals to be solved" without `try`.
+
+## Critical knowledge — Mathlib gotchas surfaced this session
+
+- **`Primrec₂.to_comp` returns `Computable₂`, not `Computable`.** Composition pattern is `.comp arg1 arg2`, NOT `.comp (arg1.pair arg2)`.
+- **No direct `Primrec₂` for ℤ/ℚ arithmetic in Mathlib.** Don't waste time looking for `Primrec.int_add` or `Primrec.rat_add`; they're derivable but not exported. The `IsComputableSeqRat` closure proofs work at the **ℕ-level** via sign-num-den decomposition.
+- **`nat_sub` is truncated.** `(a - b : ℕ)` is `0` when `b > a`. The ℚ-cast `Nat.cast_sub : b ≤ a → ((a - b : ℕ) : ℚ) = (a : ℚ) - (b : ℚ)` requires the hypothesis to handle the truncation properly.
+- **`(-1 : ℚ)^n` is best reduced via `n % 2`** rather than tracking parity in the witness predicate. The `pow_red` helper above is the bridge.
+- **`field_simp` may close the goal.** Always follow with `try ring` rather than bare `ring` to avoid "No goals to be solved" errors.
 
 ## Watchpoints — don't repeat past mistakes
 
 All prior watchpoints still apply. Augmentations from this session:
 
-- **DON'T conjecture lemma names** (`Int.cast_natAbs`-vs-`Nat.cast_natAbs`). 30 seconds of `grep -rn "theorem.*natAbs\|lemma.*natAbs" .lake/packages/mathlib/Mathlib/` finds the right name and avoids 3 wasted attempts.
-- **DON'T use `rw [← lemma_about_q]` when `q.num` or `q.den` appears in the goal.** Use `conv_lhs` (or `nth_rewrite 1`) to target only one occurrence. Otherwise the rewrite cascades into the field projections and explodes.
-- **DON'T inline L2 to avoid building it.** This session used the P-R Ch. 2:141 polynomial form for L4 CMap precisely to bypass needing L2 right now. The equivalence is licensed by P-R + Effective Density. If you later build L2, refactor the L4 predicate to route through L2 — but don't introduce a parallel L2 stub inside L4 in the meantime.
-- **DON'T over-promise `formalized` status.** L4 CMap.lean has theorem-body sorries on A1/A2/A3 — that's `stub`, not `formalized`. `formalized` per CLAUDE.md taxonomy requires "predicate/structure bodies sorry-free" AND ideally theorem bodies converging to sorry-free. Be honest in the tracker.
+- **DON'T trust prior-session "no new L1 lemmas needed" claims without checking the actual L1 file's `## What this file is NOT` section.** Last session's NEXT-SESSION.md made this misjudgment; the entire L1 arithmetic-closure machinery was deferred at L1 design time and we discovered it the hard way.
+- **DON'T attempt to derive `Primrec₂.rat_add` / `int_add` from scratch.** The ℕ-level sign-num-den approach is much shorter and is the project's established idiom.
+- **DON'T `rw` patterns that appear on both sides of the goal expecting it to rewrite only one.** Use `conv_lhs` / `conv_rhs` / `nth_rewrite` to target. (This was last session's `Rat.num_div_den` gotcha; still relevant.)
+- **DON'T commit Lean files with new sorry-warnings just to "show structure".** Either prove fully or leave the draft in `thinking/`. Sorry-warnings in production Lean degrade C1 and the project's "1 sorry-warning at the instance level" invariant.
+- **DON'T set proof-attempt iter budgets below what the prior round took for similar work.** The 6 iters / 120 min limit for closure proofs is too tight by ~2-3×.
 
 ## User calibration
 
-Unchanged from prior session. Technically capable; explicit authorization for bold changes. Defer on Zulip posting / commits / PRs / scope changes (the user authorized today's commit specifically, after the session).
+Unchanged from prior session. Technically capable; explicit authorization for bold changes. Defer on Zulip posting / commits / PRs / scope changes. The user authorized the prior round's final commit specifically.
 
 ## Files to know
 
@@ -120,22 +163,21 @@ Unchanged from prior session. Technically capable; explicit authorization for bo
 - `docs/SETUP.md` — Lean install + first build.
 - `docs/NEXT-SESSION.md` — this file.
 - `formal/ComputableAnalysis/L0/{Bridge,PropB,AnalysisBridge}.lean` — L0, `done`.
-- `formal/ComputableAnalysis/L1/ComputableSeqReal.lean` — L1, **`done`** (0 sorries; constant-sequence helpers proved).
+- `formal/ComputableAnalysis/L1/ComputableSeqReal.lean` — L1 `IsComputableSeqRat`/`IsComputableSeqReal`, **`done`** (0 sorries). **NB**: explicit "What this file is NOT" section at lines 56-64 lists arithmetic closure as deferred — that gap is what the next round closes.
 - `formal/ComputableAnalysis/L3/ComputabilityStructure.lean` — **L3 keystone, `formalized`** (0 sorries).
-- `formal/ComputableAnalysis/L4/Instances/CMap.lean` — **L4 first instance, `stub`** (def/instance bodies sorry-free; 3 theorem-body sorries on A1/A2/A3 with TODOs).
+- `formal/ComputableAnalysis/L4/Instances/CMap.lean` — **L4 first instance, `stub`** (def/instance bodies sorry-free; A1/A2/A3 theorem-body sorries grouped under the instance at line 261; **new this round**: `private theorem isComputableSeqRat_add` ~80 lines at the top, marked `TODO(refactor → L1):` — the candidate lift target).
 - `formal/ComputableAnalysis.lean` — umbrella import.
 - `claims/l3-computability-structure/axioms.md` — L3 design doc.
 - `claims/l1-computable-reals/is-computable-seq-real.md` — L1 design doc.
 - `literature/papers/PourEl-Richards-*.md` — per-chapter verbatim extracts.
-- `.goals/next-session-2026-06-01b/final.md` — full report of the prior session (success, 2/50 iters, ~30 min).
-- `.goals/l3-computability-structure-lean/final.md` — full report of the session before that.
-- `docs/zulip-drafts/2026-06-01-l0-pitch.md` — drafted L0 pitch, deferred.
-- `docs/zulip-drafts/2026-06-01-l3-pitch.md` — drafted L3 pitch, deferred.
-- `docs/zulip-drafts/2026-06-01b-decision.md` — defer-both-posts decision + 5-step post-when-ready recipe.
+- `.goals/l4-cmap-axiom-linearity/final.md` — full report of the prior round (budget-exhausted, 5/6 iters, ~198 min; `_add` shipped, A1 still sorry).
+- `.goals/INDEX.md` — registry of all past rounds.
+- `thinking/l4-cmap-axiom-linearity/iter-03-strategy.md` — full paper-form A1 proof + verbatim P-R citations (still load-bearing; the citations and proof sketch will guide the future A1 round).
+- `docs/zulip-drafts/{2026-06-01-l0-pitch,2026-06-01-l3-pitch,2026-06-01b-decision}.md` — Zulip drafts (still deferred).
 
 ## If the user types something different
 
-The above task list assumes default continuation. If the user opens with a different request (e.g., "let's actually post the Zulip pitches", "skip A1, start the L5 First Main Theorem stub", "rewrite the L4 predicate using the raw G-L form instead of polynomial approximation"), follow their direction — this prompt is a *default*, not a script.
+The above task list assumes default continuation. If the user opens with a different request (e.g., "let's actually post the Zulip pitches", "resume L4 A1 directly anyway", "let's start L2 instead"), follow their direction — this prompt is a *default*, not a script.
 
 ---
 

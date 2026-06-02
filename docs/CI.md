@@ -15,16 +15,13 @@ The split moves doc-gen to a release cadence (tags) where the cost is amortized,
 **What it does**:
 1. Free Ubuntu disk space (Mathlib cache fetch needs ~10 GB).
 2. Checkout the repository at full depth.
-3. Install Lean toolchain via `leanprover/lean-action` with:
-   - `build: true` — runs `lake build`
-   - `lint: false` — no `lake check-lint` (we don't declare a `lint_driver`)
-   - `mk_all-check: false` — no umbrella validation (`lake build` already validates)
-   - `use-mathlib-cache: auto` — pulls pre-built oleans from Mathlib CI cache
-4. Install Python 3.11, graphviz system packages, and `leanblueprint` from PyPI.
-5. `leanblueprint web` → produces `blueprint/web/` (plasTeX HTML + dep graph).
-6. `leanblueprint checkdecls` → validates every `\lean{...}` macro in `blueprint/src/*.tex` resolves to an actual Lean declaration.
-7. Upload `blueprint/web/` as a Pages artifact.
-8. Deploy to Pages.
+3. `leanprover-community/docgen-action` (with `blueprint: true`, `api-docs: false`, `build-page: false`) — single composite action that runs:
+   - Lean toolchain install + `lake build`
+   - Blueprint compilation (web; PDF skipped on push)
+   - `leanblueprint checkdecls` — every `\lean{...}` macro resolves
+   - Pages artifact upload + deploy
+
+This is the same docker-wrapped pipeline that PFR, FLT, and sphere-eversion use, just parameterized to skip the slow Mathlib API doc-gen on every push.
 
 **End state**: the live blueprint at `https://yssnbkd.github.io/mathlib4-computable-analysis/` reflects HEAD of `master`. The dep graph at `/dep_graph_document.html` shows `\leanok` state matching the current Lean code.
 
@@ -113,6 +110,8 @@ Until then: tag-driven docs deploy keeps the inner loop short.
 ## Troubleshooting
 
 **Fast workflow fails at `leanblueprint checkdecls`**: a `\lean{<name>}` macro in `blueprint/src/*.tex` points at a Lean declaration that doesn't exist. Either fix the macro (typo in the namespace?) or add the missing decl. Do NOT add a sorry-bearing decl just to make the check pass — that violates CLAUDE.md's `\leanok` policy.
+
+**Tempted to "just `pip install leanblueprint` + `leanblueprint web` directly in CI"?** Don't. That's exactly what we tried (commits `5822821` … `6383bcb`) and it failed with `WARNING: File not found: macros/common` → `TypeError: unhashable type: 'definition'` in `plastexdepgraph`. The macros files ARE in the checkout — pip-installed plasTeX 3.1 on bare ubuntu-latest just doesn't resolve `\input{subdir/file}` the same way the docker-wrapped version (in `docgen-action`'s `ghcr.io/xu-cheng/texlive-full` image) does. Local macOS + Python 3.9 works; CI Linux + Python 3.11 doesn't. Same plasTeX version. The fix is to use `docgen-action` (the upstream-blessed path; PFR/FLT/sphere-eversion all do).
 
 **Fast workflow fails at `lake build`**: the Mathlib cache may have rotated; the lean-action's `use-mathlib-cache: auto` should handle this, but if Mathlib's API changed, our imports may break. Locally run `lake update mathlib && lake exe cache get && lake build` to reproduce.
 

@@ -4,89 +4,130 @@
 
 ---
 
-You are continuing work on the **mathlib-computable-analysis** project: a Lean 4 / Mathlib4 formalization of Pour-El & Richards-style computable analysis, intended for upstream contribution to `Mathlib.Computability.Analysis.*`. Repo root: `/Users/yassineboulkaid/Projets/Claude/mathlib-computable-analysis/`. Read `CLAUDE.md` first — it is the project constitution (~210 lines, lean-first, do NOT roll back to paper-first).
+You are continuing work on **mathlib-computable-analysis**, a Lean 4 / Mathlib4 formalization of Pour-El & Richards' *Computability in Analysis and Physics* (Cambridge UP 1989), intended for upstream contribution to `Mathlib.Computability.Analysis.*`. Repo root: `/Users/yassineboulkaid/Projets/Claude/mathlib-computable-analysis/`. Read `CLAUDE.md` first — it is the project constitution.
+
+## Major change since the last NEXT-SESSION.md
+
+This project adopted Patrick Massot's **`leanblueprint`** framework on 2026-06-02 (one big multi-step round). Three concrete consequences for *every* future session:
+
+1. **Lake project root moved.** The Lean source now lives at `ComputableAnalysis/` (git root), not `formal/ComputableAnalysis/`. There is no `formal/` directory anymore. `lake build` runs from the repo root, no `cd formal &&` prefix.
+2. **The dep graph is the source of truth for formalization state.** `blueprint/web/dep_graph_document.html` (rebuild with `PATH="$PWD/.venv/bin:$PATH" .venv/bin/leanblueprint web`) is the milestone tracker. The CLAUDE.md hand-maintained "Construction milestones" table is GONE; the 7-label YAML status taxonomy on claim files is no longer authoritative. Color states (`\leanok` = green, `\mathlibok` = dark green, `\notready` = orange) live in `blueprint/src/*.tex` and propagate to the graph via `leanblueprint web`.
+3. **Skills are blueprint-aware.** `/claim` now writes both a rationale satellite under `claims/` AND a `\notready` LaTeX block in `blueprint/src/<layer>.tex`. `/formalize` Phase 6 toggles the LaTeX from `\notready` to `\lean{<Decl>}\leanok` after Lean type-checks and `leanblueprint checkdecls` passes. `/verify` runs `lake build` + `leanblueprint web` + `leanblueprint checkdecls` plus satellite-pointer-resolution.
 
 ## TL;DR
 
-1. `lake build` — should produce **0 errors, 1 sorry-warning** at `ComputableAnalysis/L4/Instances/CMap.lean:261:23` (the L4 `C[α,β]` instance grouping A1/A2/A3 theorem-body sorries).
-2. **A real new artifact landed last round**: `private theorem isComputableSeqRat_add` in `ComputableAnalysis/L4/Instances/CMap.lean` (~80 lines, fully proved). Closure of L1's `IsComputableSeqRat` under pointwise addition, marked `TODO(refactor → L1):` for a future architectural move.
-3. **L4 A1 (`axiom_linearity`) still has a `sorry` body.** Prior round (`l4-cmap-axiom-linearity`, 2026-06-02) closed `budget-exhausted` (5/6 iters, ~198 min vs 120 budget); shipped `_add` but not the three additional closure helpers + witness assembly needed for A1.
-4. **Recommended next direction**: pivot to L1 — lift `_add` to its proper home, ship `_mul`/`_reindex`/`_finsetSum`, define `IsComputableReal`. Closure-first round before resuming L4 axiom proofs.
+1. `lake build` should produce **0 errors, 1 sorry-warning** at `ComputableAnalysis/L4/Instances/CMap.lean:261:23` (the L4 instance grouping A1/A2/A3 theorem-body sorries). Anything else means the env diverged.
+2. `PATH="$PWD/.venv/bin:$PATH" .venv/bin/leanblueprint web && PATH="$PWD/.venv/bin:$PATH" .venv/bin/leanblueprint checkdecls` should be silent / exit 0 / produce `blueprint/web/index.html` + `blueprint/web/dep_graph_document.html` with 12 L0 nodes green and 11 L1-L5 nodes orange.
+3. **Live blueprint** (after CI deploys): `https://yssnbkd.github.io/mathlib4-computable-analysis/blueprint/` (and `.../blueprint/dep_graph_document.html` for the graph). If 404, Pages deploy didn't run yet — check `gh run list --repo YssnBkd/mathlib4-computable-analysis --limit 3`.
+4. **Recommended next direction (Action 2 below)**: L1 closure-first round, **blueprint-native**. Migrate existing L1 content to blueprint LaTeX as the first iteration; then lift `isComputableSeqRat_add` from L4 to L1 proper; then ship `_mul`/`_reindex`/`_finsetSum`; define `IsComputableReal`. Each new lemma lands as a green dep-graph node.
 
-## Context — what happened in the prior session (`l4-cmap-axiom-linearity`, 2026-06-02)
+## Where we stand by layer (blueprint-color reading)
 
-This was a `proof-attempt` `/goal` round. Mode `proof-attempt`, budget 6 iters / 120 min. Full report at `.goals/l4-cmap-axiom-linearity/final.md`.
-
-Trajectory:
-
-- **iter-02 (orient)**: Confirmed C1 (build green). Discovered the central finding: L1's `IsComputableSeqRat` lacks arithmetic closure (intentionally deferred per `ComputableSeqReal.lean:56-64`), and A1 under the polynomial form (P-R Ch. 2:141) genuinely needs these closures. NEXT-SESSION.md's prior "no new L1 lemmas needed" was wrong.
-- **iter-03 (strategy)**: Mathlib reconnaissance — `Primcodable ℤ/ℚ` automatic via Denumerable, `Primrec.nat_add/sub/mul/le` exist, `Primrec.ite/cond` exist, but **no direct `Primrec₂` for ℤ-arithmetic or ℚ-arithmetic**. Drafted full paper-form A1 proof with verbatim P-R citations.
-- **iter-04 (Lean draft)**: Wrote `isComputableSeqRat_add` skeleton in `thinking/` not committed to CMap.lean, with concrete idiom hints and 4-case dispatch.
-- **iter-05 (breakthrough)**: Ported the draft to `CMap.lean` and proved it completely. Build clean.
-- **iter-06 (didn't happen)**: budget exhausted.
-
-What changed on disk:
-
-- **`ComputableAnalysis/L4/Instances/CMap.lean`**: added private theorem `isComputableSeqRat_add` (~80 lines) at the top of the file, between the namespace open and `section CMap`. Has a "## L1 closure helpers" section header docstring explaining the temporary L4 location.
-- **CLAUDE.md** L4 CMap row annotation updated to note `_add` landed.
-- **`.goals/l4-cmap-axiom-linearity/`**: full round artifacts including `final.md`.
-- **`thinking/l4-cmap-axiom-linearity/`**: iter-02 orientation, iter-03 strategy with full paper-form A1 proof + verbatim citations, iter-04 Lean draft (now subsumed by the actual code).
+| Layer | Lean state | Blueprint chapter state | Next milestone |
+|---|---|---|---|
+| L0 | done (3 files, 0 sorries) | `L0.tex` fully populated, all 12 nodes `\leanok` | none — done |
+| L1 | `IsComputableSeqReal` done; closures + `IsComputableReal` pending | `L1.tex` 2 `\notready` stubs — does NOT reflect the parts already `\leanok`-eligible | migrate existing content + ship closures + define point predicate |
+| L2 | not started | `L2.tex` 1 `\notready` stub | predicate `IsGLComputable` (deferred) |
+| L3 | typeclass formalized (0 sorries) | `L3.tex` 1 `\notready` stub — does NOT reflect the `\leanok`-eligible parts | migration (deferred) + stability theorem |
+| L4 | CMap stub (def + instance sorry-free; A1/A2/A3 theorem-body sorries) | `L4.tex` 3 `\notready` stubs | close A1 (needs L1 closures first) |
+| L5 | not started | `L5.tex` 4 `\notready` stubs | First Main Theorem (P-R Ch. 3) |
 
 ## Your task this session
 
-### Action 1 — verify the build (first command)
+### Action 1 — confirm the env is intact (~3 min)
 
 ```bash
-lake build 2>&1 | tail -10
+lake build 2>&1 | tail -5
+PATH="$PWD/.venv/bin:$PATH" .venv/bin/leanblueprint web 2>&1 | tail -5
+PATH="$PWD/.venv/bin:$PATH" .venv/bin/leanblueprint checkdecls; echo "exit: $?"
+gh run list --repo YssnBkd/mathlib4-computable-analysis --limit 3
 ```
 
-Expected: 0 errors, **exactly 1 sorry-warning** (`ComputableAnalysis/L4/Instances/CMap.lean:261:23` for the L4 instance). If you see anything else, see `docs/SETUP.md`.
+Expected:
+- `lake build`: 1 sorry-warning at `ComputableAnalysis/L4/Instances/CMap.lean:261:23`, `Build completed successfully`.
+- `leanblueprint web`: produces `blueprint/web/` with no plasTeX errors.
+- `leanblueprint checkdecls`: exit 0, no output.
+- Recent workflow runs: most recent should be `completed` `success`.
 
-### Action 2 — recommended direction: L1 closure-first
+If `checkdecls` reports unresolved decls, a `\lean{...}` macro in `blueprint/src/*.tex` points at something the Lean project doesn't export. Fix the macro target name, don't add a sorry-bearing Lean decl just to make the check pass.
 
-**Why this and not "resume A1 directly"**: A1 under polynomial form needs three more closure helpers (`_mul`, `_reindex`, `_finsetSum`) plus ~50 lines of witness assembly. The prior round shipped one helper in 5 iters. Continuing in L4 with the `_add` helper now living inline in `CMap.lean` adds technical debt (it belongs in L1). Better path: open a round dedicated to L1 closures (proper home), then resume L4 A1 with the toolkit ready.
+### Action 2 — recommended direction: L1 closures, blueprint-native
+
+**Why this and not L4 A1 directly:** A1 under the polynomial form needs three more closure helpers (`_mul`/`_reindex`/`_finsetSum`) plus ~50 lines of witness assembly. The prior `l4-cmap-axiom-linearity` round (2026-06-02, budget-exhausted at 5/6 iters / ~198 min) shipped one helper. Continuing in L4 with the helpers inline adds technical debt (they belong in L1). Better: open a round dedicated to L1 closures (proper home), then resume L4 A1 with the toolkit ready.
+
+**Why blueprint-native:** every new L1 lemma is a candidate green node in the dep graph. Adding the LaTeX entry at the same time the Lean lemma lands keeps the graph honest. The adapted `/formalize` skill Phase 6 makes this nearly free (one extra `\lean{...}\leanok` toggle per lemma).
 
 Suggested round setup:
 
 - **Slug**: `l1-arithmetic-closure-and-real`
 - **Mode**: `proof-attempt`
-- **Budget**: 12 iters / 180 min (3× the prior round's budget, calibrated to the discovered cost)
-- **Allow_writes**: `ComputableAnalysis/L1/**`, `ComputableAnalysis/L4/Instances/CMap.lean` (to lift `_add` and remove its TODO comment), `CLAUDE.md`, `claims/l1-arithmetic-closure-and-real/**`, `.goals/l1-arithmetic-closure-and-real/**`, `.goals/INDEX.md`, `thinking/l1-arithmetic-closure-and-real/**`.
-- **Forbid_writes**: `ComputableAnalysis/L0/**`, `ComputableAnalysis/L3/**`, `ComputableAnalysis.lean`, `literature/papers/**/verbatim.md`.
-- **Criteria sketch**:
-  - C1: `lake build` green; the L4 instance sorry-warning is the only residual.
-  - C2: `isComputableSeqRat_add` lifted from `L4/Instances/CMap.lean` to `L1/ComputableSeqReal.lean` (or a new `L1/RatClosure.lean`) under its proper public name; CMap.lean references the L1 version.
-  - C3: `isComputableSeqRat_mul` shipped (fully proved). The simpler sibling of `_add` — sign XOR, no truncated-subtraction bookkeeping.
-  - C4: At least one of `isComputableSeqRat_reindex` or `isComputableSeqRat_finsetSum` shipped (whichever lands first).
-  - C5: `IsComputableReal : ℝ → Prop` defined in `ComputableAnalysis/L1/ComputableReal.lean` (~1-line definition + 1-2 sanity lemmas, P-R Ch. 0:55 citation in docstring).
-  - C6: CLAUDE.md L1 tracker rows updated.
+- **Budget**: **14 iters / 240 min** (calibrated from prior round: ~5 iters per closure helper × 3 helpers + 1 migration iter + 2 IsComputableReal iters + 3 iters slack)
+- **Allow_writes**:
+  - `ComputableAnalysis/L1/**`
+  - `ComputableAnalysis/L4/Instances/CMap.lean` (to lift `_add` and remove its TODO comment)
+  - `blueprint/src/L1.tex` (the chapter file — replace `\notready` stubs with the now-`\leanok` content)
+  - `claims/l1-computable-reals/**` (convert the pre-existing claim file to satellite format)
+  - `claims/l1-arithmetic-closure-and-real/**` (new rationale satellites)
+  - `CLAUDE.md` (only the "Corpus ingestion" table if new chapters get ingested; no other section)
+  - `.goals/l1-arithmetic-closure-and-real/**`, `.goals/INDEX.md`
+  - `thinking/l1-arithmetic-closure-and-real/**`
+  - `docs/NEXT-SESSION.md` (refresh at round end)
+- **Forbid_writes**:
+  - `ComputableAnalysis/L0/**`, `ComputableAnalysis/L3/**`, `ComputableAnalysis.lean`
+  - `blueprint/src/{content,L0,L2,L3,L4,L5}.tex` (only L1.tex changes)
+  - `blueprint/src/{blueprint.sty,plastex.cfg,latexmkrc}.tex` and `blueprint/src/macros/**` (scaffold; do not touch)
+  - `literature/papers/**/verbatim.md`
+  - `.claude/commands/**` (skills are stable)
+  - `.github/workflows/**`, `lakefile.toml`, `lake-manifest.json`, `lean-toolchain`
+- **Criteria** (each phrased to be machine-checkable; some target blueprint labels):
+  - **C1**: `lake build` green; only residual sorry-warning is `ComputableAnalysis/L4/Instances/CMap.lean:261:23`. `leanblueprint checkdecls` exits 0.
+  - **C2** (*migration*): `blueprint/src/L1.tex` has `\lean{...}\leanok` for every L1 declaration currently in `ComputableAnalysis/L1/ComputableSeqReal.lean` (the existing predicate + every helper lemma already done at 0 sorries). The two `\notready` stubs in L1.tex (`def:l1_isComputableSeqReal`, `def:l1_isComputableReal`) are replaced or extended to reflect actual state. Visual: `def:l1_isComputableSeqReal` node is green in the dep graph after Action 1 reruns.
+  - **C3** (*lift*): `isComputableSeqRat_add` lifted from `ComputableAnalysis/L4/Instances/CMap.lean` to `ComputableAnalysis/L1/ComputableSeqReal.lean` (or a new `ComputableAnalysis/L1/RatClosure.lean`) under its proper public name; CMap.lean references the L1 version via the qualified name. The L4 TODO comment removed. Blueprint label `lem:isComputableSeqRat_add` (or similar) goes green.
+  - **C4** (*mul*): `isComputableSeqRat_mul` shipped (fully proved). Simpler sibling of `_add` — sign XOR, no truncated-subtraction bookkeeping. Blueprint label `lem:isComputableSeqRat_mul` goes green.
+  - **C5** (*reindex or finsetSum*): at least one of `isComputableSeqRat_reindex` or `isComputableSeqRat_finsetSum` shipped (whichever lands first). Blueprint label goes green.
+  - **C6** (*point predicate*): `IsComputableReal : ℝ → Prop` defined in `ComputableAnalysis/L1/ComputableReal.lean` (or appended to ComputableSeqReal.lean) — ~1-line def + 1-2 sanity lemmas, P-R Ch. 0:55 citation in docstring. Blueprint label `def:l1_isComputableReal` goes green.
+  - **C7** (*satellite*): pre-existing `claims/l1-computable-reals/is-computable-seq-real.md` converted to satellite format per `claims/TEMPLATE.md` (post-2026-06-02): formal statement removed (now in blueprint LaTeX); YAML `status:` field dropped; `blueprint:` field added pointing at the matching `\label`; `[[blueprint:...]]` pointer at top of body. Rationale prose preserved.
 
-### Action 3 — alternative directions
+**Devil's-advocate required for**: C3 (the lift — easy to get the public name + namespace wrong), C6 (the point-predicate definition — high blast radius, see CLAUDE.md commitments #2-#3).
 
-If the user has different priorities:
+### Action 3 — alternative directions (if user opens with a different request)
 
-- **Just define `IsComputableReal`** (narrow, low-stakes): NEXT-SESSION.md's original Direction B at the previous session, now still applicable but doesn't unblock L4. Slug `l1-is-computable-real`, mode `explore`, 6 iters / 90 min.
-- **Resume L4 A1 directly** (stack-deeper, risk of repeating the budget overrun): slug `l4-cmap-axiom-linearity-cont`, mode `proof-attempt`, 6 iters / 180 min. Keep `_add` inline (or lift it first), then ship `_mul`/`_reindex`/`_finsetSum` + A1 witness assembly. Same allow_writes as the prior round PLUS L1.
-- **Post the deferred Zulip pitches** (human-in-loop): the L0 + L3 pitches at `docs/zulip-drafts/2026-06-01-l0-pitch.md` + `docs/zulip-drafts/2026-06-01-l3-pitch.md` are still drafted, still deferred. Decision recipe at `docs/zulip-drafts/2026-06-01b-decision.md`. ~30 min.
+- **Resume L4 A1 directly**: slug `l4-cmap-axiom-linearity-cont`, mode `proof-attempt`, 6 iters / 180 min. Risks repeating the prior round's budget overrun; doesn't migrate L1 content to blueprint. Allow_writes same as Action 2 PLUS L4.
+- **Just define `IsComputableReal`** (narrow): slug `l1-is-computable-real`, mode `explore`, 6 iters / 90 min. Closes one L1 pending milestone in isolation; doesn't unblock L4. Useful if the L1 closure round feels too large.
+- **L3 stability theorem**: slug `l3-stability`, mode `proof-attempt`, 8 iters / 150 min. P-R Ch. 2.3 — uniqueness of the computability structure under mild side conditions. The keystone result that vindicates the typeclass choice; high-leverage but no immediate dependency on L1/L4. Could go in parallel with someone else's L1 work.
+- **Zulip outreach with live blueprint**: slug `zulip-l0-l3-pitches`, mode `explore`, 3 iters / 60 min (mostly conversation with the user). The L0 + L3 pitches at `docs/zulip-drafts/2026-06-01-l0-pitch.md` + `2026-06-01-l3-pitch.md` are still drafted. With Pages live we can now embed dep-graph links. Recommend waiting until L1 chapter has at least 5-7 green nodes so the blueprint visibly justifies the pitch.
+- **Migrate L3 claim file to satellite** (housekeeping): 1-2 iter mechanical migration of `claims/l3-computability-structure/axioms.md`. Low-stakes; can ride along with any other round.
 
-## Critical knowledge — Mathlib symbols verified this session
+## Critical knowledge — the blueprint stack (NEW since prior NEXT-SESSION.md)
 
-Augmentations to the prior tables; all entries verified against Mathlib master 2026-06-02.
+| Concept | Where | Note |
+|---|---|---|
+| Blueprint CLI | `.venv/bin/leanblueprint` | Always prefix with `PATH="$PWD/.venv/bin:$PATH"` so the CLI's shell-out to `plastex` resolves. |
+| Blueprint sources | `blueprint/src/{content,L0..L5}.tex` | `content.tex` is the dispatcher (`\input{L0}…\input{L5}`). |
+| Decl list | `blueprint/lean_decls` | Regenerated by `leanblueprint web`. `lake exe checkdecls blueprint/lean_decls` runs the validation. |
+| Macros | `blueprint/src/macros/{common,web,print}.tex` | `theorem`/`proposition`/`lemma`/`corollary`/`definition`/`remark` envs are defined here. Do not modify the scaffold structure; ADD envs by editing common.tex if a new one is needed. |
+| Dep graph | `blueprint/web/dep_graph_document.html` | Open via local server: `cd blueprint/web && python3 -m http.server 8765` then `http://localhost:8765/dep_graph_document.html`. `file://` blocks Web Workers; localhost works. |
+| GHA workflows | `.github/workflows/{blueprint,docs}.yml` | Split into fast (every push, ~5 min, blueprint only) and slow (on tags, ~20 min, blueprint + Mathlib-linked API docs). Both deploy to Pages. Full rationale: `docs/CI.md`. `lint: false` + `mk_all-check: false` in the fast path (no Mathlib lint_driver declared; deferred until pre-upstream readiness). |
+| Pages URL | `https://yssnbkd.github.io/mathlib4-computable-analysis/blueprint/` | Live after first successful workflow run + Pages deploy. |
+
+## Critical knowledge — Mathlib symbols (carried from prior round)
+
+These were verified against Mathlib master 2026-06-02 in the prior round and are load-bearing for the L1 closure work:
 
 | Concept | Exact symbol | Import / location | Note |
 |---|---|---|---|
-| `Primrec₂.nat_add/sub/mul/le` | `Primrec.nat_add` etc. | `Mathlib/Computability/Primrec/Basic.lean:593,596,599,610` | The ℕ-level arithmetic building blocks. `nat_sub` is **truncated** (0 if negative). |
-| `Primrec.nat_mod / nat_bodd` | both | `Mathlib/Computability/Primrec/Basic.lean:728,733` | Use `nat_bodd` (Bool-valued: odd? true : false) over `% 2` when the result needs to be Computable. |
-| `Primrec.ite / .cond` | both | `Mathlib/Computability/Primrec/Basic.lean:602,606` | `.cond` is Bool-conditional; `.ite` is Prop-conditional with `[DecidablePred c]`. |
-| `Computable.cond` (Bool conditional on Computable) | yes | `Mathlib/Computability/Partrec.lean:594` | `cond hc hf hg : Computable (fun a => bif (c a) then (f a) else (g a))`. |
-| `Computable₂.comp` | yes | `Mathlib/Computability/Partrec.lean:477` | `(hf : Computable₂ f).comp (hg : Computable g) (hh : Computable h) : Computable (fun a => f (g a) (h a))`. **Critical**: takes two separate args, NOT a paired one. |
-| `Primrec₂.to_comp` | yes | `Mathlib/Computability/Partrec.lean:252` | Lifts Primrec₂ to Computable₂. Use as `Primrec.nat_mul.to_comp.comp hb₁ hb₂`. |
-| `PrimrecRel.decide` | yes | `Mathlib/Computability/Primrec/Basic.lean:426` | Converts a `PrimrecRel R` (like `nat_le`) to `Primrec₂ (fun a b => decide (R a b))`. Use `.swap.decide` to flip arg order. |
-| `Primcodable ℤ/ℚ` (via `Denumerable`) | auto | `Mathlib/Computability/Primrec/Basic.lean:139` priority-10 | `instDenumerableInt` at `Mathlib/Logic/Denumerable.lean:158`; `instDenumerableRat` at `Mathlib/Data/Rat/Denumerable.lean:30`. **BUT** no Mathlib-exported `Primrec₂` for ℤ-arithmetic or ℚ-arithmetic — those have to be built. |
+| `Primrec.nat_add/sub/mul/le` | as named | `Mathlib/Computability/Primrec/Basic.lean:593,596,599,610` | ℕ-level arithmetic. `nat_sub` is **truncated** (0 if negative). |
+| `Primrec.nat_mod / nat_bodd` | both | `Mathlib/Computability/Primrec/Basic.lean:728,733` | `nat_bodd` returns `Bool`; prefer over `% 2` when the result needs to be Computable. |
+| `Primrec.ite / .cond` | both | `Mathlib/Computability/Primrec/Basic.lean:602,606` | `.cond` is `Bool`-conditional; `.ite` is `Prop`-conditional with `[DecidablePred c]`. |
+| `Computable.cond` | yes | `Mathlib/Computability/Partrec.lean:594` | `cond hc hf hg : Computable (fun a => bif (c a) then (f a) else (g a))`. |
+| `Computable₂.comp` | yes | `Mathlib/Computability/Partrec.lean:477` | Takes **two separate** `Computable` args, NOT a paired one. |
+| `Primrec₂.to_comp` | yes | `Mathlib/Computability/Partrec.lean:252` | Lifts `Primrec₂` to `Computable₂`. Use as `Primrec.nat_mul.to_comp.comp hb₁ hb₂`. |
+| `PrimrecRel.decide` | yes | `Mathlib/Computability/Primrec/Basic.lean:426` | Converts `PrimrecRel R` to `Primrec₂ (fun a b => decide (R a b))`. Use `.swap.decide` to flip arg order. |
+| `Primcodable ℤ/ℚ` | auto (via `Denumerable`) | `Mathlib/Computability/Primrec/Basic.lean:139` | **No Mathlib-exported `Primrec₂` for ℤ/ℚ arithmetic**; build at the ℕ-level via sign-num-den decomposition. |
 
-## Critical knowledge — Lean 4 / Mathlib idioms that worked
+## Critical knowledge — Lean idioms that worked in `_add`
 
-These patterns worked cleanly in `isComputableSeqRat_add`; copy them for the upcoming `_mul`/`_reindex`/`_finsetSum`:
+These patterns proved out in `isComputableSeqRat_add`; copy them for `_mul`/`_reindex`/`_finsetSum`:
 
 ### Computable composition pattern
 
@@ -99,14 +140,14 @@ have hp₁ : Computable (fun k => a₁ k * b₂ k) :=
 
 ### Computable conditional pattern
 
-For a function `fun k => if (Prop predicate on k) then X else Y`:
+For `fun k => if (Prop predicate on k) then X else Y`:
 
 ```lean
 have hge : Computable (fun k => decide (a₁ k * b₂ k ≥ a₂ k * b₁ k)) := by
   have : Primrec₂ (fun p q : ℕ => decide (p ≥ q)) := Primrec.nat_le.swap.decide
   exact this.to_comp.comp hp₁ hp₂
 have htotal := Computable.cond hge hX hY
--- htotal is in `cond` form. Now convert to `ite` form:
+-- htotal is in `cond` form. Convert to `ite`:
 refine htotal.of_eq fun k => ?_
 by_cases h : (predicate)
 · simp [h]
@@ -127,57 +168,55 @@ After this, `pow_red (s k)` rewrites `(-1)^(s k)` to `(-1)^(s k % 2)`. Combine w
 ### Ring identity with truncated ℕ-subtraction
 
 ```lean
-rw [Nat.cast_sub hle]  -- ↑(a - b) → ↑a - ↑b when h : b ≤ a in ℕ
-push_cast               -- distributes other ℕ-casts
-field_simp              -- clears denominators using available `hb : (b : ℚ) ≠ 0`
-try ring                -- closes leaf; `try` because field_simp may already close
+rw [Nat.cast_sub hle]   -- ↑(a - b) → ↑a - ↑b when h : b ≤ a in ℕ
+push_cast                -- distribute remaining ℕ-casts
+field_simp               -- clear denominators with available `hb : (b : ℚ) ≠ 0`
+try ring                 -- `try` because field_simp may already close the goal
 ```
 
-The `try ring` is essential — `field_simp` closes some cases entirely; `ring` would then error "No goals to be solved" without `try`.
-
-## Critical knowledge — Mathlib gotchas surfaced this session
-
-- **`Primrec₂.to_comp` returns `Computable₂`, not `Computable`.** Composition pattern is `.comp arg1 arg2`, NOT `.comp (arg1.pair arg2)`.
-- **No direct `Primrec₂` for ℤ/ℚ arithmetic in Mathlib.** Don't waste time looking for `Primrec.int_add` or `Primrec.rat_add`; they're derivable but not exported. The `IsComputableSeqRat` closure proofs work at the **ℕ-level** via sign-num-den decomposition.
-- **`nat_sub` is truncated.** `(a - b : ℕ)` is `0` when `b > a`. The ℚ-cast `Nat.cast_sub : b ≤ a → ((a - b : ℕ) : ℚ) = (a : ℚ) - (b : ℚ)` requires the hypothesis to handle the truncation properly.
-- **`(-1 : ℚ)^n` is best reduced via `n % 2`** rather than tracking parity in the witness predicate. The `pow_red` helper above is the bridge.
-- **`field_simp` may close the goal.** Always follow with `try ring` rather than bare `ring` to avoid "No goals to be solved" errors.
+The `try ring` is essential — `field_simp` closes some cases entirely; bare `ring` would error "No goals to be solved".
 
 ## Watchpoints — don't repeat past mistakes
 
-All prior watchpoints still apply. Augmentations from this session:
-
-- **DON'T trust prior-session "no new L1 lemmas needed" claims without checking the actual L1 file's `## What this file is NOT` section.** Last session's NEXT-SESSION.md made this misjudgment; the entire L1 arithmetic-closure machinery was deferred at L1 design time and we discovered it the hard way.
-- **DON'T attempt to derive `Primrec₂.rat_add` / `int_add` from scratch.** The ℕ-level sign-num-den approach is much shorter and is the project's established idiom.
-- **DON'T `rw` patterns that appear on both sides of the goal expecting it to rewrite only one.** Use `conv_lhs` / `conv_rhs` / `nth_rewrite` to target. (This was last session's `Rat.num_div_den` gotcha; still relevant.)
-- **DON'T commit Lean files with new sorry-warnings just to "show structure".** Either prove fully or leave the draft in `thinking/`. Sorry-warnings in production Lean degrade C1 and the project's "1 sorry-warning at the instance level" invariant.
-- **DON'T set proof-attempt iter budgets below what the prior round took for similar work.** The 6 iters / 120 min limit for closure proofs is too tight by ~2-3×.
+- **DON'T trust prior-session "no new L1 lemmas needed" claims** without re-checking the actual L1 file's `## What this file is NOT` section. The l4-cmap-axiom-linearity round discovered the L1 arithmetic closure gap the hard way.
+- **DON'T attempt to derive `Primrec₂.rat_add` / `int_add` from scratch.** The ℕ-level sign-num-den approach is shorter and is the project's established idiom.
+- **DON'T `rw` patterns that appear on both sides of the goal** expecting it to rewrite only one. Use `conv_lhs` / `conv_rhs` / `nth_rewrite` to target.
+- **DON'T commit Lean files with new sorry-warnings just to "show structure".** Either prove fully or leave the draft in `thinking/`. New sorry-warnings break the project's "1 sorry-warning at the L4 instance level" invariant and hide the blueprint `\leanok` consistency check.
+- **DON'T set `\leanok` on a blueprint env whose `\lean{decl}` target has `sorry` in its proof body.** This is a hard rule in CLAUDE.md `## sorry policy`. `#print axioms <decl>` showing `sorryAx` is a refusal.
+- **DON'T set proof-attempt iter budgets below what the prior round took for similar work.** The 6 iters / 120 min limit for closure proofs was off by ~2-3×. Calibration: 14 iters / 240 min for the L1 round.
+- **DON'T edit `blueprint/src/` files beyond the layer you're working on.** The `\input` order in `content.tex` is fixed; other chapter files belong to other rounds.
+- **DON'T touch `.claude/commands/**` or `.github/workflows/**`** — those are the workflow scaffold; modifications require their own dedicated round.
 
 ## User calibration
 
-Unchanged from prior session. Technically capable; explicit authorization for bold changes. Defer on Zulip posting / commits / PRs / scope changes. The user authorized the prior round's final commit specifically.
+Technically capable; explicit authorization for bold changes. Defers on Zulip posting / commits / PRs / scope changes. Each commit needs an explicit "yes" from them; never assume. After approval, batch related changes into one or two reviewable commits with HEREDOC commit messages ending in `Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>`.
 
 ## Files to know
 
 - `CLAUDE.md` — slim constitution. Read first.
-- `docs/SETUP.md` — Lean install + first build.
+- `docs/SETUP.md` — Lean install + first build (post-hoist, runs from repo root).
 - `docs/NEXT-SESSION.md` — this file.
-- `ComputableAnalysis/L0/{Bridge,PropB,AnalysisBridge}.lean` — L0, `done`.
-- `ComputableAnalysis/L1/ComputableSeqReal.lean` — L1 `IsComputableSeqRat`/`IsComputableSeqReal`, **`done`** (0 sorries). **NB**: explicit "What this file is NOT" section at lines 56-64 lists arithmetic closure as deferred — that gap is what the next round closes.
-- `ComputableAnalysis/L3/ComputabilityStructure.lean` — **L3 keystone, `formalized`** (0 sorries).
-- `ComputableAnalysis/L4/Instances/CMap.lean` — **L4 first instance, `stub`** (def/instance bodies sorry-free; A1/A2/A3 theorem-body sorries grouped under the instance at line 261; **new this round**: `private theorem isComputableSeqRat_add` ~80 lines at the top, marked `TODO(refactor → L1):` — the candidate lift target).
-- `ComputableAnalysis.lean` — umbrella import.
-- `claims/l3-computability-structure/axioms.md` — L3 design doc.
-- `claims/l1-computable-reals/is-computable-seq-real.md` — L1 design doc.
-- `literature/papers/PourEl-Richards-*.md` — per-chapter verbatim extracts.
-- `.goals/l4-cmap-axiom-linearity/final.md` — full report of the prior round (budget-exhausted, 5/6 iters, ~198 min; `_add` shipped, A1 still sorry).
+- `ComputableAnalysis/L0/{Bridge,PropB,AnalysisBridge}.lean` — L0, **done**, all blueprint nodes green.
+- `ComputableAnalysis/L1/ComputableSeqReal.lean` — L1 `IsComputableSeqRat`/`IsComputableSeqReal`, **done** (0 sorries). NB: explicit "What this file is NOT" section at lines 56-64 lists arithmetic closure as deferred — that gap is what the next round closes.
+- `ComputableAnalysis/L3/ComputabilityStructure.lean` — **L3 keystone, formalized** (0 sorries).
+- `ComputableAnalysis/L4/Instances/CMap.lean` — **L4 first instance, stub** (def + instance sorry-free; A1/A2/A3 theorem-body sorries at line 261). Carries `private theorem isComputableSeqRat_add` (~80 lines, fully proved) inline at top — the candidate lift target for Action 2 C3, marked `TODO(refactor → L1):`.
+- `ComputableAnalysis.lean` — umbrella import. **Don't edit during the L1 round** (it's in forbid_writes); the L1 file is already imported.
+- `blueprint/src/{content,L0,L1,L2,L3,L4,L5}.tex` — blueprint chapters. **L1.tex is the editable target for this round.**
+- `blueprint/src/macros/common.tex` — theorem-env defs. Add a `\newtheorem{remark}` style only if a new env is needed.
+- `blueprint/lean_decls` — declaration list (auto-regenerated). Cited by `lake exe checkdecls`.
+- `blueprint/web/` — local-build output. `.gitignored`; rebuild with `leanblueprint web`.
+- `claims/INDEX.md` + `claims/TEMPLATE.md` — post-2026-06-02 satellite convention. Read before writing new claim files.
+- `claims/l1-computable-reals/is-computable-seq-real.md` — legacy claim file; gets migrated to satellite under Action 2 C7.
+- `claims/l3-computability-structure/axioms.md` — legacy claim file; migration deferred to a future L3 round.
+- `literature/papers/PourEl-Richards-*.md` — per-chapter verbatim extracts (P-R 1989).
+- `.goals/l4-cmap-axiom-linearity/final.md` — prior round (budget-exhausted, 5/6 iters / ~198 min). The `_add` shipped there; A1 still sorry.
 - `.goals/INDEX.md` — registry of all past rounds.
-- `thinking/l4-cmap-axiom-linearity/iter-03-strategy.md` — full paper-form A1 proof + verbatim P-R citations (still load-bearing; the citations and proof sketch will guide the future A1 round).
-- `docs/zulip-drafts/{2026-06-01-l0-pitch,2026-06-01-l3-pitch,2026-06-01b-decision}.md` — Zulip drafts (still deferred).
+- `thinking/l4-cmap-axiom-linearity/iter-03-strategy.md` — full paper-form A1 proof + verbatim P-R citations (still load-bearing for the eventual A1 round).
+- `docs/zulip-drafts/{2026-06-01-l0-pitch,2026-06-01-l3-pitch,2026-06-01b-decision}.md` — drafts (still deferred; would be updated to link the live blueprint).
 
 ## If the user types something different
 
-The above task list assumes default continuation. If the user opens with a different request (e.g., "let's actually post the Zulip pitches", "resume L4 A1 directly anyway", "let's start L2 instead"), follow their direction — this prompt is a *default*, not a script.
+The above task list assumes default continuation. If the user opens with a different request (e.g., "let's resume L4 A1 directly anyway", "let's start L2 instead", "let's actually post the Zulip pitches with the new blueprint URL"), follow their direction — this prompt is a *default*, not a script.
 
 ---
 

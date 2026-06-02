@@ -21,6 +21,8 @@ build/
 # Blueprint build outputs (added 2026-06-02)
 blueprint/print/
 blueprint/web/
+blueprint/src/*.paux
+blueprint/src/web.bbl
 
 # OS
 .DS_Store

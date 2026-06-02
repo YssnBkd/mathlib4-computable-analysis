@@ -1,0 +1,60 @@
+# Slow doc-build workflow — triggers on tag pushes, ~15-20 min.
+# Builds the Lean project, the full Mathlib API docs (the slow step), and the
+# blueprint, then deploys everything to Pages.
+# Uses `leanprover-community/docgen-action` which bundles the build + docs +
+# blueprint + Pages deploy in one composite step.
+# See docs/CI.md for the full rationale and when to run this.
+
+name: Blueprint + API docs (slow — on tags)
+
+on:
+  push:
+    tags:
+      - 'v*'
+      - 'release-*'
+  workflow_dispatch:        # allow manual runs from the Actions tab
+
+# Slow runs are not cancellable; tag a release once, let it finish.
+concurrency:
+  group: pages-slow-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+    name: Build Lean + blueprint + API docs + deploy to Pages
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Free disk space
+        uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.0
+        with:
+          tool-cache: false
+          android: true
+          dotnet: false
+          haskell: false
+          large-packages: false
+          docker-images: false
+          swap-storage: false
+
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 0
+
+      - name: Build Lean + blueprint + API docs (composite)
+        id: deployment
+        uses: leanprover-community/docgen-action@deed0cdc44dd8e5de07a300773eb751d33e32fc8 # 2025-10-26
+        with:
+          blueprint: true
+          # Our `docs/` is internal markdown notes, not a Jekyll source — skip
+          # the homepage build (would fail with "Could not locate Gemfile").
+          build-page: false

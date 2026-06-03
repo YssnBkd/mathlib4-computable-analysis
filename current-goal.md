@@ -13,12 +13,11 @@ devils_advocate_required_for:
 
 No active goal. Run `/goal <slug>` to start one.
 
-The most recent completed goal was `l4-cmap-axiom-linearity`
-(budget-exhausted, 5/6 iters, ~198 min). See
-`.goals/l4-cmap-axiom-linearity/final.md` for the full report. Main
-deliverable: `isComputableSeqRat_add` (private theorem, ~80 lines) in
-`ComputableAnalysis/L4/Instances/CMap.lean` — fully proved closure
-of L1's `IsComputableSeqRat` under pointwise addition, reusable for L4
-A1/A2/A3 and a candidate refactor target for L1 proper. A1 itself
-remains a `sorry` (3 more closure helpers + ~50 lines of witness
-assembly needed).
+The most recent completed goal was `l1-arithmetic-closure-and-real`
+(success, 7/14 iters, ~50 min). See
+`.goals/l1-arithmetic-closure-and-real/final.md` for the full report.
+Main deliverables: `IsComputableSeqRat.add` (lifted from L4 to L1),
+`.mul`, `.comp`; `IsComputableReal` point predicate + `.ofRat`/`.zero`
+sanity lemmas; legacy L1 claim file migrated to satellite format; L1.tex
+blueprint chapter populated to 11 `\leanok` envs. L4 `axiom_linearity`
+remains sorry (now unblocked by the L1 closures shipped this round).

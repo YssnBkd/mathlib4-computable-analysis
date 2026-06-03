@@ -26,4 +26,4 @@ ComputableAnalysis.L1.IsComputableReal
 ComputableAnalysis.L1.IsComputableReal.ofRat
 ComputableAnalysis.L1.IsComputableReal.zero
 ComputableAnalysis.L3.ComputabilityStructure
-ComputableAnalysis.L4.instComputabilityStructureCMap
+ComputableAnalysis.L4.computabilityStructureCMap_of

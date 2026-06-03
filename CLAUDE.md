@@ -83,6 +83,28 @@ designed for open mathematical research where conjecture-truth is uncertain. For
 *formalization* of a 1989 textbook, the type-checker is a better verifier than
 DA paper review. Default to lean-first.
 
+### When in doubt, grep — never assume
+
+Three reflexive checks, each a 2-to-5-second tool call, that prevent the most
+expensive avoidable mistakes (each one cost an iter in `l4-cmap-axiom-linearity-cont`):
+
+- **Mathlib symbol existence**: before depending on any Mathlib lemma or
+  Primrec/Computable primitive, `grep -rn "<symbol>" .lake/packages/mathlib/Mathlib/<area>/`.
+  If no hit, the symbol doesn't exist by that name — define inline (typically
+  via `Computable.nat_rec` or `Primrec.nat_rec`) or search synonyms. *E.g.,
+  `Primrec.nat_pow` does not exist — see `docs/PITFALLS.md` §1.*
+- **Literature citations**: for any `P-R Ch. X:Y`-style or `<file>:<line>`
+  reference, `Read literature/papers/<key>.md` with `offset: Y, limit: 3` and
+  verify the quoted phrase appears verbatim BEFORE writing the citation. Do
+  not trust memory of line numbers — they shift across edits. *E.g., "for
+  recursive reals a, b" is at Ch. 2:128, not :148 — verified the expensive
+  way; see `docs/PITFALLS.md` §6.*
+- **`allow_writes` scope** (in `/goal` rounds): before editing a file path
+  not yet touched this round, `grep -F "<path>" current-goal.md`. The Stop
+  hook HALTs out-of-scope writes — catching it after the fact costs an iter
+  + a revert. *E.g., `claims/INDEX.md` is typically NOT in round-scoped
+  allow_writes — see `docs/PITFALLS.md` §5.*
+
 ## Five-layer architecture
 
 | Layer | Content | P-R chapter | Lean target |
@@ -225,3 +247,22 @@ The five-layer scaffold (L0…L5) is captured both by
 `ComputableAnalysis/L<N>/*.lean` (Lean source) and `blueprint/src/L<N>.tex`
 (LaTeX dispatcher chapters). Layer status is read off the dep graph's node
 colors per the "Status (carried by blueprint)" section above.
+
+## Lessons from prior rounds
+
+Cross-round Lean / formalization knowledge harvested from completed rounds.
+These were learned the expensive way (iter-by-iter pitfalls in `.goals/*/iter-*.md`)
+and elevated here so future sessions don't re-derive them.
+
+- **`docs/LEAN-IDIOMS.md`** — positive Lean tactics that worked
+  (`convert ... using 1`, `show ...` to bridge `Computable.nat_rec`'s
+  IH-form, `@[reducible]` on class-type defs, inner-witness extraction from
+  `IsComputableSeqRat`, `Finset.sum` vs `Nat.rec` choice for closure helpers,
+  helper-first round design). Read when planning a new proof.
+- **`docs/PITFALLS.md`** — Lean / Mathlib gotchas with workarounds
+  (missing `Primrec.nat_pow`, the absent `IsComputableSeqRat ↔ Computable ℚ`
+  bridge, `Computable.id`-makes-inductions-ugly, `obtain` consumes the
+  hypothesis, citation typos, allow_writes traps). Read when debugging a
+  confusing error.
+
+Skim both files before opening a new L-layer round.

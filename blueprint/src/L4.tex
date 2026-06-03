@@ -1,16 +1,20 @@
 \chapter{L4 — Instances of the computability structure}
 
 % P-R reference: Chapter 2, examples 2.1, 2.4-2.5, literature/papers/PourEl-Richards-chapt2.md.
-% Layer status: C[a,b] is stub (A1/A2/A3 theorem-body sorries grouped at
-% ComputableAnalysis/L4/Instances/CMap.lean:261). L^p[a,b] and separable Hilbert
-% are pending.
+% Layer status (post round l4-cmap-axiom-linearity-cont, 2026-06-03): C[a,b] is
+% PARTIAL — witness construction (M, dS, aS) + Computability + IsComputableSeqRat
+% (flatten aS) all shipped sorry-free; only the norm bound for axiom_linearity remains
+% sorry. axiom_limits and axiom_norms remain stub (deferred). L^p[a,b] and separable
+% Hilbert are pending.
 
 \begin{theorem}
   \label{thm:l4_cmap_instance}
-  \lean{ComputableAnalysis.L4.instComputabilityStructureCMap}
+  \lean{ComputableAnalysis.L4.computabilityStructureCMap_of}
   \uses{def:l3_computabilityStructure}
-  $C([a,b], \mathbb{R})$ with sup-norm carries a \texttt{ComputabilityStructure}~$\mathbb{R}$ instance via the polynomial-approximation predicate. Stated in Lean; three axiom fields (\texttt{axiom\_linearity}, \texttt{axiom\_limits}, \texttt{axiom\_norms}) currently \texttt{sorry}. P-R Ch.\,2:141--153.
-  See \texttt{ComputableAnalysis/L4/Instances/CMap.lean:261}.
+  $C([a,b], \mathbb{R})$ with sup-norm carries a \texttt{ComputabilityStructure}~$\mathbb{R}$ structure via the polynomial-approximation predicate, parameterized over an explicit rational bound $B$ on $\max(|a|,|b|)$ (matching P-R Ch.\,2:128's restriction to recursive reals).
+
+  \textbf{Formalization state (2026-06-03, partial).} The witness $\langle aS, dS \rangle$ for \texttt{axiom\_linearity} is constructed and Computable; the \texttt{IsComputableSeqRat (flatten aS)} proof is closed (\textasciitilde 150 lines via \texttt{FinsetSumHelper.finsetSum\_rat} + helpers). The polynomial-approximant norm bound $\|s_n - \texttt{polyApproxCMap}\ aS\ dS\ n\ m\| \le 1/2^m$ is the sole remaining \texttt{sorry} in the body. \texttt{axiom\_limits} (= P-R Ch.\,0 Thm.\,4) and \texttt{axiom\_norms} (= P-R Ch.\,0 Thm.\,7) remain stub. P-R Ch.\,2:141--153.
+  See \texttt{ComputableAnalysis/L4/Instances/CMap.lean:439}.
 \end{theorem}
 
 \begin{theorem}

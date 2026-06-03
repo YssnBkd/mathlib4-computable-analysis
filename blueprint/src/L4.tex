@@ -7,8 +7,10 @@
 
 \begin{theorem}
   \label{thm:l4_cmap_instance}
-  \notready
-  $C([a,b], \mathbb{R})$ with sup-norm carries a \texttt{ComputabilityStructure}~$\mathbb{R}$ instance via the polynomial-approximation predicate. P-R Ch.\,2:141.
+  \lean{ComputableAnalysis.L4.instComputabilityStructureCMap}
+  \uses{def:l3_computabilityStructure}
+  $C([a,b], \mathbb{R})$ with sup-norm carries a \texttt{ComputabilityStructure}~$\mathbb{R}$ instance via the polynomial-approximation predicate. Stated in Lean; three axiom fields (\texttt{axiom\_linearity}, \texttt{axiom\_limits}, \texttt{axiom\_norms}) currently \texttt{sorry}. P-R Ch.\,2:141--153.
+  See \texttt{ComputableAnalysis/L4/Instances/CMap.lean:261}.
 \end{theorem}
 
 \begin{theorem}

@@ -6,12 +6,15 @@
 
 \begin{definition}
   \label{def:l3_computabilityStructure}
-  \notready
+  \lean{ComputableAnalysis.L3.ComputabilityStructure}
+  \leanok
+  \uses{def:l1_isComputableSeqReal}
   Typeclass \texttt{ComputabilityStructure}~$\Bbbk$~$E$ on a Banach space $[NormedAddCommGroup\,E]$ $[NormedSpace\,\Bbbk\,E]$ $[CompleteSpace\,E]$, with three axioms:
   \begin{itemize}
     \item \textbf{A1 (linearity).} Computable sequences are closed under rational linear combinations.
     \item \textbf{A2 (effective limit).} An effective Cauchy sequence of computable sequences has a computable limit.
     \item \textbf{A3 (computable norm).} The norm of a computable sequence is a computable sequence of reals.
   \end{itemize}
-  P-R Ch.\,2:18--22.
+  Plus a fourth field \texttt{zero\_seq} (admissibility of the zero sequence). P-R Ch.\,2:49--77.
+  See \texttt{ComputableAnalysis/L3/ComputabilityStructure.lean:108}.
 \end{definition}

@@ -7,8 +7,11 @@
 
 \begin{definition}
   \label{def:l1_isComputableSeqReal}
-  \notready
-  Predicate \texttt{IsComputableSeqReal}\,$: (\mathbb{N} \to \mathbb{R}) \to \texttt{Prop}$ on Mathlib's \texttt{Real}. Statement migration pending. P-R Ch.\,0:55.
+  \lean{ComputableAnalysis.L1.IsComputableSeqReal}
+  \leanok
+  \uses{def:isRecursive}
+  Predicate \texttt{IsComputableSeqReal}\,$: (\mathbb{N} \to \mathbb{R}) \to \texttt{Prop}$ on Mathlib's \texttt{Real}. A real sequence $r$ is computable iff there exists a computable rational double-sequence $q : \mathbb{N} \to \mathbb{N} \to \mathbb{Q}$ such that $|r_n - q_{n,k}| < 2^{-k}$ for all $n, k$. P-R Ch.\,0:203, Definition 5a.
+  See \texttt{ComputableAnalysis/L1/ComputableSeqReal.lean:101}.
 \end{definition}
 
 \begin{definition}

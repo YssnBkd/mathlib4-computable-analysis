@@ -14,3 +14,6 @@ ComputableAnalysis.L0.insepB_re
 ComputableAnalysis.L0.insepA_insepB_disjoint
 ComputableAnalysis.L0.insepA_insepB_no_separator
 ComputableAnalysis.L0.prop_B
+ComputableAnalysis.L1.IsComputableSeqReal
+ComputableAnalysis.L3.ComputabilityStructure
+ComputableAnalysis.L4.instComputabilityStructureCMap

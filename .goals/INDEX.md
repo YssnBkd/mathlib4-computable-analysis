@@ -11,3 +11,4 @@ Registry of all `/goal` rounds. Status is `active`, `success`, `partial`, `aband
 | l4-cmap-axiom-linearity | budget-exhausted | 2026-06-01 | 2026-06-02 | 5/6 | proof-attempt |
 | l1-arithmetic-closure-and-real | success | 2026-06-03 | 2026-06-03 | 7/14 | proof-attempt |
 | l4-cmap-axiom-linearity-cont | partial | 2026-06-03 | 2026-06-03 | 16/16 | proof-attempt |
+| l4-cmap-axiom-linearity-bound | success | 2026-06-03 | 2026-06-03 | 9/50 | proof-attempt |

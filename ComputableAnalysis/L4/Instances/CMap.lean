@@ -380,6 +380,108 @@ theorem ite_rat
 
 end FinsetSumHelper
 
+/-! ## §0b — Pure arithmetic helpers for the A1 norm bound
+
+These lemmas are recursion, Finset, and cast arithmetic facts used by the
+`axiom_linearity` norm-bound proof (round `l4-cmap-axiom-linearity-bound`).
+They are fully general (no dependence on `α, β, B`) and could be upstreamed. -/
+
+/-- Lower bound for the `max`-accumulating `Nat.rec`: every `g k` with `k < N`
+is `≤` the accumulated maximum `Nat.rec 0 (fun j acc => max acc (g j)) N`. Used
+to show the degree bound `dS` and coefficient bound `bound_max` dominate their
+per-`k` constituents (`k ≤ d n`). -/
+theorem le_natRec_max (g : ℕ → ℕ) (k : ℕ) :
+    ∀ N, k < N → g k ≤ Nat.rec (motive := fun _ => ℕ) 0 (fun j acc => max acc (g j)) N := by
+  intro N
+  induction N with
+  | zero => intro hk; exact absurd hk (Nat.not_lt_zero k)
+  | succ N ih =>
+    intro hk
+    rcases (Nat.lt_succ_iff.mp hk).lt_or_eq with h | h
+    · exact le_trans (ih h) (le_max_left _ _)
+    · subst h; exact le_max_right _ _
+
+/-- Closed form for the additive `Nat.rec`: `Nat.rec c (fun j acc => acc + g j) N`
+unfolds to `c + Σ_{j < N} g j`. Used to expose `bound_x_k`/`bound_y_k` as
+`1 + Σ_j bound_a·B^j` for the polynomial-norm bound. -/
+theorem natRec_add_eq_sum (c : ℕ) (g : ℕ → ℕ) :
+    ∀ N, Nat.rec (motive := fun _ => ℕ) c (fun j acc => acc + g j) N
+        = c + ∑ j ∈ Finset.range N, g j := by
+  intro N
+  induction N with
+  | zero => simp
+  | succ N ih =>
+    show Nat.rec (motive := fun _ => ℕ) c (fun j acc => acc + g j) N + g N
+        = c + ∑ j ∈ Finset.range (N + 1), g j
+    rw [ih, Finset.sum_range_succ]; ring
+
+/-- The real absolute value of a triple-represented rational `(-1)^s · (a / b)`
+(`a, b, s : ℕ`, `b ≠ 0`) is bounded by its numerator `a`. This is the bridge
+from L1's recursion-theoretic witness data to the ℝ-level coefficient bounds. -/
+theorem abs_cast_neg_one_pow_div_le (a b s : ℕ) (hb : b ≠ 0) :
+    |(((-1 : ℚ) ^ s * ((a : ℚ) / (b : ℚ))) : ℝ)| ≤ (a : ℝ) := by
+  have hb1 : (1 : ℝ) ≤ (b : ℝ) := by exact_mod_cast Nat.one_le_iff_ne_zero.mpr hb
+  have ha0 : (0 : ℝ) ≤ (a : ℝ) := Nat.cast_nonneg a
+  have key : |(((-1 : ℚ) ^ s * ((a : ℚ) / (b : ℚ))) : ℝ)| = (a : ℝ) / (b : ℝ) := by
+    push_cast
+    rw [abs_mul, show |(-1 : ℝ) ^ s| = 1 by rw [abs_pow]; norm_num, one_mul,
+       abs_div, abs_of_nonneg ha0, abs_of_nonneg (Nat.cast_nonneg b)]
+  rw [key]
+  exact div_le_self ha0 hb1
+
+/-- Padding a coefficient sequence with zeros above degree `dk` does not change
+the polynomial value: extending the summation range from `dk + 1` up to `D + 1`
+(with `dk ≤ D`) and masking the extra coefficients to `0` is the identity. Used
+to align the per-`k` approximants (each of degree `dX (k, ·)`) onto the common
+degree bound `D = dS (n, m)` in the convolution expansion. -/
+theorem padcoeff_sum (a : ℕ → ℝ) (dk D : ℕ) (hle : dk ≤ D) (w : ℝ) :
+    (∑ j ∈ Finset.range (D + 1), (bif decide (j ≤ dk) then a j else 0) * w ^ j)
+    = ∑ j ∈ Finset.range (dk + 1), a j * w ^ j := by
+  have hsub : Finset.range (dk + 1) ⊆ Finset.range (D + 1) := by
+    intro x hx; rw [Finset.mem_range] at hx ⊢; omega
+  rw [(Finset.sum_subset hsub (by
+        intro j hjD hjnk
+        rw [Finset.mem_range] at hjD hjnk
+        rw [show decide (j ≤ dk) = false from decide_eq_false (by omega), cond_false,
+            zero_mul])).symm]
+  apply Finset.sum_congr rfl
+  intro j hj
+  rw [Finset.mem_range] at hj
+  rw [show decide (j ≤ dk) = true from decide_eq_true (by omega), cond_true]
+
+/-- Per-`k` summand bound: if `xkw` is `ε`-close to `pxkw`, the rational
+coefficient `αr` is `ε`-close to the real coefficient `cα`, and `|cα| ≤ Ca`,
+`|pxkw| ≤ Px`, then `|cα·xkw − αr·pxkw| ≤ ε·(Ca + Px)`. The algebraic core of
+the linearity norm bound: splits the mixed product via
+`cα·xkw − αr·pxkw = cα·(xkw − pxkw) + (cα − αr)·pxkw`. -/
+theorem perk_bound (cα xkw αr pxkw ε Ca Px : ℝ)
+    (hε : 0 ≤ ε) (hCa : 0 ≤ Ca)
+    (h1 : |xkw - pxkw| ≤ ε) (h2 : |αr - cα| ≤ ε) (h3 : |cα| ≤ Ca) (h4 : |pxkw| ≤ Px) :
+    |cα * xkw - αr * pxkw| ≤ ε * (Ca + Px) := by
+  have p1 : |cα| * |xkw - pxkw| ≤ Ca * ε := mul_le_mul h3 h1 (abs_nonneg _) hCa
+  have p2 : |cα - αr| * |pxkw| ≤ ε * Px := by
+    have h2' : |cα - αr| ≤ ε := by rw [abs_sub_comm]; exact h2
+    exact mul_le_mul h2' h4 (abs_nonneg _) hε
+  calc |cα * xkw - αr * pxkw|
+      = |cα * (xkw - pxkw) + (cα - αr) * pxkw| := by ring_nf
+    _ ≤ |cα * (xkw - pxkw)| + |(cα - αr) * pxkw| := abs_add_le _ _
+    _ = |cα| * |xkw - pxkw| + |cα - αr| * |pxkw| := by rw [abs_mul, abs_mul]
+    _ ≤ Ca * ε + ε * Px := by linarith [p1, p2]
+    _ = ε * (Ca + Px) := by ring
+
+/-- Close-out ℕ inequality: `(D + 1) · Bm · 2^m ≤ 2^(m + (D + 1) + Bm + 2)`.
+The summation produces `(d n + 1)` copies of a per-`k` bound `Bm`, each scaled by
+`2^m` (the `M`-precision factor); the precision `M` is chosen with enough
+headroom (`m + (D+1) + Bm + 2`) that the resulting `2^{-M}` defeats the
+`(D+1)·Bm` prefactor down to `2^{-m}`. -/
+theorem closeout_nat (D Bm m : ℕ) : (D + 1) * Bm * 2 ^ m ≤ 2 ^ (m + (D + 1) + Bm + 2) := by
+  have hD : D + 1 ≤ 2 ^ (D + 1) := Nat.lt_two_pow_self.le
+  have hB : Bm ≤ 2 ^ Bm := Nat.lt_two_pow_self.le
+  calc (D + 1) * Bm * 2 ^ m
+      ≤ 2 ^ (D + 1) * 2 ^ Bm * 2 ^ m := Nat.mul_le_mul (Nat.mul_le_mul hD hB) (le_refl _)
+    _ = 2 ^ (m + (D + 1) + Bm) := by rw [← pow_add, ← pow_add]; congr 1; omega
+    _ ≤ 2 ^ (m + (D + 1) + Bm + 2) := Nat.pow_le_pow_right (by norm_num) (by omega)
+
 section CMap
 
 variable {α β : ℝ}
@@ -398,6 +500,99 @@ noncomputable def polyApproxCMap
   ContinuousMap.mk
     (fun x => ∑ j ∈ Finset.range (d (n, k) + 1), ((a (n, k, j) : ℝ)) * x.val ^ j)
     (by continuity)
+
+/-- Pointwise evaluation of `polyApproxCMap`: it is the polynomial sum at `w.val`.
+Holds by `rfl` (it is the definitional body of the underlying function). -/
+theorem polyApproxCMap_eval (a : ℕ × ℕ × ℕ → ℚ) (d : ℕ × ℕ → ℕ) (n k : ℕ) (w : Set.Icc α β) :
+    (polyApproxCMap (α := α) (β := β) a d n k) w
+      = ∑ j ∈ Finset.range (d (n, k) + 1), (a (n, k, j) : ℝ) * w.val ^ j := rfl
+
+/-- The convolution-coefficient polynomial (the one `aS` produces) evaluated at `w`
+equals the linear combination `Σ_k (αR·p_X + βR·p_Y)(w)` of the per-`k` approximants.
+This is the algebraic heart of the linearity construction: it re-associates the
+"flattened" degree-`Db` polynomial with coefficients
+`Σ_k (αR · padX + βR · padY)` back into the sum over `k` of the original approximants,
+using `padcoeff_sum` to undo the zero-padding onto the common degree `Db`. -/
+theorem polyApproxCMap_conv_eval
+    (aX aY : ℕ × ℕ × ℕ → ℚ) (dX dY : ℕ × ℕ → ℕ) (αR βR : ℕ × ℕ → ℚ)
+    (n N dn Db : ℕ)
+    (hge : ∀ k, k ≤ dn → dX (k, N) ≤ Db ∧ dY (k, N) ≤ Db)
+    (w : Set.Icc α β) :
+    (∑ j ∈ Finset.range (Db + 1),
+        (((∑ k ∈ Finset.range (dn + 1),
+            (αR (Nat.pair n k, N) * (bif decide (j ≤ dX (k, N)) then aX (k, N, j) else 0)
+             + βR (Nat.pair n k, N) * (bif decide (j ≤ dY (k, N)) then aY (k, N, j) else 0))) : ℚ) : ℝ)
+          * w.val ^ j)
+      = ∑ k ∈ Finset.range (dn + 1),
+          ((αR (Nat.pair n k, N) : ℝ) * (polyApproxCMap (α := α) (β := β) aX dX k N) w
+           + (βR (Nat.pair n k, N) : ℝ) * (polyApproxCMap (α := α) (β := β) aY dY k N) w) := by
+  have cast_padX : ∀ k j, ((bif decide (j ≤ dX (k, N)) then aX (k, N, j) else 0 : ℚ) : ℝ)
+      = bif decide (j ≤ dX (k, N)) then (aX (k, N, j) : ℝ) else 0 := by
+    intro k j; cases decide (j ≤ dX (k, N)) <;> simp
+  have cast_padY : ∀ k j, ((bif decide (j ≤ dY (k, N)) then aY (k, N, j) else 0 : ℚ) : ℝ)
+      = bif decide (j ≤ dY (k, N)) then (aY (k, N, j) : ℝ) else 0 := by
+    intro k j; cases decide (j ≤ dY (k, N)) <;> simp
+  calc (∑ j ∈ Finset.range (Db + 1),
+          (((∑ k ∈ Finset.range (dn + 1),
+              (αR (Nat.pair n k, N) * (bif decide (j ≤ dX (k, N)) then aX (k, N, j) else 0)
+               + βR (Nat.pair n k, N) * (bif decide (j ≤ dY (k, N)) then aY (k, N, j) else 0))) : ℚ) : ℝ)
+            * w.val ^ j)
+      = ∑ j ∈ Finset.range (Db + 1), ∑ k ∈ Finset.range (dn + 1),
+          ((αR (Nat.pair n k, N) : ℝ) * (bif decide (j ≤ dX (k, N)) then (aX (k, N, j) : ℝ) else 0)
+           + (βR (Nat.pair n k, N) : ℝ) * (bif decide (j ≤ dY (k, N)) then (aY (k, N, j) : ℝ) else 0))
+          * w.val ^ j := by
+        apply Finset.sum_congr rfl; intro j _
+        rw [Rat.cast_sum, Finset.sum_mul]
+        apply Finset.sum_congr rfl; intro k _
+        rw [Rat.cast_add, Rat.cast_mul, Rat.cast_mul, cast_padX, cast_padY]
+    _ = ∑ k ∈ Finset.range (dn + 1), ∑ j ∈ Finset.range (Db + 1),
+          ((αR (Nat.pair n k, N) : ℝ) * (bif decide (j ≤ dX (k, N)) then (aX (k, N, j) : ℝ) else 0)
+           + (βR (Nat.pair n k, N) : ℝ) * (bif decide (j ≤ dY (k, N)) then (aY (k, N, j) : ℝ) else 0))
+          * w.val ^ j := Finset.sum_comm
+    _ = ∑ k ∈ Finset.range (dn + 1),
+          ((αR (Nat.pair n k, N) : ℝ) * (polyApproxCMap (α := α) (β := β) aX dX k N) w
+           + (βR (Nat.pair n k, N) : ℝ) * (polyApproxCMap (α := α) (β := β) aY dY k N) w) := by
+        apply Finset.sum_congr rfl; intro k hk
+        rw [Finset.mem_range] at hk
+        rw [polyApproxCMap_eval, polyApproxCMap_eval,
+            ← padcoeff_sum (fun j => (aX (k, N, j) : ℝ)) (dX (k, N)) Db (hge k (by omega)).1 w.val,
+            ← padcoeff_sum (fun j => (aY (k, N, j) : ℝ)) (dY (k, N)) Db (hge k (by omega)).2 w.val,
+            Finset.mul_sum, Finset.mul_sum, ← Finset.sum_add_distrib]
+        apply Finset.sum_congr rfl; intro j _
+        ring
+
+/-- Uniform-norm bound for a polynomial approximant from per-coefficient bounds
+and an interval radius `B ≥ max(|α|, |β|)`: if `|a (k, N, j)| ≤ C j` for all `j`
+(with `C j ≥ 0`), then `‖p_{k, N}‖_∞ ≤ Σ_{j ≤ d(k, N)} C j · B^j`. The triangle
+inequality over the monomials, with `|x| ≤ B` for `x ∈ [α, β]`. Used to bound
+`‖polyApproxCMap aX dX k 0‖` by the `Nat`-valued `bound_x_k k` in the linearity
+norm argument. -/
+theorem polyApproxCMap_norm_le_sum
+    (a : ℕ × ℕ × ℕ → ℚ) (d : ℕ × ℕ → ℕ) (k N B : ℕ)
+    (hαB : |α| ≤ (B : ℝ)) (hβB : |β| ≤ (B : ℝ))
+    (C : ℕ → ℝ) (hCnn : ∀ j, 0 ≤ C j) (hC : ∀ j, |(a (k, N, j) : ℝ)| ≤ C j) :
+    ‖polyApproxCMap (α := α) (β := β) a d k N‖
+      ≤ ∑ j ∈ Finset.range (d (k, N) + 1), C j * (B : ℝ) ^ j := by
+  have hSnn : (0 : ℝ) ≤ ∑ j ∈ Finset.range (d (k, N) + 1), C j * (B : ℝ) ^ j :=
+    Finset.sum_nonneg (fun j _ => mul_nonneg (hCnn j) (by positivity))
+  rw [ContinuousMap.norm_le _ hSnn]
+  intro v
+  rw [Real.norm_eq_abs, polyApproxCMap_eval]
+  have hvB : |v.val| ≤ (B : ℝ) := by
+    have hv := v.2
+    rw [Set.mem_Icc] at hv
+    rw [abs_le]
+    exact ⟨by linarith [(abs_le.mp hαB).1, hv.1], by linarith [(abs_le.mp hβB).2, hv.2]⟩
+  calc |∑ j ∈ Finset.range (d (k, N) + 1), (a (k, N, j) : ℝ) * v.val ^ j|
+      ≤ ∑ j ∈ Finset.range (d (k, N) + 1), |(a (k, N, j) : ℝ) * v.val ^ j| :=
+        Finset.abs_sum_le_sum_abs _ _
+    _ ≤ ∑ j ∈ Finset.range (d (k, N) + 1), C j * (B : ℝ) ^ j := by
+        apply Finset.sum_le_sum
+        intro j _
+        rw [abs_mul]
+        exact mul_le_mul (hC j)
+          (by rw [abs_pow]; exact pow_le_pow_left₀ (abs_nonneg _) hvB j)
+          (abs_nonneg _) (hCnn j)
 
 /-- **P-R Ch. 2:141** characterization, used here as definition: a sequence
 `f : ℕ → C(Set.Icc α β, ℝ)` of continuous functions on the closed interval
@@ -805,8 +1000,253 @@ ref for "axiom 1 trivial / axiom 2 = Ch. 0 Thm 4 / axiom 3 = Ch. 0 Thm 7":
       --   5. Σ_k bound by `(d n + 1) · bound_max(n)`.
       --   6. Close: `2^M ≥ 4 · (d n + 1) · bound_max(n)` by M's formula.
       --
-      -- Estimated 200-300 lines; the bound machinery is all in place (bound_max, M, etc.).
-      sorry
+      intro n m
+      refine (ContinuousMap.norm_le _ (by positivity)).mpr (fun w => ?_)
+      rw [Real.norm_eq_abs]
+      -- Step 2 prep: each summand degree dX k, dY k at precision M(n,m) is ≤ dS(n,m).
+      have hge_dS : ∀ k, k ≤ d n →
+          dX (k, M (n, m)) ≤ dS (n, m) ∧ dY (k, M (n, m)) ≤ dS (n, m) := by
+        intro k hk
+        have hrec := le_natRec_max (fun k => max (dX (k, M (n, m))) (dY (k, M (n, m)))) k
+          (d n).succ (Nat.lt_succ_of_le hk)
+        exact ⟨le_trans (le_max_left _ _) hrec, le_trans (le_max_right _ _) hrec⟩
+      -- Step 2: polynomial-expansion identity for the approximant value at w.
+      have hPval : (polyApproxCMap aS dS n m) w =
+          ∑ k ∈ Finset.range (d n + 1),
+            ((αR (Nat.pair n k, M (n, m)) : ℝ) * (polyApproxCMap aX dX k (M (n, m))) w
+              + (βR (Nat.pair n k, M (n, m)) : ℝ) * (polyApproxCMap aY dY k (M (n, m))) w) := by
+        rw [polyApproxCMap_eval]
+        exact polyApproxCMap_conv_eval aX aY dX dY αR βR n (M (n, m)) (d n) (dS (n, m)) hge_dS w
+      -- LHS combination value at w.
+      have hsval : (∑ k ∈ Finset.range (d n + 1),
+            (coefα (n, k) • x k + coefβ (n, k) • y k)) w
+          = ∑ k ∈ Finset.range (d n + 1),
+              (coefα (n, k) * (x k) w + coefβ (n, k) * (y k) w) := by
+        simp only [ContinuousMap.coe_sum, Finset.sum_apply, ContinuousMap.add_apply,
+          ContinuousMap.smul_apply, smul_eq_mul]
+      -- Step 3: combine into a single sum of per-k differences (avoids applying the
+      -- ContinuousMap subtraction to `w` directly, which left the term at metavar type).
+      rw [ContinuousMap.sub_apply, hsval, hPval, ← Finset.sum_sub_distrib]
+      -- Step 5 prep: each `stuff_per_k (n, k)` is dominated by `bound_max n`.
+      have hstuff_le : ∀ k ∈ Finset.range (d n + 1),
+          (stuff_per_k (n, k) : ℝ) ≤ (bound_max n : ℝ) := by
+        intro k hk
+        have hrec := le_natRec_max (fun k => stuff_per_k (n, k)) k (d n).succ
+          (Finset.mem_range.mp hk)
+        exact_mod_cast hrec
+      -- Step 4: per-k summand bound `|F_k - G_k| ≤ 2^{-M(n,m)} · stuff_per_k (n, k)`.
+      have hperk : ∀ k ∈ Finset.range (d n + 1),
+          |(coefα (n, k) * (x k) w + coefβ (n, k) * (y k) w)
+            - ((αR (Nat.pair n k, M (n, m)) : ℝ) * (polyApproxCMap aX dX k (M (n, m))) w
+                + (βR (Nat.pair n k, M (n, m)) : ℝ) * (polyApproxCMap aY dY k (M (n, m))) w)|
+            ≤ (1 / 2 ^ (M (n, m))) * (stuff_per_k (n, k) : ℝ) := by
+        intro k hk
+        have hεpos : (0 : ℝ) ≤ 1 / 2 ^ (M (n, m)) := by positivity
+        have hone_le : (1 : ℝ) / 2 ^ (M (n, m)) ≤ 1 := by
+          rw [div_le_one (by positivity)]; exact one_le_pow₀ (by norm_num)
+        -- ε-closeness of the X-coefficient and X-approximant (orientation as `perk_bound` wants).
+        have hclose_X : |(x k) w - (polyApproxCMap aX dX k (M (n, m))) w|
+            ≤ 1 / 2 ^ (M (n, m)) := by
+          have h := (x k - polyApproxCMap aX dX k (M (n, m))).norm_coe_le_norm w
+          rw [ContinuousMap.sub_apply, Real.norm_eq_abs] at h
+          exact le_trans h (hbnd_X k (M (n, m)))
+        have hαr_close : |(αR (Nat.pair n k, M (n, m)) : ℝ) - coefα (n, k)|
+            ≤ 1 / 2 ^ (M (n, m)) := by
+          have h := hbnd_αR (Nat.pair n k) (M (n, m)); simpa only [Nat.unpair_pair] using h
+        -- |coefα| bound via the precision-0 rational approximant.
+        have hcα_bd : |coefα (n, k)| ≤ (↑(bound_αR_at_0 (n, k)) : ℝ) + 1 := by
+          have heq := h_αR_eq (Nat.pair (Nat.pair n k) 0)
+          simp only [Nat.unpair_pair] at heq
+          have habs : |(αR (Nat.pair n k, 0) : ℝ)| ≤ (↑(bound_αR_at_0 (n, k)) : ℝ) := by
+            rw [heq]
+            exact_mod_cast abs_cast_neg_one_pow_div_le (αR_a (Nat.pair (Nat.pair n k) 0))
+              (αR_b (Nat.pair (Nat.pair n k) 0)) (αR_s (Nat.pair (Nat.pair n k) 0))
+              (h_αR_bne (Nat.pair (Nat.pair n k) 0))
+          have hclose0 := hbnd_αR (Nat.pair n k) 0
+          simp only [Nat.unpair_pair, pow_zero, div_one] at hclose0
+          have h1 := abs_sub_abs_le_abs_sub (coefα (n, k)) ((αR (Nat.pair n k, 0) : ℝ))
+          rw [abs_sub_comm (coefα (n, k)) ((αR (Nat.pair n k, 0) : ℝ))] at h1
+          linarith [h1, habs, hclose0]
+        -- |polyApproxCMap aX dX k M(n,m)|_w bound: precision-M ≤ ‖x k‖+1 ≤ ‖poly_0‖+2 ≤ bound_x_k+2.
+        have hpXk_bd : |(polyApproxCMap aX dX k (M (n, m))) w| ≤ (↑(bound_x_k k) : ℝ) + 2 := by
+          have hpw_le : |(polyApproxCMap aX dX k (M (n, m))) w|
+              ≤ ‖polyApproxCMap (α := α) (β := β) aX dX k (M (n, m))‖ := by
+            have h := (polyApproxCMap aX dX k (M (n, m))).norm_coe_le_norm w
+            rwa [Real.norm_eq_abs] at h
+          have hnorm_M : ‖polyApproxCMap (α := α) (β := β) aX dX k (M (n, m))‖ ≤ ‖x k‖ + 1 := by
+            have hb := hbnd_X k (M (n, m))
+            have hnn := norm_sub_norm_le (polyApproxCMap aX dX k (M (n, m))) (x k)
+            rw [norm_sub_rev] at hnn
+            linarith [hnn, hb, hone_le]
+          have hnorm_xk : ‖x k‖ ≤ ‖polyApproxCMap (α := α) (β := β) aX dX k 0‖ + 1 := by
+            have hb := hbnd_X k 0
+            rw [pow_zero, div_one] at hb
+            have hnn := norm_sub_norm_le (x k) (polyApproxCMap aX dX k 0)
+            linarith [hnn, hb]
+          have hC : ∀ j, |(aX (k, 0, j) : ℝ)| ≤ (↑(bound_aX_at_0 (k, j)) : ℝ) := by
+            intro j
+            have heq := h_aX_eq (Nat.pair k (Nat.pair 0 j))
+            simp only [Nat.unpair_pair] at heq
+            rw [heq]
+            exact_mod_cast abs_cast_neg_one_pow_div_le (aX_a (Nat.pair k (Nat.pair 0 j)))
+              (aX_b (Nat.pair k (Nat.pair 0 j))) (aX_s (Nat.pair k (Nat.pair 0 j)))
+              (h_aX_bne (Nat.pair k (Nat.pair 0 j)))
+          have hbx : bound_x_k k
+              = 1 + ∑ j ∈ Finset.range (dX (k, 0) + 1), bound_aX_at_0 (k, j) * B ^ j := by
+            show Nat.rec 1 (fun j acc => acc + bound_aX_at_0 (k, j) * B ^ j) ((dX (k, 0)).succ)
+                = 1 + ∑ j ∈ Finset.range (dX (k, 0) + 1), bound_aX_at_0 (k, j) * B ^ j
+            exact natRec_add_eq_sum 1 (fun j => bound_aX_at_0 (k, j) * B ^ j) ((dX (k, 0)).succ)
+          have hnorm_p0 : ‖polyApproxCMap (α := α) (β := β) aX dX k 0‖ ≤ (↑(bound_x_k k) : ℝ) := by
+            have hmain : ‖polyApproxCMap (α := α) (β := β) aX dX k 0‖
+                ≤ ∑ j ∈ Finset.range (dX (k, 0) + 1),
+                    (↑(bound_aX_at_0 (k, j)) : ℝ) * (B : ℝ) ^ j :=
+              polyApproxCMap_norm_le_sum aX dX k 0 B hα_le hβ_le
+                (fun j => (↑(bound_aX_at_0 (k, j)) : ℝ)) (fun _ => by positivity) hC
+            have hcast : (↑(bound_x_k k) : ℝ)
+                = 1 + ∑ j ∈ Finset.range (dX (k, 0) + 1),
+                    (↑(bound_aX_at_0 (k, j)) : ℝ) * (B : ℝ) ^ j := by
+              rw [hbx]; push_cast; ring
+            rw [hcast]; linarith [hmain]
+          calc |(polyApproxCMap aX dX k (M (n, m))) w|
+              ≤ ‖polyApproxCMap (α := α) (β := β) aX dX k (M (n, m))‖ := hpw_le
+            _ ≤ ‖x k‖ + 1 := hnorm_M
+            _ ≤ (‖polyApproxCMap (α := α) (β := β) aX dX k 0‖ + 1) + 1 := by linarith [hnorm_xk]
+            _ ≤ ((↑(bound_x_k k) : ℝ) + 1) + 1 := by linarith [hnorm_p0]
+            _ = (↑(bound_x_k k) : ℝ) + 2 := by ring
+        -- Y-side mirror of the four X-side bounds.
+        have hclose_Y : |(y k) w - (polyApproxCMap aY dY k (M (n, m))) w|
+            ≤ 1 / 2 ^ (M (n, m)) := by
+          have h := (y k - polyApproxCMap aY dY k (M (n, m))).norm_coe_le_norm w
+          rw [ContinuousMap.sub_apply, Real.norm_eq_abs] at h
+          exact le_trans h (hbnd_Y k (M (n, m)))
+        have hβr_close : |(βR (Nat.pair n k, M (n, m)) : ℝ) - coefβ (n, k)|
+            ≤ 1 / 2 ^ (M (n, m)) := by
+          have h := hbnd_βR (Nat.pair n k) (M (n, m)); simpa only [Nat.unpair_pair] using h
+        have hcβ_bd : |coefβ (n, k)| ≤ (↑(bound_βR_at_0 (n, k)) : ℝ) + 1 := by
+          have heq := h_βR_eq (Nat.pair (Nat.pair n k) 0)
+          simp only [Nat.unpair_pair] at heq
+          have habs : |(βR (Nat.pair n k, 0) : ℝ)| ≤ (↑(bound_βR_at_0 (n, k)) : ℝ) := by
+            rw [heq]
+            exact_mod_cast abs_cast_neg_one_pow_div_le (βR_a (Nat.pair (Nat.pair n k) 0))
+              (βR_b (Nat.pair (Nat.pair n k) 0)) (βR_s (Nat.pair (Nat.pair n k) 0))
+              (h_βR_bne (Nat.pair (Nat.pair n k) 0))
+          have hclose0 := hbnd_βR (Nat.pair n k) 0
+          simp only [Nat.unpair_pair, pow_zero, div_one] at hclose0
+          have h1 := abs_sub_abs_le_abs_sub (coefβ (n, k)) ((βR (Nat.pair n k, 0) : ℝ))
+          rw [abs_sub_comm (coefβ (n, k)) ((βR (Nat.pair n k, 0) : ℝ))] at h1
+          linarith [h1, habs, hclose0]
+        have hpYk_bd : |(polyApproxCMap aY dY k (M (n, m))) w| ≤ (↑(bound_y_k k) : ℝ) + 2 := by
+          have hpw_le : |(polyApproxCMap aY dY k (M (n, m))) w|
+              ≤ ‖polyApproxCMap (α := α) (β := β) aY dY k (M (n, m))‖ := by
+            have h := (polyApproxCMap aY dY k (M (n, m))).norm_coe_le_norm w
+            rwa [Real.norm_eq_abs] at h
+          have hnorm_M : ‖polyApproxCMap (α := α) (β := β) aY dY k (M (n, m))‖ ≤ ‖y k‖ + 1 := by
+            have hb := hbnd_Y k (M (n, m))
+            have hnn := norm_sub_norm_le (polyApproxCMap aY dY k (M (n, m))) (y k)
+            rw [norm_sub_rev] at hnn
+            linarith [hnn, hb, hone_le]
+          have hnorm_yk : ‖y k‖ ≤ ‖polyApproxCMap (α := α) (β := β) aY dY k 0‖ + 1 := by
+            have hb := hbnd_Y k 0
+            rw [pow_zero, div_one] at hb
+            have hnn := norm_sub_norm_le (y k) (polyApproxCMap aY dY k 0)
+            linarith [hnn, hb]
+          have hC : ∀ j, |(aY (k, 0, j) : ℝ)| ≤ (↑(bound_aY_at_0 (k, j)) : ℝ) := by
+            intro j
+            have heq := h_aY_eq (Nat.pair k (Nat.pair 0 j))
+            simp only [Nat.unpair_pair] at heq
+            rw [heq]
+            exact_mod_cast abs_cast_neg_one_pow_div_le (aY_a (Nat.pair k (Nat.pair 0 j)))
+              (aY_b (Nat.pair k (Nat.pair 0 j))) (aY_s (Nat.pair k (Nat.pair 0 j)))
+              (h_aY_bne (Nat.pair k (Nat.pair 0 j)))
+          have hby : bound_y_k k
+              = 1 + ∑ j ∈ Finset.range (dY (k, 0) + 1), bound_aY_at_0 (k, j) * B ^ j := by
+            show Nat.rec 1 (fun j acc => acc + bound_aY_at_0 (k, j) * B ^ j) ((dY (k, 0)).succ)
+                = 1 + ∑ j ∈ Finset.range (dY (k, 0) + 1), bound_aY_at_0 (k, j) * B ^ j
+            exact natRec_add_eq_sum 1 (fun j => bound_aY_at_0 (k, j) * B ^ j) ((dY (k, 0)).succ)
+          have hnorm_p0 : ‖polyApproxCMap (α := α) (β := β) aY dY k 0‖ ≤ (↑(bound_y_k k) : ℝ) := by
+            have hmain : ‖polyApproxCMap (α := α) (β := β) aY dY k 0‖
+                ≤ ∑ j ∈ Finset.range (dY (k, 0) + 1),
+                    (↑(bound_aY_at_0 (k, j)) : ℝ) * (B : ℝ) ^ j :=
+              polyApproxCMap_norm_le_sum aY dY k 0 B hα_le hβ_le
+                (fun j => (↑(bound_aY_at_0 (k, j)) : ℝ)) (fun _ => by positivity) hC
+            have hcast : (↑(bound_y_k k) : ℝ)
+                = 1 + ∑ j ∈ Finset.range (dY (k, 0) + 1),
+                    (↑(bound_aY_at_0 (k, j)) : ℝ) * (B : ℝ) ^ j := by
+              rw [hby]; push_cast; ring
+            rw [hcast]; linarith [hmain]
+          calc |(polyApproxCMap aY dY k (M (n, m))) w|
+              ≤ ‖polyApproxCMap (α := α) (β := β) aY dY k (M (n, m))‖ := hpw_le
+            _ ≤ ‖y k‖ + 1 := hnorm_M
+            _ ≤ (‖polyApproxCMap (α := α) (β := β) aY dY k 0‖ + 1) + 1 := by linarith [hnorm_yk]
+            _ ≤ ((↑(bound_y_k k) : ℝ) + 1) + 1 := by linarith [hnorm_p0]
+            _ = (↑(bound_y_k k) : ℝ) + 2 := by ring
+        -- Per-k product bounds via `perk_bound`, for X and Y.
+        have hX := perk_bound (coefα (n, k)) ((x k) w)
+          ((αR (Nat.pair n k, M (n, m)) : ℝ)) ((polyApproxCMap aX dX k (M (n, m))) w)
+          (1 / 2 ^ (M (n, m))) ((↑(bound_αR_at_0 (n, k)) : ℝ) + 1) ((↑(bound_x_k k) : ℝ) + 2)
+          hεpos (by positivity) hclose_X hαr_close hcα_bd hpXk_bd
+        have hY := perk_bound (coefβ (n, k)) ((y k) w)
+          ((βR (Nat.pair n k, M (n, m)) : ℝ)) ((polyApproxCMap aY dY k (M (n, m))) w)
+          (1 / 2 ^ (M (n, m))) ((↑(bound_βR_at_0 (n, k)) : ℝ) + 1) ((↑(bound_y_k k) : ℝ) + 2)
+          hεpos (by positivity) hclose_Y hβr_close hcβ_bd hpYk_bd
+        have hstuff_cast : (stuff_per_k (n, k) : ℝ)
+            = (↑(bound_x_k k) : ℝ) + ↑(bound_y_k k) + ↑(bound_αR_at_0 (n, k))
+              + ↑(bound_βR_at_0 (n, k)) + 6 := by
+          show ((bound_x_k k + bound_y_k k + bound_αR_at_0 (n, k) + bound_βR_at_0 (n, k) + 6 : ℕ)
+              : ℝ) = (↑(bound_x_k k) : ℝ) + ↑(bound_y_k k) + ↑(bound_αR_at_0 (n, k))
+                + ↑(bound_βR_at_0 (n, k)) + 6
+          push_cast; ring
+        calc |(coefα (n, k) * (x k) w + coefβ (n, k) * (y k) w)
+                - ((αR (Nat.pair n k, M (n, m)) : ℝ) * (polyApproxCMap aX dX k (M (n, m))) w
+                    + (βR (Nat.pair n k, M (n, m)) : ℝ) * (polyApproxCMap aY dY k (M (n, m))) w)|
+            = |(coefα (n, k) * (x k) w
+                  - (αR (Nat.pair n k, M (n, m)) : ℝ) * (polyApproxCMap aX dX k (M (n, m))) w)
+                + (coefβ (n, k) * (y k) w
+                  - (βR (Nat.pair n k, M (n, m)) : ℝ) * (polyApproxCMap aY dY k (M (n, m))) w)| := by
+              congr 1; ring
+          _ ≤ |coefα (n, k) * (x k) w
+                  - (αR (Nat.pair n k, M (n, m)) : ℝ) * (polyApproxCMap aX dX k (M (n, m))) w|
+              + |coefβ (n, k) * (y k) w
+                  - (βR (Nat.pair n k, M (n, m)) : ℝ) * (polyApproxCMap aY dY k (M (n, m))) w| :=
+              abs_add_le _ _
+          _ ≤ (1 / 2 ^ (M (n, m)))
+                * (((↑(bound_αR_at_0 (n, k)) : ℝ) + 1) + ((↑(bound_x_k k) : ℝ) + 2))
+              + (1 / 2 ^ (M (n, m)))
+                * (((↑(bound_βR_at_0 (n, k)) : ℝ) + 1) + ((↑(bound_y_k k) : ℝ) + 2)) :=
+              add_le_add hX hY
+          _ = (1 / 2 ^ (M (n, m))) * (stuff_per_k (n, k) : ℝ) := by
+              rw [hstuff_cast]; ring
+      -- Final assembly: triangle ⇒ Σ-bound ⇒ close-out by M's formula.
+      calc |∑ k ∈ Finset.range (d n + 1),
+              ((coefα (n, k) * (x k) w + coefβ (n, k) * (y k) w)
+                - ((αR (Nat.pair n k, M (n, m)) : ℝ) * (polyApproxCMap aX dX k (M (n, m))) w
+                    + (βR (Nat.pair n k, M (n, m)) : ℝ) * (polyApproxCMap aY dY k (M (n, m))) w))|
+          ≤ ∑ k ∈ Finset.range (d n + 1),
+              |(coefα (n, k) * (x k) w + coefβ (n, k) * (y k) w)
+                - ((αR (Nat.pair n k, M (n, m)) : ℝ) * (polyApproxCMap aX dX k (M (n, m))) w
+                    + (βR (Nat.pair n k, M (n, m)) : ℝ) * (polyApproxCMap aY dY k (M (n, m))) w)| :=
+            Finset.abs_sum_le_sum_abs _ _
+        _ ≤ ∑ k ∈ Finset.range (d n + 1), (1 / 2 ^ (M (n, m))) * (stuff_per_k (n, k) : ℝ) :=
+            Finset.sum_le_sum hperk
+        _ = (1 / 2 ^ (M (n, m))) * ∑ k ∈ Finset.range (d n + 1), (stuff_per_k (n, k) : ℝ) := by
+            rw [Finset.mul_sum]
+        _ ≤ (1 / 2 ^ (M (n, m))) * ((d n + 1 : ℝ) * (bound_max n : ℝ)) := by
+            apply mul_le_mul_of_nonneg_left _ (by positivity)
+            calc ∑ k ∈ Finset.range (d n + 1), (stuff_per_k (n, k) : ℝ)
+                ≤ ∑ k ∈ Finset.range (d n + 1), (bound_max n : ℝ) := Finset.sum_le_sum hstuff_le
+              _ = (d n + 1 : ℝ) * (bound_max n : ℝ) := by
+                  rw [Finset.sum_const, Finset.card_range, nsmul_eq_mul]; push_cast; ring
+        _ ≤ 1 / 2 ^ m := by
+            have hmpos : (0 : ℝ) < 2 ^ m := by positivity
+            have hMpos : (0 : ℝ) < 2 ^ (M (n, m)) := by positivity
+            rw [le_div_iff₀ hmpos, one_div_mul_eq_div, div_mul_eq_mul_div, div_le_one hMpos]
+            have hMunfold : (2 : ℝ) ^ (M (n, m)) = 2 ^ (m + (d n + 1) + bound_max n + 2) := rfl
+            rw [hMunfold]
+            have hkey := closeout_nat (d n) (bound_max n) m
+            calc (d n + 1 : ℝ) * (bound_max n : ℝ) * 2 ^ m
+                = (((d n + 1) * bound_max n * 2 ^ m : ℕ) : ℝ) := by push_cast; ring
+              _ ≤ ((2 ^ (m + (d n + 1) + bound_max n + 2) : ℕ) : ℝ) := by exact_mod_cast hkey
+              _ = (2 : ℝ) ^ (m + (d n + 1) + bound_max n + 2) := by push_cast; ring
   axiom_limits := by
     -- TODO(/formalize L4 CMap): A2 = Ch. 0 Theorem 4 (Pour-El & Richards, "effective limits
     -- of computable sequences of continuous functions are computable"). Under our predicate:

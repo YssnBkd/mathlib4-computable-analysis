@@ -99,6 +99,36 @@ sed -n '<LINE>p' literature/papers/<key>.md
 
 ---
 
+## 7. `#print axioms (inst).someField` falsely reports `sorryAx` from sibling fields
+
+**Pitfall**: to audit that ONE field of a multi-field `instance`/`structure` is genuinely sorry-free, the natural move is `#print axioms (computabilityStructureCMap_of ..).axiom_linearity`. This reports `sorryAx` whenever ANY *sibling* field (e.g. `axiom_limits`, `axiom_norms`) still has a `sorry` — regardless of the inspected field's own purity. The projection drags in the whole structure's axiom set, so it cannot isolate one field. **False positive** — and equally a false *negative* risk if you ever read the absence of `sorryAx` on a projection as proof a sibling is clean.
+
+**Workaround**: extract the field's proof body verbatim into a standalone theorem whose type is the field type, with NO sibling fields in scope, then audit that:
+```lean
+theorem axiom_linearity_isolated : <the field's type> := by
+  <paste the field body verbatim>
+#print axioms axiom_linearity_isolated   -- reflects ONLY this proof
+```
+If it compiles clean and prints `[propext, Classical.choice, Quot.sound]` (no `sorryAx`, no `nativeDecide`, no `Lean.ofReduceBool`), the field is genuinely sound; any instance-level `sorryAx` is then provably attributable to the other (out-of-scope) fields.
+
+**Control that proves the artifact**: a hand-built structure with `axiom_linearity := trivial` (provably pure) but `sorry` in two siblings STILL prints `sorryAx` on the projected `.axiom_linearity`. So projection is unsound for field-level audits even when the conclusion happens to be right.
+
+**Hit at**: `l4-cmap-axiom-linearity-bound` — the first-pass C2 review used field projection and reached the right verdict by luck; the post-compaction re-run caught the flawed method and replaced it with standalone extraction.
+
+---
+
+## 8. Devil's-advocate verdict token must be exactly `verdict: passes`
+
+**Pitfall**: writing the DA verdict as prose — `## VERDICT: **sound**`, `Verdict: looks good`, or even `verdict: passes-partial`. The `/goal` Stop hook (`scripts/goal_stop_hook.py:257`) greps each review with the anchored regex `^verdict:\s*passes\s*$` (case-insensitive, MULTILINE). Anything that isn't a bare `verdict: passes` line fails to match, so marking the criterion `[x]` trips `HALT (unauthorized check)` — even though a human reading the review sees a clear pass. Note `passes-partial` also fails the `$`-anchor; only bare `passes` clears the gate.
+
+**Workaround**: the DA vocabulary is a fixed three-token enum — `passes | unsound | unsupported` (`.claude/agents/devils-advocate.md:38,69`). "sound" is NOT a token. Every review for a `devils_advocate_required_for` criterion must contain a line that is exactly `verdict: passes` (own line, lowercase, no markdown decorations; a frontmatter `verdict: passes` works too, since the regex is MULTILINE).
+
+**Do NOT fix it by hand-editing the token** — that bypasses the very gate the criterion exists to enforce (the moral equivalent of `--no-verify`). If a review has the wrong token, re-run `/devils-advocate <id>` for a genuine fresh verdict (it may also surface real issues — here it caught the §7 projection-artifact flaw). Treat the Stop hook as part of the definition of done: before reporting a round complete, grep `^verdict:\s*passes` on every DA-required review yourself.
+
+**Hit at**: `l4-cmap-axiom-linearity-bound` (post-compaction) — a prose `## VERDICT: **sound**` review HALTed the round at completion; resolved by re-running the DA gate, which returned canonical `verdict: passes`.
+
+---
+
 ## Cross-reference
 
-For the positive recipe that resolves each pitfall, see [LEAN-IDIOMS.md](LEAN-IDIOMS.md). Pitfalls #1, #3, #4 map to LEAN-IDIOMS §1–5; pitfall #2 maps to LEAN-IDIOMS §5; pitfalls #5 and #6 are procedural, resolved via the auto-memory `feedback_*` entries.
+For the positive recipe that resolves each pitfall, see [LEAN-IDIOMS.md](LEAN-IDIOMS.md). Pitfalls #1, #3, #4 map to LEAN-IDIOMS §1–5; pitfall #2 maps to LEAN-IDIOMS §5; pitfalls #5 and #6 are procedural, resolved via the auto-memory `feedback_*` entries. Pitfall #7 is a Lean soundness-audit gotcha (no LEAN-IDIOMS counterpart yet); pitfall #8 is procedural — the `/goal` Stop-hook contract (`scripts/goal_stop_hook.py:257`, `.claude/agents/devils-advocate.md:38,69`).

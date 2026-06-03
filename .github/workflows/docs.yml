@@ -50,7 +50,18 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Build Lean + blueprint + API docs (composite)
+      # `lean-action` installs elan + lake. `docgen-action`'s checkdecls
+      # step invokes `lake exe checkdecls`, so lake must be on PATH.
+      # (Matches upstream PatrickMassot/leanblueprint blueprint.yml template.)
+      - name: Build Lean (installs elan + lake, uses Mathlib cache)
+        uses: leanprover/lean-action@434f25c2f80ded67bba02502ad3a86f25db50709 # 2025-07-02
+        with:
+          build: true
+          lint: false
+          mk_all-check: false
+          use-mathlib-cache: auto
+
+      - name: Build blueprint + API docs + deploy (composite)
         id: deployment
         uses: leanprover-community/docgen-action@deed0cdc44dd8e5de07a300773eb751d33e32fc8 # 2025-10-26
         with:

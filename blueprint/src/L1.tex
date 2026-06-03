@@ -1,21 +1,107 @@
 \chapter{L1 — Computable reals and computable sequences}
 
 % P-R reference: Chapter 0, "Computability on the real line", literature/papers/PourEl-Richards-chapt0.md.
-% Layer status: predicate \texttt{IsComputableSeqReal} done (0 sorries);
-% \texttt{IsComputableSeqComplex}, \texttt{IsComputableReal}, and the
-% countable-subfield structure still pending. Content migration deferred.
+% Layer status: rational + double-rational + real sequence predicates done (0 sorries),
+% two const-witness sanity lemmas done. \texttt{IsComputableSeqComplex}, point-level
+% \texttt{IsComputableReal}, and the countable-subfield structure still pending.
+% This chapter was migrated to blueprint-native form in the
+% \texttt{l1-arithmetic-closure-and-real} round (2026-06-03).
+
+\begin{definition}
+  \label{def:l1_isComputableSeqRat}
+  \lean{ComputableAnalysis.L1.IsComputableSeqRat}
+  \leanok
+  \uses{def:isRecursive}
+  Predicate \texttt{IsComputableSeqRat}\,$: (\mathbb{N} \to \mathbb{Q}) \to \texttt{Prop}$. A rational sequence $r$ is computable iff there exist recursive functions $a, b, s : \mathbb{N} \to \mathbb{N}$ with $b(k) \ne 0$ such that $r_k = (-1)^{s(k)} \cdot (a(k) / b(k))$. P-R Ch.\,0:46, Definition 1.
+  See \texttt{ComputableAnalysis/L1/ComputableSeqReal.lean:82}.
+\end{definition}
+
+\begin{definition}
+  \label{def:l1_isComputableDoubleSeqRat}
+  \lean{ComputableAnalysis.L1.IsComputableDoubleSeqRat}
+  \leanok
+  \uses{def:l1_isComputableSeqRat}
+  Predicate \texttt{IsComputableDoubleSeqRat}\,$: (\mathbb{N} \times \mathbb{N} \to \mathbb{Q}) \to \texttt{Prop}$. A double sequence $r_{n,k}$ is computable iff its re-indexing through Mathlib's \texttt{Nat.unpair} is a computable rational sequence. P-R Ch.\,0:189 (``a double sequence will be called computable if it is mapped onto a computable sequence by one of the standard recursive pairing functions'').
+  See \texttt{ComputableAnalysis/L1/ComputableSeqReal.lean:92}.
+\end{definition}
+
+\begin{lemma}
+  \label{lem:l1_isComputableSeqRat_const}
+  \lean{ComputableAnalysis.L1.isComputableSeqRat_const}
+  \leanok
+  \uses{def:l1_isComputableSeqRat}
+  For every rational $q$, the constant sequence $\lambda n.\,q$ satisfies \texttt{IsComputableSeqRat}. Witness $(a,b,s) := (|q.\mathrm{num}|, q.\mathrm{den}, \mathbf{1}[q.\mathrm{num} < 0])$, all constant hence recursive; the arithmetic identity reduces to a sign case-split on \texttt{Rat.num\_div\_den}.
+  See \texttt{ComputableAnalysis/L1/ComputableSeqReal.lean:119}.
+\end{lemma}
 
 \begin{definition}
   \label{def:l1_isComputableSeqReal}
   \lean{ComputableAnalysis.L1.IsComputableSeqReal}
   \leanok
-  \uses{def:isRecursive}
-  Predicate \texttt{IsComputableSeqReal}\,$: (\mathbb{N} \to \mathbb{R}) \to \texttt{Prop}$ on Mathlib's \texttt{Real}. A real sequence $r$ is computable iff there exists a computable rational double-sequence $q : \mathbb{N} \to \mathbb{N} \to \mathbb{Q}$ such that $|r_n - q_{n,k}| < 2^{-k}$ for all $n, k$. P-R Ch.\,0:203, Definition 5a.
+  \uses{def:l1_isComputableDoubleSeqRat}
+  Predicate \texttt{IsComputableSeqReal}\,$: (\mathbb{N} \to \mathbb{R}) \to \texttt{Prop}$ on Mathlib's \texttt{Real}. A real sequence $x$ is computable iff there exists a computable rational double-sequence $r_{n,k}$ with $|r_{n,k} - x_n| \le 2^{-k}$ for all $n, k$. P-R Ch.\,0:203, Definition 5a.
   See \texttt{ComputableAnalysis/L1/ComputableSeqReal.lean:101}.
 \end{definition}
 
+\begin{lemma}
+  \label{lem:l1_isComputableSeqReal_const_rat}
+  \lean{ComputableAnalysis.L1.isComputableSeqReal_const_rat}
+  \leanok
+  \uses{def:l1_isComputableSeqReal, lem:l1_isComputableSeqRat_const}
+  For every rational $q$, the real-valued constant sequence $\lambda n.\,(q : \mathbb{R})$ satisfies \texttt{IsComputableSeqReal}. Witness: the constant double sequence $r(n,k) := q$. The error bound $|q - q| = 0 \le 2^{-k}$ is immediate.
+  See \texttt{ComputableAnalysis/L1/ComputableSeqReal.lean:140}.
+\end{lemma}
+
+\begin{lemma}
+  \label{lem:l1_isComputableSeqRat_add}
+  \lean{ComputableAnalysis.L1.IsComputableSeqRat.add}
+  \leanok
+  \uses{def:l1_isComputableSeqRat}
+  Closure of \texttt{IsComputableSeqRat} under pointwise addition: if $h_i : \texttt{IsComputableSeqRat}\,r_i$ for $i \in \{1,2\}$, then $r_1 + r_2$ (Pi-pointwise sum) is computable. The new $\mathbb{N}$-level witness $(\mathrm{newA}, \mathrm{newB}, \mathrm{newS})$ dispatches on the sign-parities $(s_1\,k \bmod 2, s_2\,k \bmod 2)$ and the cross-product comparison $a_1\,k \cdot b_2\,k \ge a_2\,k \cdot b_1\,k$; $\mathbb{N}$-truncated subtraction handles the sign-cancellation cases.
+  See \texttt{ComputableAnalysis/L1/ComputableSeqReal.lean} \S4.
+\end{lemma}
+
+\begin{lemma}
+  \label{lem:l1_isComputableSeqRat_mul}
+  \lean{ComputableAnalysis.L1.IsComputableSeqRat.mul}
+  \leanok
+  \uses{def:l1_isComputableSeqRat}
+  Closure of \texttt{IsComputableSeqRat} under pointwise multiplication: $r_1 \cdot r_2$ is computable when both factors are. The witness is direct, $(\mathrm{newA}, \mathrm{newB}, \mathrm{newS}) := (a_1 \cdot a_2,\, b_1 \cdot b_2,\, s_1 + s_2)$; the identity reduces to a single \texttt{pow\_add} + \texttt{field\_simp} step (no sign-case dispatch).
+  See \texttt{ComputableAnalysis/L1/ComputableSeqReal.lean} \S4.
+\end{lemma}
+
+\begin{lemma}
+  \label{lem:l1_isComputableSeqRat_comp}
+  \lean{ComputableAnalysis.L1.IsComputableSeqRat.comp}
+  \leanok
+  \uses{def:l1_isComputableSeqRat}
+  Closure of \texttt{IsComputableSeqRat} under precomposition with a computable re-indexing: if $\sigma : \mathbb{N} \to \mathbb{N}$ is \texttt{Computable} and $r : \mathbb{N} \to \mathbb{Q}$ satisfies \texttt{IsComputableSeqRat}, then so does $r \circ \sigma$. Each component $(a, b, s)$ of the witness is precomposed with $\sigma$; closure of \texttt{Computable} under composition (\texttt{Computable.comp}) supplies the recursion-theoretic data.
+  See \texttt{ComputableAnalysis/L1/ComputableSeqReal.lean} \S4.
+\end{lemma}
+
 \begin{definition}
   \label{def:l1_isComputableReal}
-  \notready
-  Predicate \texttt{IsComputableReal}\,$: \mathbb{R} \to \texttt{Prop}$. A real $x$ is computable iff the constant sequence $\lambda n.\,x$ satisfies $\texttt{IsComputableSeqReal}$. P-R Ch.\,0:55.
+  \lean{ComputableAnalysis.L1.IsComputableReal}
+  \leanok
+  \uses{def:l1_isComputableSeqReal}
+  Predicate \texttt{IsComputableReal}\,$: \mathbb{R} \to \texttt{Prop}$. A real $x$ is computable iff the constant sequence $\lambda n.\,x$ satisfies \texttt{IsComputableSeqReal}. P-R Ch.\,0:58, Definition 3 (point predicate, equivalent to the constant-sequence form via project commitment \#2, P-R intro:7).
+  See \texttt{ComputableAnalysis/L1/ComputableSeqReal.lean} \S5.
 \end{definition}
+
+\begin{lemma}
+  \label{lem:l1_isComputableReal_ofRat}
+  \lean{ComputableAnalysis.L1.IsComputableReal.ofRat}
+  \leanok
+  \uses{def:l1_isComputableReal, lem:l1_isComputableSeqReal_const_rat}
+  Every rational is a computable real: the constant sequence at $(q : \mathbb{R})$ is a computable sequence of reals.
+  See \texttt{ComputableAnalysis/L1/ComputableSeqReal.lean} \S5.
+\end{lemma}
+
+\begin{lemma}
+  \label{lem:l1_isComputableReal_zero}
+  \lean{ComputableAnalysis.L1.IsComputableReal.zero}
+  \leanok
+  \uses{lem:l1_isComputableReal_ofRat}
+  Zero is a computable real. (Base case for downstream arithmetic-closure work.)
+  See \texttt{ComputableAnalysis/L1/ComputableSeqReal.lean} \S5.
+\end{lemma}

@@ -1,119 +1,107 @@
 ---
-id: is-computable-seq-real
-topic: l1-computable-reals
-status: our_construction
-lean_target:
-  - formal/ComputableAnalysis/L1/ComputableSeqReal.lean
-  - formal/ComputableAnalysis/L1/ComputableSeqComplex.lean
+id: l1-computable-reals-is-computable-seq-real
+blueprint: blueprint:def:l1_isComputableSeqReal
 created: 2026-06-01
 sources:
-  - literature/papers/PourEl-Richards-chapt0.md
-depends_on: []
-referenced_by:
-  - claims/l3-computability-structure/axioms.md  # Axiom 1 invokes IsComputableSeqComplex (when K=ℂ); Axiom 3 (Norms) invokes IsComputableSeqReal
+  - PourEl-Richards-1989:Ch.0:203 (Definition 5a)
+  - PourEl-Richards-1989:Ch.0:46 (Definition 1)
+  - PourEl-Richards-1989:Ch.0:189 (computable double sequences)
+  - PourEl-Richards-1989:Ch.0:200 (Definition 5)
+dependencies: []
+da_status: pending
 ---
 
-# L1 — `IsComputableSeqReal`: the L3-facing stub
+> **Blueprint:** `[[blueprint:def:l1_isComputableSeqReal]]` — formal statement
+> and formalization state (`\leanok` / `\notready` / `\mathlibok`) live there.
+> This file holds design rationale only.
 
-**Status: `our_construction`.** This is a **stub claim**: it pins down the meaning of "computable sequence of real numbers" so that L3 Axiom 3 (`claims/l3-computability-structure/axioms.md`, A3) has a precise referent. Full L1 elaboration (computable points as the constant-sequence case, closure under field operations, the subfield structure of `ℝ_c`, etc.) is downstream and out of scope for the current goal `l3-computability-structure-axioms`.
+# `IsComputableSeqReal` — predicate-form computable sequences of reals on Mathlib's `ℝ`
 
-## Setup
+## Why this construction
 
-We work over Mathlib's pre-existing `ℝ` (`Mathlib.Data.Real.Basic`). Per project commitment #3, we define a *predicate* on sequences of reals, not a new type.
+The L1 → L3 reach-down forces three pinned choices:
 
-## Auxiliary definition: computable sequence of rationals
+1. **Predicate, not new type.** Per project commitment #3, we do not introduce
+   a parallel `ℝ_c` type. L3's typeclass `ComputabilityStructure` adds
+   structure to Mathlib's pre-existing Banach hierarchy; its Axiom 3 (Norms)
+   asks for "the norm of a computable sequence in `X` is a computable
+   sequence in `ℝ`". That requires a `Prop` on `ℕ → ℝ`, not membership in a
+   subtype.
+2. **Definition 5a, not Definition 5.** P-R offers two equivalent
+   formulations (lines 200 vs 203 of Ch. 0): Definition 5 carries an explicit
+   recursive modulus `e(n, N)` ("`k ≥ e(n, N) ⇒ |r_{n,k} − x_n| ≤ 2^{-N}`");
+   Definition 5a folds the modulus into the second index ("`|r_{n,k} − x_n|
+   ≤ 2^{-k}`"). The reverse direction `5 ⇒ 5a` is the short subsequence
+   argument at chapt0.md:209 (`r'_{n,k} := r_{n, e(n,k)}`). Adopting 5a as
+   primary saves the predicate's signature one parameter and matches the
+   blueprint's clean form.
+3. **Computable double sequence via `Nat.unpair`.** P-R Ch. 0:189 says "by
+   one of the standard recursive pairing functions"; we use Mathlib's
+   `Nat.unpair` (the inverse of the max-based `Nat.pair`) because it is the
+   pairing already wired into `Primrec`/`Computable` throughout Mathlib. The
+   specific Cantor formula `(x+y)(x+y+1)/2 + x` is also available as
+   `ComputableAnalysis.L0.cantorPair` for paper-citation purposes; both
+   bijections are recursive so all P-R statements transfer.
 
-A sequence `(r_k) : ℕ → ℚ` is a **computable sequence of rationals** if there exist Mathlib-`Computable` functions `a, b, s : ℕ → ℕ` with `b k ≠ 0` for all `k`, such that
+## Alternatives considered
 
-```
-r_k = (-1)^{s k} · (a k / b k)   for all k.
-```
+- **New `ℝ_c` subtype.** Rejected — violates commitment #3 and forces
+  duplication of the entire Mathlib analysis hierarchy.
+- **Definition 5 with explicit modulus.** Rejected as primary form — adds a
+  parameter to every L1 lemma and to L3 Axiom 3's signature. We may state
+  Definition 5 as an `iff`-equivalence lemma later.
+- **TTE / represented spaces.** Rejected as headline framework per CLAUDE.md
+  preferences; the predicate-on-Mathlib-types route is more directly
+  compatible with `NormedSpace 𝕜 E` upstream.
+- **Cantor pairing `(x+y)(x+y+1)/2 + x` as primary.** Rejected as primary
+  decode; kept as a citation-only constructor in L0.
 
-> *Verbatim source* — `literature/papers/PourEl-Richards-chapt0.md:46–50`:
->
-> > "Definition 1. A sequence `{r_k}` of rational numbers is computable if there exist three recursive functions `a, b, s` from `ℕ` to `ℕ` such that `b(k) ≠ 0` for all `k` and
-> >
-> > `r_k = (-1)^{s(k)} · a(k)/b(k)` for all `k`."
+## Mathlib-idiom mapping
 
-A **computable double sequence of rationals** `(r_{n,k}) : ℕ × ℕ → ℚ` is one whose Cantor-paired re-indexing `ℕ → ℚ` is a computable sequence of rationals.
+- `IsComputableSeqRat`, `IsComputableDoubleSeqRat`, `IsComputableSeqReal` are
+  defined in `ComputableAnalysis/L1/ComputableSeqReal.lean` against:
+  - `Mathlib.Computability.Partrec` (`Computable`)
+  - `Mathlib.Data.Nat.Pairing` (`Nat.unpair`)
+  - `Mathlib.Data.Rat.Defs` / `Mathlib.Data.Rat.Cast.Defs`
+  - `Mathlib.Data.Real.Basic` (`ℝ`)
+- The `Is`-prefix follows Mathlib idiom (compare `Continuous : Prop`).
+  Bundled subtype forms (à la `ContinuousMap`) are allowed as additions when
+  ergonomically necessary, never as replacements.
 
-> *Verbatim source* — `literature/papers/PourEl-Richards-chapt0.md:189`:
->
-> > "A double sequence will be called computable if it is mapped onto a computable sequence by one of the standard recursive pairing functions from `ℕ × ℕ` onto `ℕ`. Similarly for triple or `q`-fold sequences."
+## Sources
 
-## Definition: `IsComputableSeqReal`
+- P-R Ch. 0:46 (Def. 1): *"A sequence `{r_k}` of rational numbers is
+  computable if there exist three recursive functions `a, b, s` from `ℕ` to
+  `ℕ` such that `b(k) ≠ 0` for all `k` and `r_k = (-1)^{s(k)} · a(k)/b(k)`
+  for all `k`."* — `literature/papers/PourEl-Richards-chapt0.md:46`.
+- P-R Ch. 0:189: *"A double sequence will be called computable if it is
+  mapped onto a computable sequence by one of the standard recursive pairing
+  functions from `ℕ × ℕ` onto `ℕ`. Similarly for triple or `q`-fold
+  sequences."* — `literature/papers/PourEl-Richards-chapt0.md:189`.
+- P-R Ch. 0:200 (Def. 5): *"A sequence of real numbers `{x_n}` is computable
+  (as a sequence) if there is a computable double sequence of rationals
+  `{r_{n k}}` such that `r_{n k} → x_n` as `k → ∞`, effectively in `k` and
+  `n`."* — `literature/papers/PourEl-Richards-chapt0.md:200`.
+- P-R Ch. 0:203 (Def. 5a, primary): *"A sequence of real numbers `{x_n}` is
+  computable (as a sequence) if there is a computable double sequence of
+  rationals `{r_{n k}}` such that `|r_{n k} − x_n| ≤ 2^{-k}` for all `k` and
+  `n`."* — `literature/papers/PourEl-Richards-chapt0.md:203`.
 
-We adopt P-R's **Definition 5a** as the primary form (cleaner because the index `k` *is* the precision parameter, so no separate modulus function is needed):
+## Devil's-advocate verdict
 
-> `IsComputableSeqReal (x : ℕ → ℝ) : Prop` holds iff there exists a computable double sequence of rationals `(r_{n,k}) : ℕ × ℕ → ℚ` such that
->
-> ```
-> |r_{n,k} − x_n| ≤ 1 / 2^k     for all n, k.
-> ```
+- Last reviewed: never
+- Verdict: (none yet)
+- Open weaknesses: equivalence of Definitions 5 and 5a is *stated* but not
+  formally proved in Lean yet — should land as a downstream lemma so future
+  callers can rely on either form interchangeably.
 
-> *Verbatim source* — `literature/papers/PourEl-Richards-chapt0.md:203–207`:
->
-> > "Definition 5a. A sequence of real numbers `{x_n}` is computable (as a sequence) if there is a computable double sequence of rationals `{r_{n k}}` such that
-> >
-> > `|r_{n k} − x_n| ≤ 2^{-k}` for all `k` and `n`."
+## Notes for future revisions
 
-### Equivalence with Definition 5
-
-P-R also gives **Definition 5** (with an explicit recursive modulus `e(n,N)` rather than the index serving as the precision):
-
-> *Verbatim source* — `literature/papers/PourEl-Richards-chapt0.md:200`:
->
-> > "Definition 5. A sequence of real numbers `{x_n}` is computable (as a sequence) if there is a computable double sequence of rationals `{r_{n k}}` such that `r_{n k} → x_n` as `k → ∞`, effectively in `k` and `n`."
-
-The two are equivalent — `5a ⇒ 5` is trivial (take `e(n,N) := N`); `5 ⇒ 5a` is proved at `PourEl-Richards-chapt0.md:209–215` by subsequencing: given `5` with modulus `e`, replace `r_{n,k}` by `r'_{n,k} := r_{n, e(n,k)}`.
-
-We adopt 5a because it removes the modulus parameter from the predicate's signature.
-
-## Definition: `IsComputableSeqComplex`
-
-For sequences of complex numbers we use P-R's coordinatewise extension.
-
-> `IsComputableSeqComplex (z : ℕ → ℂ) : Prop` holds iff both `n ↦ (z n).re` and `n ↦ (z n).im` satisfy `IsComputableSeqReal`.
-
-> *Verbatim source* — `literature/papers/PourEl-Richards-chapt0.md:216`:
->
-> > "The above definitions extend in the obvious way to complex numbers and to `q`-vectors. Thus a sequence of complex numbers is called computable if its real and imaginary parts are computable sequences. A sequence of `q`-vectors is called computable if each of its components is a computable sequence of real or complex numbers."
-
-This is the L1 predicate that L3 Axiom 1 invokes when the underlying scalar field of a Banach space is `K = ℂ`. (L3 Axiom 3 — norms — always returns `ℝ`, so it only ever references `IsComputableSeqReal`, regardless of whether the underlying Banach space is real or complex.)
-
-A `q`-vector extension `IsComputableSeqVec : (ℕ → Fin q → 𝕜) → Prop` (componentwise) follows from the same source quote but is deferred to a downstream claim — L3 does not need it directly.
-
-## Effective convergence (referenced by L3 Axiom 2)
-
-For completeness — and because L3 Axiom 2 (Limits) reuses the same effective-convergence notion at the Banach-space level — we record P-R's Definition 4:
-
-> *Verbatim source* — `literature/papers/PourEl-Richards-chapt0.md:191–195`:
->
-> > "Definition 4. Let `{x_{n k}}` be a double sequence of reals and `{x_n}` a sequence of reals such that, as `k → ∞`, `x_{n k} → x_n` for each `n`. We say that `x_{n k} → x_n` effectively in `k` and `n` if there is a recursive function `e : ℕ × ℕ → ℕ` such that for all `n, N`:
-> >
-> > `k ≥ e(n, N)` implies `|x_{n k} − x_n| ≤ 2^{-N}`."
-
-This definition is what L3's Axiom 2 (Limits) lifts to a Banach space `X` (replace `|·|` with `‖·‖_X`).
-
-## What this stub is *not*
-
-This is **not** the full L1 layer. The following are intentionally deferred:
-
-- `IsComputableReal : ℝ → Prop` (constant-sequence case) — a future L1 milestone.
-- Closure under arithmetic (sum, product, reciprocal where nonzero, …) — proved in P-R Ch. 0, but downstream of this stub.
-- The countable-subfield theorem — downstream.
-- The equivalence with Definition 5 is *stated* here but not proved; the proof in Ch. 0:209 is short and can be discharged when L1 is elaborated.
-- Effective sign-decidability (P-R Proposition 0, `chapt0.md:64`) — separate downstream claim.
-
-## Why this stub is sufficient for the L3 axioms goal
-
-L3 Axiom 3 says: "if `(x_n)` is a computable sequence in `X`, then `n ↦ ‖x_n‖_X` is a computable sequence of reals." The phrase "computable sequence of reals" is the predicate `IsComputableSeqReal` defined above. That is the totality of the L1 → L3 reach-down. No further L1 content is needed to make the L3 axioms well-formed.
-
-## Dependencies
-
-| Layer | Artifact | Why |
-|---|---|---|
-| L0 | `Mathlib.Computability.Partrec` (`Computable`) | "recursive functions `a, b, s : ℕ → ℕ`" in Definition 1 |
-| L0 | `Mathlib.Data.Nat.Pairing` (`Nat.pair` / `Nat.unpair`) | "computable double sequence of rationals" decoding |
-| Mathlib | `Mathlib.Data.Real.Basic` (`ℝ`) | The type we predicate over |
-| Mathlib | `Mathlib.Data.Rat.Defs` (`ℚ`) | Rational approximants |
+- If Mathlib ever upstreams `Mathlib.Computability.Real.IsComputableSeq` (or
+  similar), this predicate and its docstring become the migration target.
+- The `IsComputableSeqComplex` and `q`-vector extensions (P-R Ch. 0:216) get
+  their own claim file when they land — they are out of scope here.
+- The countable-subfield structure on `ℝ_c` (Ch. 0 §3) is also a separate
+  downstream claim; it depends on `IsComputableReal` (point predicate, see
+  `[[blueprint:def:l1_isComputableReal]]`) which is `\notready` as of
+  2026-06-03.

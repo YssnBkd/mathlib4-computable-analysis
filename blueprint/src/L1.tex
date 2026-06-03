@@ -31,8 +31,10 @@
   \leanok
   \uses{def:l1_isComputableSeqRat}
   For every rational $q$, the constant sequence $\lambda n.\,q$ satisfies \texttt{IsComputableSeqRat}. Witness $(a,b,s) := (|q.\mathrm{num}|, q.\mathrm{den}, \mathbf{1}[q.\mathrm{num} < 0])$, all constant hence recursive; the arithmetic identity reduces to a sign case-split on \texttt{Rat.num\_div\_den}.
-  See \texttt{ComputableAnalysis/L1/ComputableSeqReal.lean:119}.
 \end{lemma}
+\begin{proof}\leanok
+  Formalized in \texttt{ComputableAnalysis/L1/ComputableSeqReal.lean}.
+\end{proof}
 
 \begin{definition}
   \label{def:l1_isComputableSeqReal}
@@ -49,8 +51,10 @@
   \leanok
   \uses{def:l1_isComputableSeqReal, lem:l1_isComputableSeqRat_const}
   For every rational $q$, the real-valued constant sequence $\lambda n.\,(q : \mathbb{R})$ satisfies \texttt{IsComputableSeqReal}. Witness: the constant double sequence $r(n,k) := q$. The error bound $|q - q| = 0 \le 2^{-k}$ is immediate.
-  See \texttt{ComputableAnalysis/L1/ComputableSeqReal.lean:140}.
 \end{lemma}
+\begin{proof}\leanok
+  Formalized in \texttt{ComputableAnalysis/L1/ComputableSeqReal.lean}.
+\end{proof}
 
 \begin{lemma}
   \label{lem:l1_isComputableSeqRat_add}
@@ -58,8 +62,10 @@
   \leanok
   \uses{def:l1_isComputableSeqRat}
   Closure of \texttt{IsComputableSeqRat} under pointwise addition: if $h_i : \texttt{IsComputableSeqRat}\,r_i$ for $i \in \{1,2\}$, then $r_1 + r_2$ (Pi-pointwise sum) is computable. The new $\mathbb{N}$-level witness $(\mathrm{newA}, \mathrm{newB}, \mathrm{newS})$ dispatches on the sign-parities $(s_1\,k \bmod 2, s_2\,k \bmod 2)$ and the cross-product comparison $a_1\,k \cdot b_2\,k \ge a_2\,k \cdot b_1\,k$; $\mathbb{N}$-truncated subtraction handles the sign-cancellation cases.
-  See \texttt{ComputableAnalysis/L1/ComputableSeqReal.lean} \S4.
 \end{lemma}
+\begin{proof}\leanok
+  Formalized in \texttt{ComputableAnalysis/L1/ComputableSeqReal.lean}.
+\end{proof}
 
 \begin{lemma}
   \label{lem:l1_isComputableSeqRat_mul}
@@ -67,8 +73,10 @@
   \leanok
   \uses{def:l1_isComputableSeqRat}
   Closure of \texttt{IsComputableSeqRat} under pointwise multiplication: $r_1 \cdot r_2$ is computable when both factors are. The witness is direct, $(\mathrm{newA}, \mathrm{newB}, \mathrm{newS}) := (a_1 \cdot a_2,\, b_1 \cdot b_2,\, s_1 + s_2)$; the identity reduces to a single \texttt{pow\_add} + \texttt{field\_simp} step (no sign-case dispatch).
-  See \texttt{ComputableAnalysis/L1/ComputableSeqReal.lean} \S4.
 \end{lemma}
+\begin{proof}\leanok
+  Formalized in \texttt{ComputableAnalysis/L1/ComputableSeqReal.lean}.
+\end{proof}
 
 \begin{lemma}
   \label{lem:l1_isComputableSeqRat_comp}
@@ -76,8 +84,10 @@
   \leanok
   \uses{def:l1_isComputableSeqRat}
   Closure of \texttt{IsComputableSeqRat} under precomposition with a computable re-indexing: if $\sigma : \mathbb{N} \to \mathbb{N}$ is \texttt{Computable} and $r : \mathbb{N} \to \mathbb{Q}$ satisfies \texttt{IsComputableSeqRat}, then so does $r \circ \sigma$. Each component $(a, b, s)$ of the witness is precomposed with $\sigma$; closure of \texttt{Computable} under composition (\texttt{Computable.comp}) supplies the recursion-theoretic data.
-  See \texttt{ComputableAnalysis/L1/ComputableSeqReal.lean} \S4.
 \end{lemma}
+\begin{proof}\leanok
+  Formalized in \texttt{ComputableAnalysis/L1/ComputableSeqReal.lean}.
+\end{proof}
 
 \begin{definition}
   \label{def:l1_isComputableReal}
@@ -94,8 +104,10 @@
   \leanok
   \uses{def:l1_isComputableReal, lem:l1_isComputableSeqReal_const_rat}
   Every rational is a computable real: the constant sequence at $(q : \mathbb{R})$ is a computable sequence of reals.
-  See \texttt{ComputableAnalysis/L1/ComputableSeqReal.lean} \S5.
 \end{lemma}
+\begin{proof}\leanok
+  Formalized in \texttt{ComputableAnalysis/L1/ComputableSeqReal.lean}.
+\end{proof}
 
 \begin{lemma}
   \label{lem:l1_isComputableReal_zero}
@@ -103,5 +115,7 @@
   \leanok
   \uses{lem:l1_isComputableReal_ofRat}
   Zero is a computable real. (Base case for downstream arithmetic-closure work.)
-  See \texttt{ComputableAnalysis/L1/ComputableSeqReal.lean} \S5.
 \end{lemma}
+\begin{proof}\leanok
+  Formalized in \texttt{ComputableAnalysis/L1/ComputableSeqReal.lean}.
+\end{proof}

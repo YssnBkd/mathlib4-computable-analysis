@@ -148,17 +148,4 @@ is the standard tool but takes a value-providing function rather than a bool. -/
 def charFn (S : Set ℕ) [DecidablePred (· ∈ S)] (x : ℕ) : ℕ :=
   if x ∈ S then 1 else 0
 
-/-! ## §5 — Smoke checks -/
-
-#check @IsRecursive
-#check @IsRecursivelyEnumerable
-#check @IsRecursiveSet
-#check @haltingSetAt
-#check @haltingSetAt_re
-#check @haltingSetAt_not_recursive
-#check @prop_A_exists_re_not_recursive
-#check @cantorPair
-#check @cantorPair_computable
-#check @charFn
-
 end ComputableAnalysis.L0

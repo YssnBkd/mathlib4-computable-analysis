@@ -55,8 +55,11 @@ commitments above.
   in P-R-shaped API.
 - **Classical reasoning.** Mathlib is classical; we match.
 - **Mathlib4 naming and style.** snake_case proofs, UpperCamelCase
-  types/classes, `Is`-prefix for `Prop`-valued predicates, 100-char lines,
-  `Type*` over `Type 0`, `autoImplicit false`.
+  types/classes, `Is`-prefix for *noun* `Prop`-valued predicates only (Mathlib's
+  rule: `Is` for nouns like `IsTopologicalRing`, not adjectives like `Normal` —
+  <https://leanprover-community.github.io/contribute/naming.html>), 100-char
+  lines, `Type*` over `Type 0`, `autoImplicit false`. Class/structure fields name
+  the *conclusion* (`add_comm`, `norm_smul`), never `axiom_*`.
 
 ## Workflow — lean-first by default
 
@@ -159,15 +162,32 @@ for "what's stated / proved / formalized" (post-2026-06-02 transition to
 Patrick Massot's `leanblueprint` framework — see `claims/INDEX.md` for the
 mapping from the old 7-label YAML taxonomy).
 
-Color mapping in the graph:
+Color encodes **two independent dimensions**: the node **border** is the
+*statement* state, the node **fill** is the *proof* state. (Full `blueprint.py`
+logic and the dark-green-fill trap are in `docs/BLUEPRINT-CONVENTIONS.md`.)
 
-| Color | Marker in `blueprint/src/*.tex` | Meaning |
+**Border — statement state:**
+
+| Border | Marker | Meaning |
 |---|---|---|
-| Green ellipse | `\leanok` + `\lean{<Decl>}` | Theorem stated and proved in Lean. |
-| Green filled box | `\leanok` + `\lean{<Decl>}` | Definition concrete in Lean. |
-| Dark green | `\mathlibok` | Lives in Mathlib upstream. |
-| Blue / white-bordered | (stated env, no `\lean{}`) | Stated formally; Lean target not declared yet. |
+| Dark green | `\mathlibok` | Statement already lives in Mathlib upstream. |
+| Green | `\leanok` on the statement (+ `\lean{<Decl>}`) | Statement formalized in Lean. |
+| Blue | every statement-level `\uses` target is leanok | Ready to formalize; Lean target not declared yet. |
 | Orange (`#FFAA33`) | `\notready` | Statement not ready for formalization. |
+
+**Fill — proof state:**
+
+| Fill | Condition | Meaning |
+|---|---|---|
+| Dark green (`#1CAC78`) | `fully_proved`: self + all ancestors proved-or-definition | Proof and entire upward cone formalized. |
+| Mid green (`#9CEC8B`) | `proved`: the proof env carries `\leanok` | This proof formalized. |
+| Light green (`#B0ECA3`) | definition, `stated` | Definition concrete in Lean. |
+| Blue (`#A3D6FF`) | `can_prove`: all dependencies leanok | Dependencies formalized; proof not yet. |
+
+A node reaches dark-green *fill* only with BOTH a `\leanok` statement and a
+`\begin{proof}\leanok ... \end{proof}` block. `\mathlibok` is for the rare
+already-upstream result — **not** a citation-node mechanism (see
+`docs/BLUEPRINT-CONVENTIONS.md`).
 
 For non-blueprint artifacts (pre-formal mental models under `intuition/`),
 status is implicitly `intuition` and they do not appear in the dep graph until

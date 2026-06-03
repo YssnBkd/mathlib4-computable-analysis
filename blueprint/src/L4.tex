@@ -1,22 +1,30 @@
 \chapter{L4 — Instances of the computability structure}
 
 % P-R reference: Chapter 2, examples 2.1, 2.4-2.5, literature/papers/PourEl-Richards-chapt2.md.
-% Layer status (post round l4-cmap-axiom-linearity-bound, 2026-06-03): C[a,b]
-% axiom_linearity is FULLY CLOSED (sorry-free) — witness construction (M, dS, aS),
-% Computability, IsComputableSeqRat (flatten aS), AND the polynomial-approximant norm
-% bound. axiom_limits (A2) and axiom_norms (A3) remain stub (deferred), so the decl
-% still carries sorryAx and this node stays white-bordered (NO \leanok). L^p[a,b] and
-% separable Hilbert are pending.
 
 \begin{theorem}
   \label{thm:l4_cmap_instance}
   \lean{ComputableAnalysis.L4.computabilityStructureCMap_of}
   \uses{def:l3_computabilityStructure}
-  $C([a,b], \mathbb{R})$ with sup-norm carries a \texttt{ComputabilityStructure}~$\mathbb{R}$ structure via the polynomial-approximation predicate, parameterized over an explicit rational bound $B$ on $\max(|a|,|b|)$ (matching P-R Ch.\,2:128's restriction to recursive reals).
-
-  \textbf{Formalization state (2026-06-03, partial --- \texttt{axiom\_linearity} closed).} The witness $\langle aS, dS \rangle$ for \texttt{axiom\_linearity} is constructed and Computable; the \texttt{IsComputableSeqRat (flatten aS)} proof is closed (via \texttt{FinsetSumHelper.finsetSum\_rat} + helpers); and the polynomial-approximant norm bound $\|s_n - \texttt{polyApproxCMap}\ aS\ dS\ n\ m\| \le 1/2^m$ is now \emph{proved sorry-free}. The bound uses precision pad $M(n,m) = m + (d\,n{+}1) + \texttt{bound\_max}\,n + 2$, a per-summand triangle bound (\texttt{perk\_bound}: $|c_\alpha x - \alpha_r p| \le \varepsilon(C_a + P_x)$) over the polynomial-expansion identity, $\mathbb{N}$-valued coefficient/norm bounds (\texttt{bound\_x\_k}, \texttt{bound\_max}), and the close-out $\texttt{closeout\_nat}: (D{+}1)\,B_m\,2^m \le 2^{m+(D+1)+B_m+2}$. Thus \texttt{axiom\_linearity} (= P-R Axiom~1, Linear Forms) is complete for the first concrete instance on an infinite-dimensional space. \texttt{axiom\_limits} (= P-R Ch.\,0 Thm.\,4) and \texttt{axiom\_norms} (= P-R Ch.\,0 Thm.\,7) remain stub, so the declaration retains \texttt{sorryAx} and this node stays white-bordered (no \texttt{\textbackslash leanok}) until A2/A3 land. P-R Ch.\,2:141--153.
-  See \texttt{ComputableAnalysis/L4/Instances/CMap.lean:634}.
+  $C([a,b], \mathbb{R})$ with the sup-norm carries a \texttt{ComputabilityStructure}~$\mathbb{R}$, where a sequence $(s_n)$ in $C[a,b]$ is computable iff there is a computable double array of rational-coefficient polynomials $p_{n,m}$ with $\|s_n - p_{n,m}\|_\infty \le 2^{-m}$ for all $n,m$. The construction is parameterized by an explicit rational bound $B \ge \max(|a|,|b|)$, matching P-R Ch.\,2:128's restriction to recursive endpoints. P-R Ch.\,2:141--153.
 \end{theorem}
+\begin{proof}
+  \uses{def:l1_isComputableSeqReal}
+  The three structure fields are verified separately.
+  \emph{Linearity} (P-R Axiom~1, Linear Forms): given computable polynomial
+  approximants for $(x_n)$ and $(y_n)$ and computable rational scalar arrays
+  $\alpha, \beta$, the finite combination $\sum_{k\le d(n)} \alpha_{n,k} x_k +
+  \beta_{n,k} y_k$ is approximated by the same combination of the approximating
+  polynomials. A precision pad $M(n,m)$ absorbing the per-summand coefficient and
+  sup-norm bounds turns the triangle inequality into the required $2^{-m}$
+  estimate.
+  \emph{Effective limit} (P-R Axiom~2): the diagonal of a computably-Cauchy
+  double array of polynomial approximants is again a polynomial approximant of
+  the limit (P-R Ch.\,0 Thm.\,4).
+  \emph{Computable norm} (P-R Axiom~3): $\|s_n\|_\infty = \lim_m \|p_{n,m}\|_\infty$
+  and the sup-norm of a rational polynomial on $[a,b]$ is a computable real, so
+  the norms form a computable sequence of reals (P-R Ch.\,0 Thm.\,7).
+\end{proof}
 
 \begin{theorem}
   \label{thm:l4_lp_instance}

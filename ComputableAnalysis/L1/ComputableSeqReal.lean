@@ -264,7 +264,6 @@ theorem add
       rw [pow_red (s₁ k), h₁, h₂]
       push_cast
       field_simp
-      try ring
     · -- s₁ even, s₂ odd: different parity.
       have hne : s₁ k % 2 ≠ s₂ k % 2 := by rw [h₁, h₂]; decide
       simp only [if_neg hne]
@@ -273,13 +272,13 @@ theorem add
         rw [pow_red (s₁ k), h₁, h₂, Nat.cast_sub hpge]
         push_cast
         field_simp
-        try ring
+        ring
       · simp only [if_neg hpge]
         have hle : a₁ k * b₂ k ≤ a₂ k * b₁ k := le_of_not_ge hpge
         rw [pow_red (s₂ k), h₁, h₂, Nat.cast_sub hle]
         push_cast
         field_simp
-        try ring
+        ring
     · -- s₁ odd, s₂ even: mirror of (even, odd).
       have hne : s₁ k % 2 ≠ s₂ k % 2 := by rw [h₁, h₂]; decide
       simp only [if_neg hne]
@@ -288,20 +287,20 @@ theorem add
         rw [pow_red (s₁ k), h₁, h₂, Nat.cast_sub hpge]
         push_cast
         field_simp
-        try ring
+        ring
       · simp only [if_neg hpge]
         have hle : a₁ k * b₂ k ≤ a₂ k * b₁ k := le_of_not_ge hpge
         rw [pow_red (s₂ k), h₁, h₂, Nat.cast_sub hle]
         push_cast
         field_simp
-        try ring
+        ring
     · -- Both odd: same parity, newS = s₁ k (odd), newA = a₁·b₂ + a₂·b₁.
       have hsame : s₁ k % 2 = s₂ k % 2 := h₁.trans h₂.symm
       simp only [if_pos hsame]
       rw [pow_red (s₁ k), h₁, h₂]
       push_cast
       field_simp
-      try ring
+      ring
 
 /-- Closure of `IsComputableSeqRat` under pointwise multiplication.
 
@@ -332,7 +331,6 @@ theorem mul
   rw [pow_add]
   push_cast
   field_simp
-  try ring
 
 /-- Closure of `IsComputableSeqRat` under precomposition with a computable
 re-indexing `σ : ℕ → ℕ`. Witness: each ingredient `(a, b, s)` of `r` is
@@ -390,19 +388,5 @@ theorem zero : IsComputableReal (0 : ℝ) := by
   simpa using ofRat 0
 
 end IsComputableReal
-
-/-! ## §6 — Smoke checks -/
-
-#check @IsComputableSeqRat
-#check @IsComputableDoubleSeqRat
-#check @IsComputableSeqReal
-#check @isComputableSeqRat_const
-#check @isComputableSeqReal_const_rat
-#check @IsComputableSeqRat.add
-#check @IsComputableSeqRat.mul
-#check @IsComputableSeqRat.comp
-#check @IsComputableReal
-#check @IsComputableReal.ofRat
-#check @IsComputableReal.zero
 
 end ComputableAnalysis.L1

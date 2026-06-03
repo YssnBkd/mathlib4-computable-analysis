@@ -101,17 +101,17 @@ sed -n '<LINE>p' literature/papers/<key>.md
 
 ## 7. `#print axioms (inst).someField` falsely reports `sorryAx` from sibling fields
 
-**Pitfall**: to audit that ONE field of a multi-field `instance`/`structure` is genuinely sorry-free, the natural move is `#print axioms (computabilityStructureCMap_of ..).axiom_linearity`. This reports `sorryAx` whenever ANY *sibling* field (e.g. `axiom_limits`, `axiom_norms`) still has a `sorry` — regardless of the inspected field's own purity. The projection drags in the whole structure's axiom set, so it cannot isolate one field. **False positive** — and equally a false *negative* risk if you ever read the absence of `sorryAx` on a projection as proof a sibling is clean.
+**Pitfall**: to audit that ONE field of a multi-field `instance`/`structure` is genuinely sorry-free, the natural move is `#print axioms (computabilityStructureCMap_of ..).isComputableSeq_linearCombination`. This reports `sorryAx` whenever ANY *sibling* field (e.g. `isComputableSeq_of_effectiveLimit`, `isComputableSeqReal_norm`) still has a `sorry` — regardless of the inspected field's own purity. The projection drags in the whole structure's axiom set, so it cannot isolate one field. **False positive** — and equally a false *negative* risk if you ever read the absence of `sorryAx` on a projection as proof a sibling is clean.
 
 **Workaround**: extract the field's proof body verbatim into a standalone theorem whose type is the field type, with NO sibling fields in scope, then audit that:
 ```lean
-theorem axiom_linearity_isolated : <the field's type> := by
+theorem isComputableSeq_linearCombination_isolated : <the field's type> := by
   <paste the field body verbatim>
-#print axioms axiom_linearity_isolated   -- reflects ONLY this proof
+#print axioms isComputableSeq_linearCombination_isolated   -- reflects ONLY this proof
 ```
 If it compiles clean and prints `[propext, Classical.choice, Quot.sound]` (no `sorryAx`, no `nativeDecide`, no `Lean.ofReduceBool`), the field is genuinely sound; any instance-level `sorryAx` is then provably attributable to the other (out-of-scope) fields.
 
-**Control that proves the artifact**: a hand-built structure with `axiom_linearity := trivial` (provably pure) but `sorry` in two siblings STILL prints `sorryAx` on the projected `.axiom_linearity`. So projection is unsound for field-level audits even when the conclusion happens to be right.
+**Control that proves the artifact**: a hand-built structure with `isComputableSeq_linearCombination := trivial` (provably pure) but `sorry` in two siblings STILL prints `sorryAx` on the projected `.isComputableSeq_linearCombination`. So projection is unsound for field-level audits even when the conclusion happens to be right.
 
 **Hit at**: `l4-cmap-axiom-linearity-bound` — the first-pass C2 review used field projection and reached the right verdict by luck; the post-compaction re-run caught the flawed method and replaced it with standalone extraction.
 

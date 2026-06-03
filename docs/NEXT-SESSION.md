@@ -1,160 +1,145 @@
 # Prompt for next session
 
-> *Paste this prompt as the opening message in the next conversation. It is self-contained — you do not need to re-read prior transcripts.*
+> *Paste this as the opening message in the next conversation. It is self-contained;
+> you do not need prior transcripts.* This is a **default** — if the user opens with a
+> different request, follow their direction.
 
 ---
 
-You are continuing work on **mathlib-computable-analysis**, a Lean 4 / Mathlib4 formalization of Pour-El & Richards' *Computability in Analysis and Physics* (Cambridge UP 1989), intended for upstream contribution to `Mathlib.Computability.Analysis.*`. Repo root: `/Users/yassineboulkaid/Projets/Claude/mathlib-computable-analysis/`. Read `CLAUDE.md` first — it is the project constitution.
+You are continuing work on **mathlib-computable-analysis**, a Lean 4 / Mathlib4
+formalization of Pour-El & Richards' *Computability in Analysis and Physics* (Cambridge
+UP 1989), targeting upstream contribution to `Mathlib.Computability.Analysis.*`. Repo root:
+`/Users/yassineboulkaid/Projets/Claude/mathlib-computable-analysis/`. **Read `CLAUDE.md`
+first** — it is the project constitution. The deliverable is **Lean code**; the
+type-checker is the final arbiter.
 
-## Major change since the last NEXT-SESSION.md
+## What just happened (2026-06-04 conformance pass)
 
-Round `l4-cmap-axiom-linearity-cont` (2026-06-03, partial close at 16/16 of doubled budget) shipped the **L4 `axiom_linearity` witness construction + Computability + IsComputableSeqRat proof** — 5 of 6 axiom_linearity components closed sorry-free; only the norm bound remains. Devil's-advocate verdict on C2: `passes-partial` (all closed parts sound).
+The previous session audited the project against official Lean 4 + leanblueprint
+conventions and ran a three-phase cleanup. **No mathematics changed; no new `sorry`
+appeared.** The build is green (2532 jobs); the only sorry-warning is at
+`CMap.lean:639` (the C[a,b] instance `def`, from its open A2/A3 fields).
 
-Key shipped pieces:
+1. **A planned refactor was investigated and rejected.** The prior `NEXT-SESSION.md`
+   proposed adding a project-wide layer of `\mathlibok` "foundation nodes" to make the
+   Mathlib dependency visible in the dep graph. Research into the three most-cited
+   community blueprints killed it: **`\mathlibok` is used 0 times across PFR (406
+   `\leanok`), Carleson (360), and sphere-eversion (116)** — see the evidence table in
+   `docs/BLUEPRINT-CONVENTIONS.md` §"Do NOT build a `\mathlibok` foundation layer". The
+   community idiom is to model only your *own* nodes and let Mathlib be invisible
+   substrate. **Do not resurrect the foundation-layer plan.**
 
-1. **Instance restructured** — `noncomputable instance instComputabilityStructureCMap` → `@[reducible] noncomputable def computabilityStructureCMap_of (B : ℕ) (hα_le : |α| ≤ (B : ℝ)) (hβ_le : |β| ≤ (B : ℝ))`. Takes explicit rational bound on `max(|α|, |β|)`, matching P-R Ch. 2:128's restriction to recursive reals. `@[reducible]` was added so the def can participate in typeclass unfolding.
-2. **Witness `aS, dS, M, pad_X, pad_Y`** as concrete let-bindings inside `axiom_linearity` body. M's formula: `m + (d n + 1) + bound_max(n) + 2`.
-3. **Complete bound machinery** (~250 lines, all sorry-free): `bound_aX_at_0`, `bound_aY_at_0`, `bound_αR_at_0`, `bound_βR_at_0`, `h_Bpow` (B^j Computable via `Computable.nat_rec`), `bound_x_k`, `bound_y_k`, `stuff_per_k`, `bound_max`, `hM`, `hd_S`.
-4. **`IsComputableSeqRat (flatten aS)` proof** via `FinsetSumHelper.finsetSum_rat` + `ite_rat` + `isComputableSeqRat_doubleApply` + `isComputableSeqRat_tripleApply` + L1 `IsComputableSeqRat.{add, mul, comp}`. ~150 lines, all sorry-free. The `convert h_r_flat using 1` trick bridges the Pi.add_apply/Pi.mul_apply gap.
-5. **5 reusable closure helpers** in `FinsetSumHelper` namespace (in `ComputableAnalysis/L4/Instances/CMap.lean`): `addTriple` (+ `_b_ne_zero`, `_correct`, `_computable`), `tripleToRat`, `finsetSum_rat`, `ite_rat`, `isComputableSeqRat_doubleApply`, `isComputableSeqRat_tripleApply`. TODO: lift to L1 in a follow-up round.
-6. **C5 claim file** at `claims/l4-cmap-axiom-linearity/axiom_linearity.md` — full design rationale + alternatives + sources + DA-pending verdict + roadmap.
-7. **Blueprint L4.tex updated** to reflect partial state.
-8. **DA verdict** at `.goals/l4-cmap-axiom-linearity-cont/reviews/C2.md` (~240 lines): `passes-partial`. All closed parts verified sound; 3 fixes applied (citation typo, over-claim softening, reducibility warning).
+2. **Docs corrected, blueprint cleaned, Lean conventions enforced.** `CLAUDE.md`'s status
+   section now separates border (statement state) from fill (proof state). Blueprint node
+   text is pure mathematics — all changelog/iteration/"see `.lean:NN`" prose stripped;
+   `\usepackage{cleveref}` added to `web.tex`/`print.tex` so `\Cref` resolves; `\uses`
+   placement fixed (statement-level when the statement text references the target,
+   proof-level for results invoked in the proof). Lean files: `#check`/smoke-test blocks
+   removed, `try ring` crutches replaced by `ring` (or dropped where `field_simp` already
+   closed the goal), all lines wrapped to ≤100 columns.
 
-## TL;DR
+3. **The L3 axiom fields were renamed to name their conclusion** (Mathlib rule: structure
+   fields name the conclusion, never `axiom_*`). Current `ComputabilityStructure` fields:
+   `isComputableSeq_linearCombination` (A1), `isComputableSeq_of_effectiveLimit` (A2),
+   `isComputableSeqReal_norm` (A3), `zero_seq` (NV). The old `axiom_linearity` /
+   `axiom_limits` / `axiom_norms` names survive only in *historical* artifacts
+   (`claims/`, `.goals/`, round slugs) — deliberately not rewritten.
 
-1. `lake build` should produce **0 errors, 1 sorry-warning** at `ComputableAnalysis/L4/Instances/CMap.lean:439:31` (the `axiom_linearity` decl line; the actual sorry is the norm bound at the end of axiom_linearity's body). 2532 jobs.
-2. `PATH="$PWD/.venv/bin:$PATH" .venv/bin/leanblueprint web && PATH="$PWD/.venv/bin:$PATH" .venv/bin/leanblueprint checkdecls` should be silent / exit 0 / produce blueprint with 12 L0 nodes green, 11 L1 nodes green, 1 L1 stub + L2/L5 nodes orange, 1 L3 node green, 1 L4 node WHITE-BORDERED (stated, polynomial-form predicate; partial proof — witness + IsComputableSeqRat closed, norm bound deferred).
-3. **Recommended next direction (Action 2 below)**: open round **`l4-cmap-axiom-linearity-bound`** to close the remaining norm bound (~200-300 lines). DA-verified 5-step plan in `claims/.../axiom_linearity.md:88-107` + risk profile in `.goals/l4-cmap-axiom-linearity-cont/reviews/C2.md:233-247`.
+The durable conventions are recorded in `docs/BLUEPRINT-CONVENTIONS.md`; read it before
+touching any `.tex`.
 
-## Where we stand by layer (blueprint-color reading)
+## Current state (accurate as of 2026-06-04, post-cleanup)
 
-| Layer | Lean state | Blueprint chapter state | Next milestone |
-|---|---|---|---|
-| L0 | done | `L0.tex` all 12 nodes `\leanok` | none — done |
-| L1 | rat-seq closures + point predicate done | `L1.tex` 11 `\leanok` envs | real-seq closures; `finsetSum` lift; Def 5 ↔ 5a |
-| L2 | not started | `L2.tex` 1 `\notready` stub | predicate `IsGLComputable` (deferred) |
-| L3 | typeclass formalized (0 sorries) | `L3.tex` 1 `\notready` stub — does NOT reflect `\leanok`-eligible parts | content migration (deferred) + stability theorem |
-| L4 | **CMap stub: A1 PARTIAL (witness + IsComputableSeqRat closed, norm bound sorry); A2/A3 stub** | `L4.tex` 3 `\notready` stubs; CMap text updated to reflect partial state | **close A1 norm bound** (recommended next) |
-| L5 | not started | `L5.tex` 4 `\notready` stubs | First Main Theorem |
-
-## Your task this session
-
-### Action 1 — confirm the env is intact (~3 min)
-
-```bash
-lake build 2>&1 | tail -5
-PATH="$PWD/.venv/bin:$PATH" .venv/bin/leanblueprint web 2>&1 | tail -5
-PATH="$PWD/.venv/bin:$PATH" .venv/bin/leanblueprint checkdecls; echo "exit: $?"
-gh run list --repo YssnBkd/mathlib4-computable-analysis --limit 3
-```
-
-Expected: 2532 jobs successful, 1 sorry-warning at `CMap.lean:439:31`, exit 0 for checkdecls.
-
-### Action 2 — recommended direction: close the L4 A1 norm bound
-
-**Why this and not other directions**: the round just shipped 5/6 of A1 with all bound machinery in place. The norm bound is well-scoped (200-300 lines), DA-verified for soundness, and the polynomial-form A1 proof completion unlocks the full L4 CMap instance for downstream L5 work.
-
-Suggested round setup:
-
-- **Slug**: `l4-cmap-axiom-linearity-bound`
-- **Mode**: `proof-attempt`
-- **Budget**: **10 iters / 240 min** (calibrated: 200-300 lines of Lean, friction-driven not content-driven).
-- **Allow_writes**:
-  - `ComputableAnalysis/L4/Instances/CMap.lean`
-  - `blueprint/src/L4.tex` (toggle to `\leanok` after closure)
-  - `blueprint/lean_decls`
-  - `claims/l4-cmap-axiom-linearity/**`
-  - `CLAUDE.md`
-  - `.goals/l4-cmap-axiom-linearity-bound/**`
-  - `.goals/INDEX.md`
-  - `thinking/l4-cmap-axiom-linearity-bound/**`
-  - `docs/NEXT-SESSION.md`
-- **Forbid_writes**:
-  - `ComputableAnalysis/L0/**`, `ComputableAnalysis/L1/**`, `ComputableAnalysis/L3/**`, `ComputableAnalysis.lean`
-  - `blueprint/src/{content,L0,L1,L2,L3,L5}.tex`
-  - `blueprint/src/{blueprint.sty,plastex.cfg,latexmkrc}.tex` and `blueprint/src/macros/**`
-  - `literature/papers/**/verbatim.md`
-  - `.claude/commands/**`
-  - `.github/workflows/**`, `lakefile.toml`, `lake-manifest.json`, `lean-toolchain`
-- **Criteria** (machine-checkable):
-  - **C1**: `lake build` green; `ComputableAnalysis/L4/Instances/CMap.lean` has **0** sorry-warnings (A1 fully closed; A2 and A3 still sorry — see C3).
-  - **C2**: norm bound `∀ n m, ‖s n - polyApproxCMap aS dS n m‖ ≤ 1/2^m` is concrete (no `sorry`); the proof follows the DA-verified 5-step outline.
-  - **C3**: A2 and A3 remain `sorry` (deferred).
-  - **C4**: blueprint label `thm:l4_cmap_instance` toggled to `\leanok`.
-  - **C5**: claim file updated with the bound proof's actual structure + DA verdict on C2.
-- **Devil's-advocate required for**: C2 (the bound proof).
-
-### DA-identified risk profile for the bound round (high to low)
-
-1. **`Finset.sum_comm` for the polynomial j-k swap** (highest Lean-syntactic friction).
-2. **`ContinuousMap.norm_le`** (Compact.lean:204) for `‖f - g‖ → ∀ x_*, |f x_* - g x_*| ≤ ε`. Does NOT require `Nonempty` — handles empty `Set.Icc α β` directly.
-3. **Per-k summand bound chasing** using `hbnd_αR`, `hbnd_X`, `bound_x_k`, `bound_αR_at_0`, `hα_le`, `hβ_le`. Deeply nested `let`s — name resolution may be painful.
-4. **Σ_k bound** via `Finset.sum_le_sum` + `Finset.sum_const_nat`.
-5. **Close-out**: `2^{-M} · 2 · (d n + 1) · bound_max(n) ≤ 1/2^m` using `Nat.lt_pow_self` or similar.
-
-Bound algebra verified by DA: `2^M = 4 · 2^m · 2^(d n + 1) · 2^bound_max(n)`. Two factor-≤-1 brackets `[(d n + 1) / 2^(d n + 1)]` and `[bound_max(n) / 2^bound_max(n)]` give factor 2 slack.
-
-### Action 3 — alternative directions
-
-- **L1 real-sequence closures** (slug `l1-real-sequence-closure`, proof-attempt, ~10 iters / 180 min). Lifts `IsComputableSeqRat.{add,mul,comp}` through `IsComputableSeqReal`. Useful for future L4 axioms but doesn't close any current sorry.
-- **L1 `finsetSum_rat` + `ite_rat` lift** (slug `l1-finsetsum-and-ite`, proof-attempt, ~6 iters / 90 min). Lifts the round's two private closure helpers from CMap.lean to L1's `IsComputableSeqRat` namespace. Frees CMap.lean from carrying ~250 lines of L1-shaped code.
-- **L3 stability theorem** (slug `l3-stability`, proof-attempt, ~8 iters / 150 min). Independent of L1/L4; high-leverage.
-- **Zulip outreach with live blueprint** (slug `zulip-l0-l1-l3-l4-pitches`, mode `explore`, 3 iters / 60 min). L1 now has 11 green nodes + L4 has a substantial partial; Zulip pitches at `docs/zulip-drafts/*` can credibly link a fuller dep graph.
-
-## Critical knowledge — what's in `ComputableAnalysis/L4/Instances/CMap.lean` now
-
-| Section | Decls | Status |
+| Layer | Lean state | Blueprint |
 |---|---|---|
-| §0 `FinsetSumHelper` | `addTriple`, `addTriple_b_ne_zero`, `tripleToRat`, `addTriple_correct`, `addTriple_computable`, `finsetSum_rat`, `isComputableSeqRat_doubleApply`, `isComputableSeqRat_tripleApply`, `ite_rat` | All sorry-free |
-| `polyApproxCMap` | `noncomputable def` | sorry-free |
-| `IsComputableSeqCMap` | `def` | sorry-free |
-| `computabilityStructureCMap_of` | `@[reducible] noncomputable def` taking `(B : ℕ) (hα_le hβ_le)` | **A1 partial** (witness + Computability + IsComputableSeqRat closed; norm bound sorry); **A2/A3 stub**; `zero_seq` done |
+| L0 | done, 0 sorry (recursion bridge + Prop B inseparable pair) | `L0.tex` — 12 nodes `\leanok`, 8 with proof blocks (dark-green fill) |
+| L1 | rational-seq closures + real *point* predicate done, 0 sorry | `L1.tex` — 11 `\leanok`, 7 with proof blocks |
+| L2 | not started (Grzegorczyk–Lacombe) | `L2.tex` — 1 `\notready` stub |
+| L3 | `ComputabilityStructure` typeclass done, 0 sorry | `L3.tex` — 1 `\leanok` def |
+| L4 | C[a,b]: **A1 closed (sorry-free)**; A2/A3 sorried; Lᵖ/Hilbert not started | `L4.tex` — `thm:l4_cmap_instance` (white border: instance carries `sorryAx`); 2 `\notready` |
+| L5 | not started (Main Theorems) | `L5.tex` — 4 `\notready` stubs |
 
-Length: ~850 lines (was ~360 before this round).
+- **HEAD = `59bf80d`.** This session's cleanup (18 modified files + new
+  `docs/BLUEPRINT-CONVENTIONS.md`) is **uncommitted** in the working tree. Commit it
+  first if the user approves (they have not yet asked).
+- The two remaining `sorry`s are in `CMap.lean`: A2 `isComputableSeq_of_effectiveLimit`
+  at **line 1268**, A3 `isComputableSeqReal_norm` at **line 1279**. Each has a detailed
+  TODO sketch in the field body (`CMap.lean:1258-1279`) citing P-R Ch. 0 Thm 4 (A2) and
+  Thm 7 (A3) — **re-verify those citations verbatim before copying them into a claim or
+  blueprint** (`docs/PITFALLS.md` §6).
+- `blueprint/web/` is gitignored (regenerated, not committed).
 
-## Critical knowledge — Mathlib symbols (re-verified through iter-16)
+## Recommended next task — drive C[a,b] to a complete instance
 
-| Concept | Exact symbol | Location | Note |
-|---|---|---|---|
-| `Computable.nat_rec` | yes | `Partrec.lean:584` | Constant-motive form. Step function may show as `(y, IH).2 * X` — use `show` to bridge to `IH * X` in inductions. |
-| `Computable.id, .const, .fst, .snd, .pair, .comp, .succ, .unpair` | all standard | `Partrec.lean:268-301` | |
-| `Primrec.nat_add/sub/mul/le/max/mod/bodd` | all | `Primrec/Basic.lean:593,596,599,610,620,728,733` | |
-| `Primrec.nat_le.decide`, `Primrec.beq` | yes | derived | For Bool conditions |
-| `Primrec₂.natPair` | yes | derived from `Primrec.nat_pair` | For pairing |
-| `ContinuousMap.norm_le` | yes | `Topology/ContinuousMap/Compact.lean:204` | Does NOT require Nonempty; only `0 ≤ C` |
-| `Finset.sum_comm` | yes | standard | For polynomial j-k swap |
-| `Finset.sum_le_sum`, `Finset.sum_const_nat` | yes | standard | For Σ_k bound |
+Closing the C[a,b] instance is the highest-value near-term milestone: it would be the
+**first complete `ComputabilityStructure` instance**, validating the entire L3 keystone
+against a real Banach space — a genuine, shareable result. Two phases:
 
-**Pitfalls logged from iter-03 → iter-12**:
-- `Computable.nat_rec` step shows `(y, IH).2 * X` — use `show Nat.rec ... j` in induction with same form.
-- `let` shadowing for hypotheses: `obtain ⟨...⟩ := h; have h : ... := ⟨...⟩` to re-introduce.
-- `convert ... using 1` for Pi.add_apply/Pi.mul_apply gap (iter-09 trick).
-- `@[reducible]` on `def` of class type (iter-16 fix).
+**Phase 1 — surface the A1 win (low-risk warmup).** Right now the public dep graph hides
+the hardest-already-done axiom: because the instance carries `sorryAx` from A2/A3, the
+single `thm:l4_cmap_instance` node is white-bordered, so a viewer sees *nothing* green in
+L4 even though A1 (linearity, with the full polynomial-approximation machinery) is closed.
+Extract the A1 field body into a named, sorry-free lemma (e.g.
+`isComputableSeqCMap_linearCombination`), make the instance field `:=` that lemma, and add
+a green blueprint node (`lem:l4_cmap_axiom1`, `\lean{}` + `\leanok` + a `\begin{proof}
+\leanok` block) wired by proof-level `\uses` into `thm:l4_cmap_instance`. This makes real
+progress visible without proving anything new. *(Confirm the extraction stays sorry-free
+with the standalone-theorem `#print axioms` method — `docs/PITFALLS.md` §7 — not field
+projection, which gives false positives.)*
 
-## Watchpoints — don't repeat past mistakes
+**Phase 2 — close A2 and A3.**
+- **A3** (`isComputableSeqReal_norm`, sup-norm is computable) is blocked on **L1 closure
+  under finite `max` and absolute value** — the field's own TODO says so. Do the L1
+  max/abs closure first (clean extension of the already-green L1 layer), then A3.
+- **A2** (`isComputableSeq_of_effectiveLimit`) is closer to self-contained: the TODO
+  sketches a diagonalized polynomial approximant whose witnesses are computable by
+  composition of recursive functions (P-R Ch. 0 Thm 4). It mainly needs the
+  effective-limit triangle-inequality bookkeeping.
 
-- **DON'T cite P-R Ch. 2:148 for "recursive reals a, b"**. The phrase is at Ch. 2:128. Line 148 has the polynomial-form equation. This was caught by DA in this round.
-- **DON'T over-claim "provably unrealizable"** without specifying scope. The unconditional A1 instance is unrealizable *by the polynomial-form bound strategy*, not in general. DA's monomial counterexample (constant linear combination) shows an alternative strategy could work.
-- **DON'T write to `claims/INDEX.md` outside an explicit allow_writes**. Caught by Stop hook in iter-13.
-- **DON'T expect Mathlib to have everything**. `Primrec.nat_pow` doesn't exist — define inline via `Computable.nat_rec`.
+Closing both makes `computabilityStructureCMap_of` sorry-free → `thm:l4_cmap_instance`
+becomes `\leanok` (green border, and dark-green fill once its proof block is `\leanok`).
 
-## Files to know
+## Other viable directions (ranked menu)
 
-- `CLAUDE.md` — slim constitution. Read first.
-- `docs/NEXT-SESSION.md` — this file.
-- `ComputableAnalysis/L0/{Bridge,PropB,AnalysisBridge}.lean` — L0, done.
-- `ComputableAnalysis/L1/ComputableSeqReal.lean` — L1, mature.
-- `ComputableAnalysis/L3/ComputabilityStructure.lean` — L3 keystone, formalized.
-- `ComputableAnalysis/L4/Instances/CMap.lean` — **L4 first instance, A1 partial (witness + IsComputableSeqRat closed, norm bound sorry); A2/A3 stub**. ~850 lines.
-- `claims/l4-cmap-axiom-linearity/axiom_linearity.md` — round's design rationale + DA-verified roadmap for the bound.
-- `.goals/l4-cmap-axiom-linearity-cont/reviews/C2.md` — ~240-line DA verdict.
-- `.goals/l4-cmap-axiom-linearity-cont/final.md` — round-end summary.
-- `thinking/l4-cmap-axiom-linearity/iter-03-strategy.md` — paper-form A1 proof, still load-bearing for the bound round.
+- **L1 buildout** (slug `l1-real-sequence-closure`): lift `IsComputableSeqRat.{add,mul,comp}`
+  through `IsComputableSeqReal`; add finite-`max`/abs closure. Foundational — directly
+  unblocks A3 above and every future instance. Good if you prefer foundations-first.
+- **L1 helper hoist** (slug `l1-finsetsum-and-ite`): move the private `FinsetSumHelper`
+  closure helpers from `CMap.lean` up to L1's `IsComputableSeqRat` namespace (frees ~250
+  lines of L1-shaped code currently stranded in L4).
+- **L3 stability theorem** (slug `l3-stability`): uniqueness of `IsComputableSeq` under
+  effective separability (P-R Ch. 2 Stability Lemma). Independent of L1/L4, high-leverage,
+  exercises the typeclass design.
+- **L2 Grzegorczyk–Lacombe** (slug `l2-grzegorczyk-lacombe`): new front. Note the heavy
+  overlap with `CMap.lean`'s polynomial-approximation machinery — scope it to *reuse*, not
+  duplicate, before starting.
+- **Zulip outreach** (per `CLAUDE.md` §"Mathlib community engagement"): with L0/L1/L3
+  green and L4-A1 closed, the project is credible to pitch. Prepare drafts only — **the
+  user does the actual posting/sharing**, not you.
 
-## If the user types something different
+## Hard guardrails
 
-The above task list assumes default continuation (Action 2 = close the A1 bound). If the user opens with a different request, follow their direction — this prompt is a *default*, not a script.
+- **Never commit unless the user explicitly asks.** `git push` is denied in settings.
+- **Sorry policy** (`CLAUDE.md`): `sorry` allowed only in theorem/lemma bodies, each with
+  a `-- TODO(/formalize L<N>):` comment; **never** in `def`/`structure`/`class`/`instance`/
+  `abbrev` bodies. `\leanok`/`\mathlibok` only on decls with no transitive `sorry`.
+- **Do not author L5/L2 theorem statements (or any P-R citation) from memory.** Grep the
+  literature and verify the quoted phrase verbatim first (`CLAUDE.md` §"When in doubt,
+  grep"; `docs/PITFALLS.md` §6).
+- **Do not touch**: `claims/INDEX.md`, `.github/workflows/**`, `lakefile.toml`,
+  `lake-manifest.json`, `lean-toolchain`, `literature/papers/**/verbatim.md`, and the
+  historical `.goals/**` / `claims/**` / `thinking/**` archives.
+- **Read `docs/PITFALLS.md` + `docs/LEAN-IDIOMS.md`** before opening a new L-layer round.
+
+## Verification pipeline (run in order)
+
+1. `lake build 2>&1 | tail -5` — expect 0 errors. Until A2/A3 close, expect exactly **2
+   `sorry`s** (`CMap.lean:1268,1279`) and **1** sorry-warning at `CMap.lean:639`.
+2. `python3 -c "[print(p,i) for p in ['<file>'] for i,l in enumerate(open(p,encoding='utf-8'),1) if len(l.rstrip(chr(10)))>100]"`
+   — no line >100 columns (count **codepoints**, not bytes; awk over-counts unicode).
+3. `PATH="$PWD/.venv/bin:$PATH" .venv/bin/leanblueprint web 2>&1 | tail -5` — exit 0.
+4. `PATH="$PWD/.venv/bin:$PATH" .venv/bin/leanblueprint checkdecls; echo "exit: $?"` —
+   must stay exit 0 (every `\lean{}` target resolves in the lake env).
 
 ---
 

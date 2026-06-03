@@ -154,8 +154,4 @@ theorem prop_B :
   ⟨Code, inferInstance, insepA, insepB,
     insepA_re, insepB_re, insepA_insepB_disjoint, insepA_insepB_no_separator⟩
 
-#check @insepA
-#check @insepB
-#check @prop_B
-
 end ComputableAnalysis.L0

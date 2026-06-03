@@ -2,10 +2,6 @@
 
 % P-R reference: §0.2 "Prerequisites from logic and analysis",
 % literature/papers/PourEl-Richards-0.2.prerequisites.md.
-%
-% Layer status: \texttt{done}. All three Lean files are 0-sorry. This chapter
-% serves as the proof-of-concept that every entry-point pattern (\lean{} +
-% \leanok{}, \uses{}, definitions, lemmas, theorems) renders cleanly.
 
 \section{Recursion-theoretic bridge}
 
@@ -26,14 +22,14 @@ informally.
     \item \textbf{IsRecursivelyEnumerable} $A$ abbreviates \texttt{REPred} $(\lambda x.\,x \in A)$ (semi-decidable membership).
     \item \textbf{IsRecursiveSet} $A$ abbreviates \texttt{ComputablePred} $(\lambda x.\,x \in A)$ (decidable membership).
   \end{itemize}
-  These are pure aliases of Mathlib symbols introduced to keep P-R Ch.\,0.2 vocabulary visible inside the project. See \texttt{literature/papers/PourEl-Richards-0.2.prerequisites.md:5-12}.
+  These are pure aliases of Mathlib symbols introduced to keep P-R Ch.\,0.2 vocabulary visible inside the project.
 \end{definition}
 
 \begin{definition}
   \label{def:cantorPair}
   \lean{ComputableAnalysis.L0.cantorPair}
   \leanok
-  The Cantor pairing function \texttt{cantorPair}\,$: \mathbb{N} \to \mathbb{N} \to \mathbb{N}$ alias of Mathlib's \texttt{Nat.pair}. P-R Ch.\,0.2 implicitly assumes a primitive-recursive bijection $\mathbb{N}^2 \to \mathbb{N}$; \texttt{Nat.pair} is the canonical choice.
+  The Cantor pairing function \texttt{cantorPair}\,$: \mathbb{N} \to \mathbb{N} \to \mathbb{N}$, an alias of Mathlib's \texttt{Nat.pair}. P-R Ch.\,0.2 implicitly assumes a primitive-recursive bijection $\mathbb{N}^2 \to \mathbb{N}$; \texttt{Nat.pair} is the canonical choice.
 \end{definition}
 
 \begin{lemma}
@@ -41,10 +37,12 @@ informally.
   \lean{ComputableAnalysis.L0.cantorPair_computable}
   \leanok
   \uses{def:cantorPair}
-  \texttt{cantorPair} is \texttt{Computable}$_2$. The proof composes \texttt{Primrec}$_2$ projections, addition, multiplication, and quotient-by-two via \texttt{Primrec.nat\_mul.comp} / \texttt{Primrec.nat\_div2}, then lifts via \texttt{.to\_comp}.
+  \texttt{cantorPair} is \texttt{Computable}$_2$.
 \end{lemma}
 \begin{proof}\leanok
-  Formalized in \texttt{ComputableAnalysis/L0/Bridge.lean}.
+  \texttt{Nat.pair} is built from projections and arithmetic that are all
+  primitive recursive, hence computable; the binary form follows by lifting
+  \texttt{Primrec}~$\to$~\texttt{Computable}.
 \end{proof}
 
 \begin{definition}
@@ -62,7 +60,9 @@ informally.
   \texttt{haltingSetAt}~$n$ is recursively enumerable.
 \end{lemma}
 \begin{proof}\leanok
-  Formalized in \texttt{ComputableAnalysis/L0/Bridge.lean}.
+  Membership of a code $c$ is semi-decidable: evaluate $c$ on input $n$ and
+  accept exactly when the computation halts. This is the acceptance domain of a
+  partial-recursive predicate, so the set is r.e.
 \end{proof}
 
 \begin{lemma}
@@ -70,21 +70,25 @@ informally.
   \lean{ComputableAnalysis.L0.haltingSetAt_not_recursive}
   \leanok
   \uses{def:isRecursive, def:haltingSetAt}
-  \texttt{haltingSetAt}~$n$ is not recursive. The proof reduces the halting problem to membership.
+  \texttt{haltingSetAt}~$n$ is not recursive.
 \end{lemma}
 \begin{proof}\leanok
-  Formalized in \texttt{ComputableAnalysis/L0/Bridge.lean}.
+  A decision procedure for membership in \texttt{haltingSetAt}~$n$ would decide
+  whether an arbitrary code halts at $n$, i.e.\ solve the halting problem, which
+  is impossible.
 \end{proof}
 
 \begin{theorem}[Proposition A]
   \label{thm:propA}
   \lean{ComputableAnalysis.L0.prop_A_exists_re_not_recursive}
   \leanok
-  \uses{lem:haltingSetAt_re, lem:haltingSetAt_not_recursive}
   There exists a recursively enumerable set $A \subseteq \mathbb{N}$ that is not recursive. P-R Ch.\,0.2:12.
 \end{theorem}
 \begin{proof}\leanok
-  Formalized in \texttt{ComputableAnalysis/L0/Bridge.lean}.
+  \uses{lem:haltingSetAt_re, lem:haltingSetAt_not_recursive}
+  Take $A = \texttt{haltingSetAt}~n$: it is recursively enumerable by
+  \Cref{lem:haltingSetAt_re} and not recursive by
+  \Cref{lem:haltingSetAt_not_recursive}.
 \end{proof}
 
 \section{Proposition B — a recursively inseparable r.e. pair}
@@ -93,7 +97,7 @@ informally.
   \label{def:insepAB}
   \lean{ComputableAnalysis.L0.insepA, ComputableAnalysis.L0.insepB}
   \leanok
-  \texttt{insepA} and \texttt{insepB} are subsets of \texttt{Nat.Partrec.Code}: \texttt{insepA} is the set of codes that, when applied to their own index, halt with output $0$; \texttt{insepB} the same but with output $1$. P-R Ch.\,0.2:35.
+  \texttt{insepA} and \texttt{insepB} are subsets of \texttt{Nat.Partrec.Code}: \texttt{insepA} is the set of codes that, applied to their own index, halt with output $0$; \texttt{insepB} the same but with output $1$. P-R Ch.\,0.2:35.
 \end{definition}
 
 \begin{lemma}
@@ -104,7 +108,9 @@ informally.
   Both \texttt{insepA} and \texttt{insepB} are recursively enumerable.
 \end{lemma}
 \begin{proof}\leanok
-  Formalized in \texttt{ComputableAnalysis/L0/PropB.lean}.
+  Each set is the acceptance domain of a partial-recursive predicate: run a code
+  on its own index and accept on output $0$ (resp.\ $1$). Semi-decidability of
+  that predicate gives recursive enumerability.
 \end{proof}
 
 \begin{lemma}
@@ -112,10 +118,11 @@ informally.
   \lean{ComputableAnalysis.L0.insepA_insepB_disjoint}
   \leanok
   \uses{def:insepAB}
-  \texttt{insepA} $\cap$ \texttt{insepB} $= \emptyset$. Immediate from the contradictory output condition.
+  \texttt{insepA} $\cap$ \texttt{insepB} $= \emptyset$.
 \end{lemma}
 \begin{proof}\leanok
-  Formalized in \texttt{ComputableAnalysis/L0/PropB.lean}.
+  A single computation cannot return both $0$ and $1$, so no code lies in both
+  sets.
 \end{proof}
 
 \begin{theorem}
@@ -123,26 +130,38 @@ informally.
   \lean{ComputableAnalysis.L0.insepA_insepB_no_separator}
   \leanok
   \uses{def:insepAB, def:isRecursive}
-  No recursive set $C$ satisfies \texttt{insepA} $\subseteq C$ and $C \cap$ \texttt{insepB} $= \emptyset$. The proof is by \texttt{Nat.Partrec.Code.fixed\_point}$_2$ applied to the candidate separator's characteristic function.
+  No recursive set $C$ satisfies \texttt{insepA} $\subseteq C$ and $C \cap$ \texttt{insepB} $= \emptyset$.
 \end{theorem}
 \begin{proof}\leanok
-  Formalized in \texttt{ComputableAnalysis/L0/PropB.lean}.
+  Suppose such a recursive $C$ existed. Apply the recursion theorem
+  (\texttt{Nat.Partrec.Code.fixed\_point}$_2$) to the characteristic function of
+  $C$ to obtain a self-referential code that halts with output $1$ when its own
+  index lies in $C$ and output $0$ otherwise. That code is then forced into
+  \texttt{insepB} when in $C$ and into \texttt{insepA} when outside $C$,
+  contradicting $\texttt{insepA} \subseteq C$ and $C \cap \texttt{insepB} = \emptyset$.
 \end{proof}
 
 \begin{theorem}[Proposition B]
   \label{thm:propB}
   \lean{ComputableAnalysis.L0.prop_B}
   \leanok
-  \uses{lem:insep_re, lem:insep_disjoint, thm:insep_no_separator}
   There exist disjoint recursively enumerable sets $A, B \subseteq \mathbb{N}$ such that no recursive set separates them. P-R Ch.\,0.2:35.
 \end{theorem}
 \begin{proof}\leanok
-  Formalized in \texttt{ComputableAnalysis/L0/PropB.lean}.
+  \uses{lem:insep_re, lem:insep_disjoint, thm:insep_no_separator}
+  Take $A = \texttt{insepA}$ and $B = \texttt{insepB}$: both are r.e.\
+  (\Cref{lem:insep_re}), disjoint (\Cref{lem:insep_disjoint}), and admit no
+  recursive separator (\Cref{thm:insep_no_separator}).
 \end{proof}
 
 \section{Analysis prerequisites pointer}
 
 \begin{remark}
   \label{rem:analysisBridge}
-  The file \texttt{ComputableAnalysis/L0/AnalysisBridge.lean} contains \texttt{\#check} and \texttt{example} pointers into Mathlib's analysis hierarchy: \texttt{NormedSpace}, \texttt{InnerProductSpace}, \texttt{lp}, \texttt{MeasureTheory.Lp}, \texttt{ContinuousMap}, \texttt{ContDiff}. There are no theorems or definitions to mark \texttt{\textbackslash leanok} — the file's role is to surface the Mathlib paths L3/L4/L5 will need. See P-R Ch.\,0.2:13--34 for the analysis prerequisites P-R itself lists.
+  The file \texttt{ComputableAnalysis/L0/AnalysisBridge.lean} records the
+  P-R\,$\leftrightarrow$\,Mathlib correspondence for the analysis hierarchy
+  (\texttt{NormedSpace}, \texttt{InnerProductSpace}, \texttt{lp},
+  \texttt{MeasureTheory.Lp}, \texttt{ContinuousMap}, \texttt{ContDiff}). It
+  introduces no symbols: downstream layers (L3, L4) import Mathlib's names
+  directly. See P-R Ch.\,0.2:58--81 for the analysis prerequisites P-R lists.
 \end{remark}

@@ -46,9 +46,9 @@ witness data, so axiom proofs can route through L1 without inlining a full L2
 - `polyApproxCMap` and `IsComputableSeqCMap` have concrete (sorry-free) bodies
   per CLAUDE.md §sorry policy.
 - The `ComputabilityStructure ℝ (C(Set.Icc α β, ℝ))` instance declares all four
-  axiom-fields; theorem-body sorries are present for `axiom_linearity`,
-  `axiom_limits`, `axiom_norms` with explicit `-- TODO(/formalize L4 CMap):`
-  comments. `zero_seq` is proved.
+  fields; `isComputableSeq_linearCombination` (A1) and `zero_seq` are proved,
+  while `isComputableSeq_of_effectiveLimit` (A2) and `isComputableSeqReal_norm`
+  (A3) carry `-- TODO(/formalize L4 CMap):` sorries.
 
 ref for axioms 1-3: `literature/papers/PourEl-Richards-chapt2.md:66-77`.
 ref for "axiom 1 trivial / axiom 2 = Ch. 0 Thm 4 / axiom 3 = Ch. 0 Thm 7":
@@ -109,26 +109,26 @@ theorem addTriple_correct {t₁ t₂ : ℕ × ℕ × ℕ}
     rcases Nat.mod_two_eq_zero_or_one s₂ with h₂ | h₂
   · have hsame : s₁ % 2 = s₂ % 2 := h₁.trans h₂.symm
     simp only [if_pos hsame]
-    rw [pow_red s₁, h₁, h₂]; push_cast; field_simp; try ring
+    rw [pow_red s₁, h₁, h₂]; push_cast; field_simp
   · have hne : s₁ % 2 ≠ s₂ % 2 := by rw [h₁, h₂]; decide
     simp only [if_neg hne]
     by_cases hpge : a₁ * b₂ ≥ a₂ * b₁
     · simp only [if_pos hpge]
-      rw [pow_red s₁, h₁, h₂, Nat.cast_sub hpge]; push_cast; field_simp; try ring
+      rw [pow_red s₁, h₁, h₂, Nat.cast_sub hpge]; push_cast; field_simp; ring
     · simp only [if_neg hpge]
       have hle : a₁ * b₂ ≤ a₂ * b₁ := le_of_not_ge hpge
-      rw [pow_red s₂, h₁, h₂, Nat.cast_sub hle]; push_cast; field_simp; try ring
+      rw [pow_red s₂, h₁, h₂, Nat.cast_sub hle]; push_cast; field_simp; ring
   · have hne : s₁ % 2 ≠ s₂ % 2 := by rw [h₁, h₂]; decide
     simp only [if_neg hne]
     by_cases hpge : a₁ * b₂ ≥ a₂ * b₁
     · simp only [if_pos hpge]
-      rw [pow_red s₁, h₁, h₂, Nat.cast_sub hpge]; push_cast; field_simp; try ring
+      rw [pow_red s₁, h₁, h₂, Nat.cast_sub hpge]; push_cast; field_simp; ring
     · simp only [if_neg hpge]
       have hle : a₁ * b₂ ≤ a₂ * b₁ := le_of_not_ge hpge
-      rw [pow_red s₂, h₁, h₂, Nat.cast_sub hle]; push_cast; field_simp; try ring
+      rw [pow_red s₂, h₁, h₂, Nat.cast_sub hle]; push_cast; field_simp; ring
   · have hsame : s₁ % 2 = s₂ % 2 := h₁.trans h₂.symm
     simp only [if_pos hsame]
-    rw [pow_red s₁, h₁, h₂]; push_cast; field_simp; try ring
+    rw [pow_red s₁, h₁, h₂]; push_cast; field_simp; ring
 
 theorem addTriple_computable : Computable₂ addTriple := by
   show Computable (fun t : (ℕ × ℕ × ℕ) × (ℕ × ℕ × ℕ) => addTriple t.1 t.2)
@@ -383,7 +383,7 @@ end FinsetSumHelper
 /-! ## §0b — Pure arithmetic helpers for the A1 norm bound
 
 These lemmas are recursion, Finset, and cast arithmetic facts used by the
-`axiom_linearity` norm-bound proof (round `l4-cmap-axiom-linearity-bound`).
+`isComputableSeq_linearCombination` (A1) norm-bound proof.
 They are fully general (no dependence on `α, β, B`) and could be upstreamed. -/
 
 /-- Lower bound for the `max`-accumulating `Nat.rec`: every `g k` with `k < N`
@@ -521,7 +521,8 @@ theorem polyApproxCMap_conv_eval
     (∑ j ∈ Finset.range (Db + 1),
         (((∑ k ∈ Finset.range (dn + 1),
             (αR (Nat.pair n k, N) * (bif decide (j ≤ dX (k, N)) then aX (k, N, j) else 0)
-             + βR (Nat.pair n k, N) * (bif decide (j ≤ dY (k, N)) then aY (k, N, j) else 0))) : ℚ) : ℝ)
+             + βR (Nat.pair n k, N)
+               * (bif decide (j ≤ dY (k, N)) then aY (k, N, j) else 0))) : ℚ) : ℝ)
           * w.val ^ j)
       = ∑ k ∈ Finset.range (dn + 1),
           ((αR (Nat.pair n k, N) : ℝ) * (polyApproxCMap (α := α) (β := β) aX dX k N) w
@@ -535,11 +536,13 @@ theorem polyApproxCMap_conv_eval
   calc (∑ j ∈ Finset.range (Db + 1),
           (((∑ k ∈ Finset.range (dn + 1),
               (αR (Nat.pair n k, N) * (bif decide (j ≤ dX (k, N)) then aX (k, N, j) else 0)
-               + βR (Nat.pair n k, N) * (bif decide (j ≤ dY (k, N)) then aY (k, N, j) else 0))) : ℚ) : ℝ)
+               + βR (Nat.pair n k, N)
+                 * (bif decide (j ≤ dY (k, N)) then aY (k, N, j) else 0))) : ℚ) : ℝ)
             * w.val ^ j)
       = ∑ j ∈ Finset.range (Db + 1), ∑ k ∈ Finset.range (dn + 1),
           ((αR (Nat.pair n k, N) : ℝ) * (bif decide (j ≤ dX (k, N)) then (aX (k, N, j) : ℝ) else 0)
-           + (βR (Nat.pair n k, N) : ℝ) * (bif decide (j ≤ dY (k, N)) then (aY (k, N, j) : ℝ) else 0))
+           + (βR (Nat.pair n k, N) : ℝ)
+             * (bif decide (j ≤ dY (k, N)) then (aY (k, N, j) : ℝ) else 0))
           * w.val ^ j := by
         apply Finset.sum_congr rfl; intro j _
         rw [Rat.cast_sum, Finset.sum_mul]
@@ -547,7 +550,8 @@ theorem polyApproxCMap_conv_eval
         rw [Rat.cast_add, Rat.cast_mul, Rat.cast_mul, cast_padX, cast_padY]
     _ = ∑ k ∈ Finset.range (dn + 1), ∑ j ∈ Finset.range (Db + 1),
           ((αR (Nat.pair n k, N) : ℝ) * (bif decide (j ≤ dX (k, N)) then (aX (k, N, j) : ℝ) else 0)
-           + (βR (Nat.pair n k, N) : ℝ) * (bif decide (j ≤ dY (k, N)) then (aY (k, N, j) : ℝ) else 0))
+           + (βR (Nat.pair n k, N) : ℝ)
+             * (bif decide (j ≤ dY (k, N)) then (aY (k, N, j) : ℝ) else 0))
           * w.val ^ j := Finset.sum_comm
     _ = ∑ k ∈ Finset.range (dn + 1),
           ((αR (Nat.pair n k, N) : ℝ) * (polyApproxCMap (α := α) (β := β) aX dX k N) w
@@ -624,9 +628,10 @@ The previous `noncomputable instance instComputabilityStructureCMap` (without
 hypothesis) was provably unrealizable for arbitrary `α, β` — see
 `.goals/l4-cmap-axiom-linearity-cont/iter-04.md` for the obstruction analysis.
 
-The predicate is `IsComputableSeqCMap`; `zero_seq` is proved directly,
-`axiom_linearity` is in progress (iter-06+), `axiom_limits` and `axiom_norms`
-remain `sorry` (deferred per C3 of the round's success criteria).
+The predicate is `IsComputableSeqCMap`; `zero_seq` and
+`isComputableSeq_linearCombination` (A1) are proved, while
+`isComputableSeq_of_effectiveLimit` (A2) and `isComputableSeqReal_norm` (A3)
+remain `sorry` (deferred).
 
 ref for axioms 1-3: `literature/papers/PourEl-Richards-chapt2.md:66-77`.
 ref for "axiom 1 trivial / axiom 2 = Ch. 0 Thm 4 / axiom 3 = Ch. 0 Thm 7":
@@ -635,8 +640,8 @@ ref for "axiom 1 trivial / axiom 2 = Ch. 0 Thm 4 / axiom 3 = Ch. 0 Thm 7":
     (B : ℕ) (hα_le : |α| ≤ (B : ℝ)) (hβ_le : |β| ≤ (B : ℝ)) :
     ComputabilityStructure ℝ (C(Set.Icc α β, ℝ)) where
   IsComputableSeq := IsComputableSeqCMap
-  axiom_linearity := by
-    -- Destructure all 5 hypotheses (iter-05 setup).
+  isComputableSeq_linearCombination := by
+    -- Destructure all 5 hypotheses.
     intro x y coefα coefβ d hx hy hcoefα hcoefβ hd
     obtain ⟨aX, dX, hflat_X, hd_X, hbnd_X⟩ := hx
     obtain ⟨aY, dY, hflat_Y, hd_Y, hbnd_Y⟩ := hy
@@ -993,7 +998,8 @@ ref for "axiom 1 trivial / axiom 2 = Ch. 0 Thm 4 / axiom 3 = Ch. 0 Thm 7":
       --      `BoundedContinuousFunction.norm_le_iff` after isometric embedding).
       --   2. Polynomial-expansion identity: `polyApproxCMap aS dS n m (x_*) =
       --      Σ_k (αR · polyApproxCMap aX dX k M(n,m) + βR · polyApproxCMap aY dY k M(n,m))(x_*)`
-      --      via `Finset.sum_comm` + the padcoeff identity (Σ_{j ≤ dS} pad_X = polyApprox aX dX k M).
+      --      via `Finset.sum_comm` + the padcoeff identity
+      --      (Σ_{j ≤ dS} pad_X = polyApprox aX dX k M).
       --   3. Triangle inequality on `Σ_k (coefα·x_k - αR·polyApprox aX dX k M)`.
       --   4. Per-k summand bound via `hbnd_αR`, `hbnd_X`, `bound_x_k`, `bound_αR_at_0`,
       --      and `hα_le`, `hβ_le` to bound `‖x_k‖_∞ ≤ bound_x_k k`.
@@ -1067,7 +1073,8 @@ ref for "axiom 1 trivial / axiom 2 = Ch. 0 Thm 4 / axiom 3 = Ch. 0 Thm 7":
           have h1 := abs_sub_abs_le_abs_sub (coefα (n, k)) ((αR (Nat.pair n k, 0) : ℝ))
           rw [abs_sub_comm (coefα (n, k)) ((αR (Nat.pair n k, 0) : ℝ))] at h1
           linarith [h1, habs, hclose0]
-        -- |polyApproxCMap aX dX k M(n,m)|_w bound: precision-M ≤ ‖x k‖+1 ≤ ‖poly_0‖+2 ≤ bound_x_k+2.
+        -- |polyApproxCMap aX dX k M(n,m)|_w bound:
+        -- precision-M ≤ ‖x k‖+1 ≤ ‖poly_0‖+2 ≤ bound_x_k+2.
         have hpXk_bd : |(polyApproxCMap aX dX k (M (n, m))) w| ≤ (↑(bound_x_k k) : ℝ) + 2 := by
           have hpw_le : |(polyApproxCMap aX dX k (M (n, m))) w|
               ≤ ‖polyApproxCMap (α := α) (β := β) aX dX k (M (n, m))‖ := by
@@ -1202,7 +1209,8 @@ ref for "axiom 1 trivial / axiom 2 = Ch. 0 Thm 4 / axiom 3 = Ch. 0 Thm 7":
             = |(coefα (n, k) * (x k) w
                   - (αR (Nat.pair n k, M (n, m)) : ℝ) * (polyApproxCMap aX dX k (M (n, m))) w)
                 + (coefβ (n, k) * (y k) w
-                  - (βR (Nat.pair n k, M (n, m)) : ℝ) * (polyApproxCMap aY dY k (M (n, m))) w)| := by
+                  - (βR (Nat.pair n k, M (n, m)) : ℝ)
+                    * (polyApproxCMap aY dY k (M (n, m))) w)| := by
               congr 1; ring
           _ ≤ |coefα (n, k) * (x k) w
                   - (αR (Nat.pair n k, M (n, m)) : ℝ) * (polyApproxCMap aX dX k (M (n, m))) w|
@@ -1247,7 +1255,7 @@ ref for "axiom 1 trivial / axiom 2 = Ch. 0 Thm 4 / axiom 3 = Ch. 0 Thm 7":
                 = (((d n + 1) * bound_max n * 2 ^ m : ℕ) : ℝ) := by push_cast; ring
               _ ≤ ((2 ^ (m + (d n + 1) + bound_max n + 2) : ℕ) : ℝ) := by exact_mod_cast hkey
               _ = (2 : ℝ) ^ (m + (d n + 1) + bound_max n + 2) := by push_cast; ring
-  axiom_limits := by
+  isComputableSeq_of_effectiveLimit := by
     -- TODO(/formalize L4 CMap): A2 = Ch. 0 Theorem 4 (Pour-El & Richards, "effective limits
     -- of computable sequences of continuous functions are computable"). Under our predicate:
     -- given a computable double sequence `{f_{n, k}}` converging effectively to `{f_n}` with
@@ -1258,7 +1266,7 @@ ref for "axiom 1 trivial / axiom 2 = Ch. 0 Thm 4 / axiom 3 = Ch. 0 Thm 7":
     -- `2^{-N+1}` by triangle inequality, and `a', d'` are computable by composition of
     -- recursive functions.
     sorry
-  axiom_norms := by
+  isComputableSeqReal_norm := by
     -- TODO(/formalize L4 CMap): A3 = Ch. 0 Theorem 7 (computable continuous functions have
     -- computable sup-norm). Given `f_n` computable with witness `(a, d)`, the sup-norm
     -- `‖f_n‖_∞ = sup_{x ∈ [α, β]} |f_n(x)|` can be approximated from rational data:
@@ -1283,11 +1291,5 @@ ref for "axiom 1 trivial / axiom 2 = Ch. 0 Thm 4 / axiom 3 = Ch. 0 Thm 7":
       positivity
 
 end CMap
-
-/-! ## Smoke checks -/
-
-#check @polyApproxCMap
-#check @IsComputableSeqCMap
-#check @computabilityStructureCMap_of
 
 end ComputableAnalysis.L4

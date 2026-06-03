@@ -117,7 +117,7 @@ class ComputabilityStructure
   `IsComputableSeq`.
 
   ref: P-R Ch. 2:66-72. -/
-  axiom_linearity :
+  isComputableSeq_linearCombination :
     ∀ (x y : ℕ → E) (α β : ℕ × ℕ → 𝕜) (d : ℕ → ℕ),
       IsComputableSeq x → IsComputableSeq y →
       ScalarComputableSeq.IsComputableSeq (fun n => α (Nat.unpair n)) →
@@ -131,7 +131,7 @@ class ComputabilityStructure
   all `n`, `N` and all `k ≥ e(n, N)`, `‖x_{n,k} − y_n‖ ≤ 1 / 2^N`.
 
   ref: P-R Ch. 2:58-64, 73. -/
-  axiom_limits :
+  isComputableSeq_of_effectiveLimit :
     ∀ (x : ℕ × ℕ → E) (y : ℕ → E) (e : ℕ × ℕ → ℕ),
       IsComputableSeq (fun n => x (Nat.unpair n)) →
       Computable e →
@@ -141,7 +141,7 @@ class ComputabilityStructure
   real-valued sequence `(‖x_n‖)` is an L1-computable sequence of reals.
 
   ref: P-R Ch. 2:75. -/
-  axiom_norms :
+  isComputableSeqReal_norm :
     ∀ (x : ℕ → E), IsComputableSeq x →
       ComputableAnalysis.L1.IsComputableSeqReal (fun n => ‖x n‖)
   /-- **(NV) Non-vacuity.** The constant zero sequence is in `IsComputableSeq`.
@@ -176,12 +176,5 @@ Axiom 2 / Axiom 1 use sites.
 ref: P-R Ch. 2:53. -/
 def IsComputableDoubleSeq (x : ℕ × ℕ → E) : Prop :=
   ComputabilityStructure.IsComputableSeq (𝕜 := 𝕜) (fun n => x (Nat.unpair n))
-
-/-! ## §4 — Smoke checks -/
-
-#check @ScalarComputableSeq
-#check @ComputabilityStructure
-#check @IsComputableElement
-#check @IsComputableDoubleSeq
 
 end ComputableAnalysis.L3

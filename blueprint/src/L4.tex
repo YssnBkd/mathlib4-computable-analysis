@@ -32,12 +32,33 @@
   $C([a,b], \mathbb{R})$ with the sup-norm carries a \texttt{ComputabilityStructure}~$\mathbb{R}$, where a sequence $(s_n)$ in $C[a,b]$ is computable iff there is a computable double array of rational-coefficient polynomials $p_{n,m}$ with $\|s_n - p_{n,m}\|_\infty \le 2^{-m}$ for all $n,m$. The construction is parameterized by an explicit rational bound $B \ge \max(|a|,|b|)$, matching P-R Ch.\,2:128's restriction to recursive endpoints. P-R Ch.\,2:141--153.
 \end{theorem}
 \begin{proof}
-  \uses{lem:l4_cmap_axiom1, def:l1_isComputableSeqReal}
+  \uses{lem:l4_cmap_axiom1, lem:l4_cmap_axiom2, lem:l4_cmap_axiom3, def:l1_isComputableSeqReal}
   The three structure fields are verified separately.
   \emph{Linearity} (P-R Axiom~1, Linear Forms): by \Cref{lem:l4_cmap_axiom1}.
-  \emph{Effective limit} (P-R Axiom~2): the diagonal of a computably-Cauchy double array of polynomial approximants is again a polynomial approximant of the limit (P-R Ch.\,0 Thm.\,4).
-  \emph{Computable norm} (P-R Axiom~3): $\|s_n\|_\infty = \lim_m \|p_{n,m}\|_\infty$ and the sup-norm of a rational polynomial on $[a,b]$ is a computable real, so the norms form a computable sequence of reals (P-R Ch.\,0 Thm.\,7).
+  \emph{Effective limit} (P-R Axiom~2): by \Cref{lem:l4_cmap_axiom2}.
+  \emph{Computable norm} (P-R Axiom~3): delegates to \Cref{lem:l4_cmap_axiom3}, which is a partial close (sorry-carrying) until the signature is strengthened — see that lemma's docstring + the obstruction analysis.
 \end{proof}
+
+\begin{lemma}
+  \label{lem:l4_cmap_axiom2}
+  \lean{ComputableAnalysis.L4.isComputableSeqCMap_of_effectiveLimit}
+  \leanok
+  \uses{def:l3_computabilityStructure, def:l1_isComputableSeqRat}
+  C[a,b] computability is closed under effective uniform limits (P-R Ch.\,0 Theorem~4, \texttt{literature/papers/PourEl-Richards-chapt0.md:748}): if $\{f_{n,k}\}$ is an \texttt{IsComputableSeqCMap} double sequence and a computable modulus $e : \mathbb{N} \times \mathbb{N} \to \mathbb{N}$ witnesses $\|f_{n,k} - f_n\|_\infty \le 2^{-N}$ for $k \ge e(n,N)$, then $\{f_n\}$ is \texttt{IsComputableSeqCMap}.
+\end{lemma}
+\begin{proof}
+  \leanok
+  Diagonalise the polynomial-approximant double sequence by $a'_{n,N,j} := a_{n, e(n,N+1), N+1, j}$ and $d'_{n,N} := d_{n, e(n,N+1), N+1}$ (where $a, d$ are the rational-polynomial witnesses of the input double sequence). Computability of $(a', d')$ follows from \texttt{FinsetSumHelper.isComputableSeqRat\_tripleApply} (for $a'$) and the composability of \texttt{Computable} (for $d'$). The norm bound is the triangle estimate $\|f_n - p'_{n,N}\|_\infty \le \|f_n - f_{n,e(n,N+1)}\|_\infty + \|f_{n,e(n,N+1)} - p^{(n,k)}_{N+1}\|_\infty \le 2^{-(N+1)} + 2^{-(N+1)} = 2^{-N}$.
+\end{proof}
+
+\begin{lemma}
+  \label{lem:l4_cmap_axiom3}
+  \lean{ComputableAnalysis.L4.isComputableSeqCMap_norm}
+  \uses{def:l3_computabilityStructure, def:l1_isComputableSeqReal, lem:l1_isComputableSeqRat_max, lem:l1_isComputableSeqRat_abs}
+  Sup-norm of a \texttt{IsComputableSeqCMap} family is a \texttt{IsComputableSeqReal} (P-R Ch.\,0 Theorem~7, Maximum Values, \texttt{literature/papers/PourEl-Richards-chapt0.md:977}). \textbf{Partial close} (sorry-carrying): the current signature takes only a rational bound $B$ with $|\alpha|, |\beta| \le B$, which is provably insufficient — the rational grid points $\alpha + (j/k)(\beta - \alpha)$ that P-R's proof samples on are not computable from $B$ alone. Counterexample in the Lean docstring. The L1 closures $\texttt{IsComputableSeqRat.max}, \texttt{IsComputableSeqRat.abs}$ are listed in \texttt{uses} above because they will be used once the signature is strengthened to take $\texttt{IsComputableReal}~\alpha, \beta$ hypotheses.
+\end{lemma}
+% No \leanok on lem:l4_cmap_axiom3 — its body carries `sorry` (partial close). See the
+% lemma's docstring in CMap.lean for the obstruction analysis + three resolution paths.
 
 \begin{theorem}
   \label{thm:l4_lp_instance}

@@ -129,6 +129,29 @@ If it compiles clean and prints `[propext, Classical.choice, Quot.sound]` (no `s
 
 ---
 
+## 9. Order-lemma naming drift: `div_le_div_iff` renamed, `Max.max_eq_left` doesn't exist
+
+**Pitfall**: two systematic Mathlib-naming-drift issues bite at once when formalizing rational-fraction `max`/`min` closure under `IsComputableSeqRat`:
+
+1. **`div_le_div_iff` is no longer a valid identifier.** Lemmas attempting to compare cross-products via `a/b ≤ c/d ↔ a·d ≤ c·b` fail with `Unknown identifier 'div_le_div_iff'`. The current canonical name is **`div_le_div_iff₀`** at `.lake/packages/mathlib/Mathlib/Algebra/Order/GroupWithZero/Unbundled/Basic.lean:1419` — signature `div_le_div_iff₀ (hb : 0 < b) (hd : 0 < d) : a / b ≤ c / d ↔ a * d ≤ c * b`. Note the trailing `₀` (subscript zero, not letter o). Adjacent siblings exist but with different shapes — `div_le_div_iff_of_pos_left` (one numerator fixed), `div_le_div_iff_right` (one denominator fixed), `div_le_div_iff'` (group form, `LinearOrderedSemifield`). The `₀` variant is the one for the cross-product rewrite.
+
+2. **`Max.max_eq_left`, `Max.max_eq_right`, `Min.min_eq_left`, `Min.min_eq_right` do NOT exist as qualified names.** The qualification looks plausible because `Max` and `Min` are real typeclasses in Mathlib, but the order-collapse lemmas live at the root namespace — use **unqualified** `max_eq_left : b ≤ a → max a b = a`, `max_eq_right : a ≤ b → max a b = b`, `min_eq_left : a ≤ b → min a b = a`, `min_eq_right : b ≤ a → min a b = b`. The dot-notation `h.max_eq_left` also won't fire because `h : b ≤ a` is not a `Max`-namespace declaration.
+
+**Workaround**: when proving rational-order closures, write the cross-product comparison as
+```lean
+have hr1le : (a₁ k : ℚ) / (b₁ k : ℚ) ≤ (a₂ k : ℚ) / (b₂ k : ℚ) := by
+  rw [div_le_div_iff₀ hb₁ℚ hb₂ℚ]
+  exact_mod_cast hle_case
+rw [max_eq_right (by linarith)]   -- NOT Max.max_eq_right
+```
+and then close the goal-shape via `by linarith` after `(-1)^(0:ℕ) = 1` / `(-1)^(1:ℕ) = -1` collapse via `simp`.
+
+**General rule**: see `feedback_grep_before_assuming` in auto-memory. Before writing an order-lemma rewrite, grep `.lake/packages/mathlib/Mathlib/Order/MinMax.lean` and `.lake/packages/mathlib/Mathlib/Algebra/Order/` for the exact identifier. The 5-second grep prevents a multi-iter cleanup round.
+
+**Hit at**: `l1-max-abs-closure` iter-02 (the original drafts of `.max` and `.min` collapsed under 5×`div_le_div_iff` failures and 4×`Max.max_eq_left`/`Min.min_eq_right` failures; reverted at round end). Resolved at `l1-max-min-rebuild` (this round) by the `div_le_div_iff₀` substitution and dropping the `Max.`/`Min.` qualification.
+
+---
+
 ## Cross-reference
 
-For the positive recipe that resolves each pitfall, see [LEAN-IDIOMS.md](LEAN-IDIOMS.md). Pitfalls #1, #3, #4 map to LEAN-IDIOMS §1–5; pitfall #2 maps to LEAN-IDIOMS §5; pitfalls #5 and #6 are procedural, resolved via the auto-memory `feedback_*` entries. Pitfall #7 is a Lean soundness-audit gotcha (no LEAN-IDIOMS counterpart yet); pitfall #8 is procedural — the `/goal` Stop-hook contract (`scripts/goal_stop_hook.py:257`, `.claude/agents/devils-advocate.md:38,69`).
+For the positive recipe that resolves each pitfall, see [LEAN-IDIOMS.md](LEAN-IDIOMS.md). Pitfalls #1, #3, #4 map to LEAN-IDIOMS §1–5; pitfall #2 maps to LEAN-IDIOMS §5; pitfalls #5 and #6 are procedural, resolved via the auto-memory `feedback_*` entries. Pitfall #7 is a Lean soundness-audit gotcha (no LEAN-IDIOMS counterpart yet); pitfall #8 is procedural — the `/goal` Stop-hook contract (`scripts/goal_stop_hook.py:257`, `.claude/agents/devils-advocate.md:38,69`). Pitfall #9 is a Mathlib naming-drift gotcha — same family as #1, but for order lemmas rather than `Primrec`/`Computable` primitives.

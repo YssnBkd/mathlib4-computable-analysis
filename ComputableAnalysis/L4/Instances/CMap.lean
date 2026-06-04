@@ -1259,6 +1259,332 @@ theorem isComputableSeqCMap_linearCombination
             _ ≤ ((2 ^ (m + (d n + 1) + bound_max n + 2) : ℕ) : ℝ) := by exact_mod_cast hkey
             _ = (2 : ℝ) ^ (m + (d n + 1) + bound_max n + 2) := by push_cast; ring
 
+/-- **C[a,b] computability — Axiom 2 (Effective Limits).** P-R Ch. 0 Theorem 4
+(quoted at `literature/papers/PourEl-Richards-chapt0.md:748`):
+
+> "Let `f_{n k}: I^q → ℝ` be a computable double sequence of functions such
+> that `f_{n k} → f_n` as `k → ∞`, uniformly in `x`, effectively in `k` and `n`.
+> Then `{f_n}` is a computable sequence of functions."
+
+Under our polynomial-form predicate (`IsComputableSeqCMap`): given a computable
+double sequence `x : ℕ × ℕ → C([α, β], ℝ)` (i.e. the flatten
+`fun n => x (Nat.unpair n)` is in `IsComputableSeqCMap`), an effective modulus
+`e : ℕ × ℕ → ℕ` with the property `‖x (n, k) − y n‖ ≤ 1 / 2^N` whenever
+`k ≥ e (n, N)`, the diagonalized witness
+
+  `a' (n, N, j) := a (Nat.pair n (e (n, N + 1)), N + 1, j)`,
+  `d' (n, N)    := d (Nat.pair n (e (n, N + 1)), N + 1)`
+
+(where `(a, d)` is the witness pair for the flattened double sequence) gives
+`polyApproxCMap a' d' n N = polyApproxCMap a d (Nat.pair n (e (n, N+1))) (N+1)`
+by definitional unfolding. The norm bound then follows by triangle inequality:
+`‖y n − p'_{n,N}‖ ≤ ‖y n − x (n, e (n, N+1))‖ + ‖x (n, e (n, N+1)) − p'_{n,N}‖
+                  ≤ 1/2^(N+1) + 1/2^(N+1) = 1/2^N`.
+
+Surfaced as a named, sorry-free lemma so that the blueprint's `lem:l4_cmap_axiom2`
+can `\lean{}`-link directly to it without inheriting `sorryAx` from sibling
+fields of `computabilityStructureCMap_of` (see `docs/PITFALLS.md §7`).
+
+ref: `literature/papers/PourEl-Richards-chapt0.md:748` (statement),
+`literature/papers/PourEl-Richards-chapt2.md:128-129` (axiom 2 = Ch. 0 Thm 4). -/
+theorem isComputableSeqCMap_of_effectiveLimit :
+    ∀ (x : ℕ × ℕ → C(Set.Icc α β, ℝ)) (y : ℕ → C(Set.Icc α β, ℝ)) (e : ℕ × ℕ → ℕ),
+      IsComputableSeqCMap (fun n => x (Nat.unpair n)) →
+      Computable e →
+      (∀ n N : ℕ, ∀ k : ℕ, k ≥ e (n, N) → ‖x (n, k) - y n‖ ≤ 1 / 2 ^ N) →
+      IsComputableSeqCMap y := by
+  intro x y e hx he hconv
+  obtain ⟨a, d, hflat_a, hd, hbnd⟩ := hx
+  -- Diagonalized witness: `a'` and `d'` are obtained by evaluating `(a, d)` at
+  -- the precision bumped to `N + 1` and the outer flatten-index pinned at
+  -- `Nat.pair n (e (n, N + 1))`. Then `polyApproxCMap a' d' n N` is the same
+  -- ContinuousMap as `polyApproxCMap a d (Nat.pair n (e (n, N+1))) (N+1)`
+  -- (the underlying body is literally the same polynomial in `x.val`).
+  let a' : ℕ × ℕ × ℕ → ℚ := fun nNj =>
+    a (Nat.pair nNj.1 (e (nNj.1, nNj.2.1 + 1)), nNj.2.1 + 1, nNj.2.2)
+  let d' : ℕ × ℕ → ℕ := fun nN =>
+    d (Nat.pair nN.1 (e (nN.1, nN.2 + 1)), nN.2 + 1)
+  refine ⟨a', d', ?_, ?_, ?_⟩
+  · -- IsComputableSeqRat (flatten a'). Apply `isComputableSeqRat_tripleApply`
+    -- with the flatten of `a` as `hf` and Computable indexers.
+    -- Decoding helpers for `m : ℕ` (the flat triple index for `a'`):
+    --   (Nat.unpair m).1                                 = n
+    --   (Nat.unpair (Nat.unpair m).2).1                  = N
+    --   (Nat.unpair (Nat.unpair m).2).2                  = j
+    -- Target shape per `isComputableSeqRat_tripleApply`:
+    --   `fun m => a (A m, B m, C m)` for Computable A, B, C : ℕ → ℕ
+    -- where (let `mn := (Nat.unpair m).1`, `mN := (Nat.unpair (Nat.unpair m).2).1`)
+    --   A m := Nat.pair mn (e (mn, mN + 1))
+    --   B m := mN + 1
+    --   C m := (Nat.unpair (Nat.unpair m).2).2
+    have h_n : Computable (fun m : ℕ => (Nat.unpair m).1) :=
+      Computable.fst.comp Computable.unpair
+    have h_inner : Computable (fun m : ℕ => (Nat.unpair m).2) :=
+      Computable.snd.comp Computable.unpair
+    have h_N : Computable (fun m : ℕ => (Nat.unpair (Nat.unpair m).2).1) :=
+      Computable.fst.comp (Computable.unpair.comp h_inner)
+    have h_j : Computable (fun m : ℕ => (Nat.unpair (Nat.unpair m).2).2) :=
+      Computable.snd.comp (Computable.unpair.comp h_inner)
+    have h_Nsucc : Computable (fun m : ℕ => (Nat.unpair (Nat.unpair m).2).1 + 1) :=
+      Computable.succ.comp h_N
+    have h_e_arg : Computable (fun m : ℕ =>
+        ((Nat.unpair m).1, (Nat.unpair (Nat.unpair m).2).1 + 1)) :=
+      h_n.pair h_Nsucc
+    have h_e : Computable (fun m : ℕ =>
+        e ((Nat.unpair m).1, (Nat.unpair (Nat.unpair m).2).1 + 1)) :=
+      he.comp h_e_arg
+    have h_A : Computable (fun m : ℕ => Nat.pair (Nat.unpair m).1
+        (e ((Nat.unpair m).1, (Nat.unpair (Nat.unpair m).2).1 + 1))) :=
+      Primrec₂.natPair.to_comp.comp h_n h_e
+    -- Apply the tripleApply helper. The result has the `(A m, B m, C m)`
+    -- form; the let-bound `a'` unfolds to exactly that (it's a defeq).
+    have key : IsComputableSeqRat (fun m : ℕ =>
+        a (Nat.pair (Nat.unpair m).1
+            (e ((Nat.unpair m).1, (Nat.unpair (Nat.unpair m).2).1 + 1)),
+           (Nat.unpair (Nat.unpair m).2).1 + 1,
+           (Nat.unpair (Nat.unpair m).2).2)) :=
+      FinsetSumHelper.isComputableSeqRat_tripleApply hflat_a h_A h_Nsucc h_j
+    -- key already has exactly the flatten shape of `a'`.
+    exact key
+  · -- Computable d'. Apply `hd` to a Computable function (n, N) →
+    -- (Nat.pair n (e (n, N + 1)), N + 1).
+    show Computable (fun nN : ℕ × ℕ =>
+      d (Nat.pair nN.1 (e (nN.1, nN.2 + 1)), nN.2 + 1))
+    have h_Nsucc : Computable (fun nN : ℕ × ℕ => nN.2 + 1) :=
+      Computable.succ.comp Computable.snd
+    have h_e_arg : Computable (fun nN : ℕ × ℕ => (nN.1, nN.2 + 1)) :=
+      Computable.fst.pair h_Nsucc
+    have h_e : Computable (fun nN : ℕ × ℕ => e (nN.1, nN.2 + 1)) :=
+      he.comp h_e_arg
+    have h_outer : Computable (fun nN : ℕ × ℕ =>
+        Nat.pair nN.1 (e (nN.1, nN.2 + 1))) :=
+      Primrec₂.natPair.to_comp.comp Computable.fst h_e
+    have h_d_arg : Computable (fun nN : ℕ × ℕ =>
+        (Nat.pair nN.1 (e (nN.1, nN.2 + 1)), nN.2 + 1)) :=
+      h_outer.pair h_Nsucc
+    exact hd.comp h_d_arg
+  · -- Norm bound `‖y n − polyApproxCMap a' d' n N‖ ≤ 1 / 2^N`.
+    intro n N
+    -- The let-bound a', d' are designed so that the polynomial approximant
+    -- equals `polyApproxCMap a d (Nat.pair n (e (n, N+1))) (N+1)`. Pin a
+    -- name `m₀` to the flatten-index and `K` to the precision for clarity.
+    set m₀ : ℕ := Nat.pair n (e (n, N + 1)) with hm₀
+    set K : ℕ := N + 1 with hK
+    -- (1) The two polynomial approximants are equal as ContinuousMaps —
+    -- coefficient-by-coefficient: `a' (n, N, j) = a (m₀, K, j)`,
+    -- `d' (n, N) = d (m₀, K)`. So this is `rfl`-level.
+    have hpoly_eq : polyApproxCMap (α := α) (β := β) a' d' n N
+        = polyApproxCMap (α := α) (β := β) a d m₀ K := rfl
+    -- (2) From the convergence hypothesis at `k = e (n, N + 1) = e (n, K)`:
+    -- `‖x (n, e (n, N+1)) − y n‖ ≤ 1 / 2^(N+1)`. Since `K = N + 1`, this is
+    -- `1 / 2^(K-shifted-by-one)`, but stated via `hconv`'s `1 / 2^N` form.
+    have hk_ge : e (n, N + 1) ≥ e (n, N + 1) := le_refl _
+    have h_y_to_x : ‖x (n, e (n, N + 1)) - y n‖ ≤ 1 / 2 ^ (N + 1) :=
+      hconv n (N + 1) (e (n, N + 1)) hk_ge
+    -- (3) From the predicate's bound, applied at flat-index `m₀` and
+    -- precision `K`: `‖x (Nat.unpair m₀) − polyApproxCMap a d m₀ K‖ ≤ 1/2^K`.
+    -- `Nat.unpair m₀ = Nat.unpair (Nat.pair n (e (n, N+1))) = (n, e (n, N+1))`,
+    -- so the LHS evaluates to `x (n, e (n, N+1))`.
+    have h_xunp : x (Nat.unpair m₀) = x (n, e (n, N + 1)) := by
+      rw [hm₀, Nat.unpair_pair]
+    have h_p_to_x : ‖x (n, e (n, N + 1))
+          - polyApproxCMap (α := α) (β := β) a d m₀ K‖ ≤ 1 / 2 ^ K := by
+      have hb := hbnd m₀ K
+      -- `hb` has surface form `(fun n => x (Nat.unpair n)) m₀ - …`; beta-reduce
+      -- then rewrite via `h_xunp` to substitute the unpaired index.
+      show ‖x (n, e (n, N + 1)) - polyApproxCMap (α := α) (β := β) a d m₀ K‖ ≤ 1 / 2 ^ K
+      rw [← h_xunp]
+      exact hb
+    -- (4) Triangle inequality. With `K = N + 1` we have `1/2^K + 1/2^K = 1/2^N`.
+    have h_triangle :
+        ‖y n - polyApproxCMap (α := α) (β := β) a' d' n N‖
+          ≤ ‖y n - x (n, e (n, N + 1))‖
+            + ‖x (n, e (n, N + 1))
+                - polyApproxCMap (α := α) (β := β) a' d' n N‖ := by
+      have := norm_add_le
+        (y n - x (n, e (n, N + 1)))
+        (x (n, e (n, N + 1)) - polyApproxCMap (α := α) (β := β) a' d' n N)
+      have hrew :
+          (y n - x (n, e (n, N + 1)))
+            + (x (n, e (n, N + 1))
+                - polyApproxCMap (α := α) (β := β) a' d' n N)
+          = y n - polyApproxCMap (α := α) (β := β) a' d' n N := by abel
+      rw [hrew] at this
+      exact this
+    -- Swap `‖y n − x ...‖` for the easier `‖x ... − y n‖` (norm of negation).
+    have h_yx_symm : ‖y n - x (n, e (n, N + 1))‖
+        = ‖x (n, e (n, N + 1)) - y n‖ := by rw [norm_sub_rev]
+    rw [hpoly_eq]
+    calc ‖y n - polyApproxCMap (α := α) (β := β) a d m₀ K‖
+        ≤ ‖y n - x (n, e (n, N + 1))‖
+          + ‖x (n, e (n, N + 1)) - polyApproxCMap (α := α) (β := β) a d m₀ K‖ := by
+            have := norm_add_le
+              (y n - x (n, e (n, N + 1)))
+              (x (n, e (n, N + 1)) - polyApproxCMap (α := α) (β := β) a d m₀ K)
+            have hrew :
+                (y n - x (n, e (n, N + 1)))
+                  + (x (n, e (n, N + 1))
+                      - polyApproxCMap (α := α) (β := β) a d m₀ K)
+                = y n - polyApproxCMap (α := α) (β := β) a d m₀ K := by abel
+            rw [hrew] at this
+            exact this
+      _ ≤ 1 / 2 ^ (N + 1) + 1 / 2 ^ K := by
+          rw [h_yx_symm]
+          exact add_le_add h_y_to_x h_p_to_x
+      _ = 1 / 2 ^ N := by
+          rw [hK]
+          have h2pos : (0 : ℝ) < 2 ^ N := by positivity
+          field_simp
+          ring
+
+/-- **C[a,b] computability — Axiom 3 (Norm).** P-R Ch. 0 Theorem 7 (Maximum
+Values), quoted from `literature/papers/PourEl-Richards-chapt0.md:977-983`:
+
+> "Let `Iᵍ` be a computable rectangle in `ℝᵍ`, and let `fₙ : Iᵍ → ℝ` be a
+> computable sequence of functions. Then the maximum values
+>   `sₙ = max{fₙ(x) : x ∈ Iᵍ}`
+> form a computable sequence of real numbers."
+
+P-R's proof (`chapt0.md:984-1012`) takes the 1-D case `[a, b]` and reads off
+`sₙ` as the limit of the *partial-maximum* double sequence
+`s_{n,k} = max{fₙ(a + (j/k)(b−a)) : 1 ≤ j ≤ k}`, observing:
+
+> "Since `a`, `b` are computable reals, and since `{fₙ}` is sequentially
+> computable, the double sequence `{s_{n,k}}` is computable." (P-R `chapt0:992`)
+
+The explicit hypothesis "`a`, `b` are computable reals" in P-R's proof is what
+the *current signature of `isComputableSeqCMap_norm` fails to encode*. See the
+"Why this signature is inadequate" section below for a formal counterexample
+and the "Recommended fix" section for the minimal signature change.
+
+## Status: **blocked on signature change required**
+
+The body carries `sorry`. The lemma cannot be closed under the current
+signature — see below.
+
+## Why this signature is inadequate
+
+The signature gives only an integer bound `B` with `|α|, |β| ≤ B`; α, β
+themselves may be arbitrary noncomputable reals. The witness data of
+`IsComputableSeqCMap f` (polynomial coefficients `a : ℕ × ℕ × ℕ → ℚ`, degree
+bound `d : ℕ × ℕ → ℕ`, and the per-step approximation
+`‖f n − polyApproxCMap a d n k‖ ≤ 1/2^k`) determines `f` *modulo* the
+interval `[α, β]`, but **the sup-norm `‖f n‖` depends on `[α, β]` in a way
+that no rational data about α, β can pin down**.
+
+**Counterexample**. Let `P` be any undecidable Σ⁰₁ predicate of ℕ and set
+`ε := if P then 1 else 0`. Take `α := 0`, `β := -ε`. Then `|α|, |β| ≤ 1`,
+so the signature's hypothesis is satisfied with `B = 1`.
+
+Consider the constant-one sequence `f n := 1 : C(Set.Icc α β, ℝ)`. The
+polynomial approximant `p_{n,k}(x) := 1` (`a(n, k, 0) := 1`, `d(n, k) := 0`,
+all higher coefficients 0) satisfies `f n - p_{n,k} = 0`, so
+`‖f n - p_{n,k}‖ = 0 ≤ 1/2^k`. The witness is computable. Hence
+`IsComputableSeqCMap f` holds.
+
+But:
+- If `P` holds: `β = -1 < 0 = α`, so `Set.Icc α β = ∅` and `‖f n‖ = 0` for
+  all `n` (Mathlib's `BoundedContinuousFunction.norm_eq_zero_of_empty`).
+- If `P` fails: `β = 0 = α`, so `Set.Icc α β = {0}` is nonempty and
+  `‖f n‖ = |1| = 1`.
+
+Hence the constant sequence `(‖f n‖)` is `0` or `1` depending on whether
+`P` holds — *not* `IsComputableSeqReal`, since membership in `[α, β]`
+(equivalently `α ≤ β`) reduces to deciding `P`. The hypothesis
+`|α|, |β| ≤ B` is *insufficient* to make `(‖f n‖)` computable. ∎
+
+## Where P-R's proof breaks down
+
+Re-reading P-R `chapt0:984-1012` line by line and identifying the first step
+that cannot proceed with only a rational bound `B`:
+
+- `chapt0:986-989`. Partial maxima `s_{n,k} := max{fₙ(a + (j/k)(b−a)) : 1 ≤
+  j ≤ k}`. The grid points `x_j := a + (j/k)(b−a)` are *required to be
+  computable reals* so that `{fₙ(x_j)}` is a computable double sequence.
+  Under our signature `a`, `b` are arbitrary reals; the grid points are not
+  computable, and the *value* `fₙ(x_j)` is not approximable in general.
+- `chapt0:992`. "Since `a`, `b` are computable reals, [...] the double
+  sequence `{s_{n,k}}` is computable." — **direct invocation of the
+  computable-endpoints hypothesis**. No equivalent is available from
+  `|α|, |β| ≤ B`.
+- `chapt0:1000`. "Let `M` be an integer `> (b − a)`." Here `M` plays the
+  role of our `B` — but P-R needs both `M` *and* the computability of `a`,
+  `b` themselves.
+
+The remaining steps (`chapt0:993-1011`: the effective modulus `d(n, N)`, the
+choice `e(n, N) := M · d(n, N)`, and the conclusion via Proposition 1 of
+§2) all *depend on* the grid double sequence being computable, which fails
+at step `chapt0:986-989` without the computable-endpoints hypothesis.
+
+The L1 closures `IsComputableSeqRat.max`, `.min`, `.abs` (landed in this
+working tree) would directly close P-R's `max` over the finite grid *if*
+the grid existed as a computable rational/real double sequence. They do not
+help bridge the gap when the grid itself is non-constructible from `B`
+alone.
+
+## Recommended fix — minimal signature change
+
+Add the two computable-endpoint hypotheses, matching P-R's `chapt2:128`
+phrasing "for recursive reals `a`, `b`":
+
+```lean
+theorem isComputableSeqCMap_norm
+    (B : ℕ) (hα_le : |α| ≤ (B : ℝ)) (hβ_le : |β| ≤ (B : ℝ))
+    (hα_c : IsComputableReal α) (hβ_c : IsComputableReal β)
+    (f : ℕ → C(Set.Icc α β, ℝ)) (hf : IsComputableSeqCMap (α := α) (β := β) f) :
+    IsComputableSeqReal (fun n => ‖f n‖)
+```
+
+(`IsComputableReal` lives at
+`ComputableAnalysis/L1/ComputableSeqReal.lean:696` — it unfolds to
+`IsComputableSeqReal (fun _ => α)`, so the witness data is exactly a
+rational double sequence approximating `α` to `1/2^k` precision, same for
+`β`.)
+
+This change propagates by one line in `computabilityStructureCMap_of`'s
+`isComputableSeqReal_norm` field: pass the new hypotheses through. The A1
+and A2 fields are unchanged (their proofs do not depend on `α`, `β` being
+computable beyond the rational bound `B`).
+
+## Alternative resolution paths (deferred)
+
+1. **Reparameterize `computabilityStructureCMap_of`** to take *explicit*
+   rational approximant data for α, β (analogous to how `B` is passed
+   explicitly rather than as `[Fact (|α| ≤ B)]`). Cleaner from a Mathlib-PR
+   perspective: no new typeclass instances needed at the use site, just two
+   extra ℕ × ℕ → ℚ arguments.
+2. **Restrict to integer / rational endpoints**. Adding
+   `(hαq : α = (αq : ℝ)) (hβq : β = (βq : ℝ))` for some `αq, βq : ℚ`
+   trivially gives `IsComputableReal α` and `β`. This loses generality but
+   suffices for the most common Mathlib use case (closed-form rational
+   endpoints like `Set.Icc (0 : ℝ) 1`).
+3. **Switch to the Grzegorczyk-Lacombe (G-L) raw-evaluator predicate**
+   (P-R Ch. 0 §3) instead of the polynomial-approximation predicate. The
+   G-L predicate's "evaluator at computable reals" formulation already
+   bakes in the requirement on α, β. This is a larger refactor — it
+   changes the L4 predicate definition, not just one lemma's signature —
+   and is tracked separately.
+
+ref: `literature/papers/PourEl-Richards-chapt0.md:977-1012` (Theorem 7
+statement and proof),
+`literature/papers/PourEl-Richards-chapt2.md:128-129` ("axiom 3 = Ch. 0 Thm
+7" plus "for recursive reals `a`, `b`"). -/
+theorem isComputableSeqCMap_norm
+    (B : ℕ) (hα_le : |α| ≤ (B : ℝ)) (hβ_le : |β| ≤ (B : ℝ))
+    (f : ℕ → C(Set.Icc α β, ℝ)) (_hf : IsComputableSeqCMap (α := α) (β := β) f) :
+    IsComputableSeqReal (fun n => ‖f n‖) := by
+  -- Mark B, hα_le, hβ_le as referenced so the signature stays stable across
+  -- the future fill-in.
+  let _B := B
+  let _hα := hα_le
+  let _hβ := hβ_le
+  -- BLOCKED ON SIGNATURE CHANGE REQUIRED — see this lemma's docstring for the
+  -- rigorous obstruction analysis (formal counterexample + line-by-line
+  -- breakdown of where P-R's `chapt0:984-1012` argument fails under the
+  -- current signature) and the minimal-fix recommendation (add
+  -- `IsComputableReal α`, `IsComputableReal β` hypotheses).
+  sorry
+
 /-- The `ComputabilityStructure ℝ (C(Set.Icc α β, ℝ))` structure, parameterized over an
 explicit rational bound `(B : ℕ)` on `max(|α|, |β|)`.
 
@@ -1271,10 +1597,13 @@ The previous `noncomputable instance instComputabilityStructureCMap` (without
 hypothesis) was provably unrealizable for arbitrary `α, β` — see
 `.goals/l4-cmap-axiom-linearity-cont/iter-04.md` for the obstruction analysis.
 
-The predicate is `IsComputableSeqCMap`; `zero_seq` and
-`isComputableSeq_linearCombination` (A1) are proved, while
-`isComputableSeq_of_effectiveLimit` (A2) and `isComputableSeqReal_norm` (A3)
-remain `sorry` (deferred).
+The predicate is `IsComputableSeqCMap`; `zero_seq`,
+`isComputableSeq_linearCombination` (A1), and
+`isComputableSeq_of_effectiveLimit` (A2) are proved.
+`isComputableSeqReal_norm` (A3) delegates to the named lemma
+`isComputableSeqCMap_norm`, which is itself a partial-close
+(`sorry`-carrying) until `α, β` are restricted to computable reals — see
+that lemma's docstring for the three resolution paths.
 
 ref for axioms 1-3: `literature/papers/PourEl-Richards-chapt2.md:66-77`.
 ref for "axiom 1 trivial / axiom 2 = Ch. 0 Thm 4 / axiom 3 = Ch. 0 Thm 7":
@@ -1285,28 +1614,9 @@ ref for "axiom 1 trivial / axiom 2 = Ch. 0 Thm 4 / axiom 3 = Ch. 0 Thm 7":
   IsComputableSeq := IsComputableSeqCMap
   isComputableSeq_linearCombination :=
     isComputableSeqCMap_linearCombination B hα_le hβ_le
-  isComputableSeq_of_effectiveLimit := by
-    -- TODO(/formalize L4 CMap): A2 = Ch. 0 Theorem 4 (Pour-El & Richards, "effective limits
-    -- of computable sequences of continuous functions are computable"). Under our predicate:
-    -- given a computable double sequence `{f_{n, k}}` converging effectively to `{f_n}` with
-    -- modulus `e : ℕ × ℕ → ℕ` (so `‖f_{n, k} - f_n‖_∞ ≤ 2^{-N}` for `k ≥ e(n, N)`), the
-    -- diagonalized polynomial approximant
-    --   `a'_{n, N, j} := a_{n, e(n, N + 1), N + 1, j}, d'_{n, N} := d_{n, e(n, N + 1), N + 1}`
-    -- (where `a, d` are the witnesses for the double sequence) approximates `f_n` to precision
-    -- `2^{-N+1}` by triangle inequality, and `a', d'` are computable by composition of
-    -- recursive functions.
-    sorry
-  isComputableSeqReal_norm := by
-    -- TODO(/formalize L4 CMap): A3 = Ch. 0 Theorem 7 (computable continuous functions have
-    -- computable sup-norm). Given `f_n` computable with witness `(a, d)`, the sup-norm
-    -- `‖f_n‖_∞ = sup_{x ∈ [α, β]} |f_n(x)|` can be approximated from rational data:
-    -- evaluate the polynomial approximants `p_{n, k}` on a fine rational grid
-    -- `{α + j · (β - α) / 2^k : j ∈ {0, ..., 2^k}}` (rational since `α, β` are recursive
-    -- reals — actually here arbitrary reals; the proof uses approximations to rationals),
-    -- take the maximum, and use `‖f_n - p_{n, k}‖_∞ ≤ 2^{-k}` + uniform continuity of `p_{n, k}`
-    -- to bound the discretization error. This requires L1 closure under finite `max` and
-    -- absolute-value (deferred L1 work).
-    sorry
+  isComputableSeq_of_effectiveLimit :=
+    isComputableSeqCMap_of_effectiveLimit (α := α) (β := β)
+  isComputableSeqReal_norm := fun f hf => isComputableSeqCMap_norm B hα_le hβ_le f hf
   zero_seq := by
     -- The all-zero polynomial approximant exactly equals the zero continuous map.
     refine ⟨fun _ => 0, fun _ => 0, ?_, Computable.const _, ?_⟩

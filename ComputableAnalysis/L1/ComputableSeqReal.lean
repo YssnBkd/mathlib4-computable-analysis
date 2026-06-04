@@ -332,6 +332,327 @@ theorem mul
   push_cast
   field_simp
 
+/-- Closure of `IsComputableSeqRat` under pointwise binary `max`.
+
+The new witness selects, pointwise, either the `(a₁, b₁, s₁)` triple or
+the `(a₂, b₂, s₂)` triple via a Boolean discriminator `chooseR1 k`
+which is `true` iff `max (r₁ k) (r₂ k) = r₁ k`. The discriminator is
+built recursion-theoretically as a nested `cond` over parities and a
+cross-product comparison (see the chooseR1 decision tree in
+`.goals/l1-max-abs-closure/iter-02.md`):
+
+- both parities equal and even: `chooseR1 ↔ a₁·b₂ ≥ a₂·b₁`,
+- both parities equal and odd:  `chooseR1 ↔ a₁·b₂ ≤ a₂·b₁`,
+- different parities:           `chooseR1 ↔ s₁ % 2 = 0` (i.e. r₁ ≥ 0 ≥ r₂).
+
+The rational identity then closes by a 4-way parity case-split,
+collapsing the inner `cond` per parity and applying `max_eq_left`
+(or `max_eq_right`) against the cross-product comparison, which is
+exposed via `div_le_div_iff₀ : a / b ≤ c / d ↔ a · d ≤ c · b` (for
+`b, d > 0`). -/
+theorem max
+    {r₁ r₂ : ℕ → ℚ}
+    (h₁ : IsComputableSeqRat r₁) (h₂ : IsComputableSeqRat r₂) :
+    IsComputableSeqRat (fun k => Max.max (r₁ k) (r₂ k)) := by
+  obtain ⟨a₁, b₁, s₁, ha₁, hb₁, hs₁, hne₁, heq₁⟩ := h₁
+  obtain ⟨a₂, b₂, s₂, ha₂, hb₂, hs₂, hne₂, heq₂⟩ := h₂
+  -- Computable cross-products and parities.
+  have hp₁ : Computable (fun k => a₁ k * b₂ k) :=
+    Primrec.nat_mul.to_comp.comp ha₁ hb₂
+  have hp₂ : Computable (fun k => a₂ k * b₁ k) :=
+    Primrec.nat_mul.to_comp.comp ha₂ hb₁
+  have hpar₁ : Computable (fun k => s₁ k % 2) :=
+    Primrec.nat_mod.to_comp.comp hs₁ (Computable.const 2)
+  have hpar₂ : Computable (fun k => s₂ k % 2) :=
+    Primrec.nat_mod.to_comp.comp hs₂ (Computable.const 2)
+  -- Boolean discriminator: `chooseR1 k = true` iff `max (r₁ k) (r₂ k) = r₁ k`.
+  set chooseR1 : ℕ → Bool := fun k =>
+    bif decide (s₁ k % 2 = s₂ k % 2) then
+      (bif decide (s₁ k % 2 = 0) then
+        decide (a₁ k * b₂ k ≥ a₂ k * b₁ k)
+      else
+        decide (a₁ k * b₂ k ≤ a₂ k * b₁ k))
+    else
+      decide (s₁ k % 2 = 0)
+    with hchooseR1_def
+  -- Computable discriminator: chain of Computable.cond on five primitives.
+  have hbeq_par : Computable (fun k => decide (s₁ k % 2 = s₂ k % 2)) :=
+    Primrec.beq.to_comp.comp hpar₁ hpar₂
+  have hbeq_par1zero : Computable (fun k => decide (s₁ k % 2 = 0)) :=
+    Primrec.beq.to_comp.comp hpar₁ (Computable.const 0)
+  have hge : Computable (fun k => decide (a₁ k * b₂ k ≥ a₂ k * b₁ k)) := by
+    have : Primrec₂ (fun p q : ℕ => decide (p ≥ q)) :=
+      Primrec.nat_le.swap.decide
+    exact this.to_comp.comp hp₁ hp₂
+  have hle : Computable (fun k => decide (a₁ k * b₂ k ≤ a₂ k * b₁ k)) := by
+    have : Primrec₂ (fun p q : ℕ => decide (p ≤ q)) :=
+      Primrec.nat_le.decide
+    exact this.to_comp.comp hp₁ hp₂
+  have hchooseR1 : Computable chooseR1 :=
+    Computable.cond hbeq_par (Computable.cond hbeq_par1zero hge hle) hbeq_par1zero
+  -- Witness: pick (a, b, s) per the discriminator.
+  refine ⟨
+    fun k => bif chooseR1 k then a₁ k else a₂ k,
+    fun k => bif chooseR1 k then b₁ k else b₂ k,
+    fun k => bif chooseR1 k then s₁ k else s₂ k,
+    Computable.cond hchooseR1 ha₁ ha₂,
+    Computable.cond hchooseR1 hb₁ hb₂,
+    Computable.cond hchooseR1 hs₁ hs₂,
+    ?_, ?_⟩
+  · -- newB k ≠ 0
+    intro k
+    cases hbk : chooseR1 k <;> simp [hbk, hne₁ k, hne₂ k]
+  · -- Rational identity: max (r₁ k) (r₂ k) = (-1)^{newS k} · (newA k / newB k).
+    intro k
+    show Max.max (r₁ k) (r₂ k) = _
+    rw [heq₁ k, heq₂ k]
+    have hb₁ℚ : (0 : ℚ) < b₁ k := by exact_mod_cast Nat.pos_of_ne_zero (hne₁ k)
+    have hb₂ℚ : (0 : ℚ) < b₂ k := by exact_mod_cast Nat.pos_of_ne_zero (hne₂ k)
+    -- Reduce (-1)^n in ℚ via parity (-1)^n = (-1)^(n % 2).
+    have pow_red : ∀ n : ℕ, (-1 : ℚ) ^ n = (-1) ^ (n % 2) := by
+      intro n
+      conv_lhs => rw [← Nat.div_add_mod n 2, pow_add, pow_mul]
+      simp
+    rw [pow_red (s₁ k), pow_red (s₂ k)]
+    -- Unfold chooseR1 to its definition once per case, then reduce by
+    -- the parity equalities. Each case picks the branch and reduces to
+    -- a cross-product comparison or a constant Bool.
+    have hch_eq : ∀ k, chooseR1 k =
+        (bif decide (s₁ k % 2 = s₂ k % 2) then
+          (bif decide (s₁ k % 2 = 0) then
+            decide (a₁ k * b₂ k ≥ a₂ k * b₁ k)
+          else
+            decide (a₁ k * b₂ k ≤ a₂ k * b₁ k))
+        else
+          decide (s₁ k % 2 = 0)) :=
+      fun k => congrFun hchooseR1_def k
+    rcases Nat.mod_two_eq_zero_or_one (s₁ k) with hp1 | hp1 <;>
+      rcases Nat.mod_two_eq_zero_or_one (s₂ k) with hp2 | hp2
+    · -- (par₁=0, par₂=0): both nonneg; chooseR1 ↔ a₁·b₂ ≥ a₂·b₁.
+      by_cases hge_case : a₁ k * b₂ k ≥ a₂ k * b₁ k
+      · have hbk : chooseR1 k = true := by
+          rw [hch_eq k]; simp [hp1, hp2, hge_case]
+        simp only [hbk, cond_true]
+        rw [pow_red (s₁ k), hp1, hp2]
+        have hr2le : (a₂ k : ℚ) / (b₂ k : ℚ) ≤ (a₁ k : ℚ) / (b₁ k : ℚ) := by
+          rw [div_le_div_iff₀ hb₂ℚ hb₁ℚ]
+          exact_mod_cast hge_case
+        rw [max_eq_left (by linarith)]
+      · have hlt : a₁ k * b₂ k < a₂ k * b₁ k := lt_of_not_ge hge_case
+        have hbk : chooseR1 k = false := by
+          rw [hch_eq k]; simp [hp1, hp2, hge_case]
+        simp only [hbk, cond_false]
+        rw [pow_red (s₂ k), hp1, hp2]
+        have hr1le : (a₁ k : ℚ) / (b₁ k : ℚ) ≤ (a₂ k : ℚ) / (b₂ k : ℚ) := by
+          rw [div_le_div_iff₀ hb₁ℚ hb₂ℚ]
+          exact_mod_cast hlt.le
+        rw [max_eq_right (by linarith)]
+    · -- (par₁=0, par₂=1): r₁ ≥ 0 ≥ r₂. chooseR1 = true.
+      have hbk : chooseR1 k = true := by
+        rw [hch_eq k]; simp [hp1, hp2]
+      simp only [hbk, cond_true]
+      rw [pow_red (s₁ k), hp1, hp2]
+      have hr1nn : (0 : ℚ) ≤ (a₁ k : ℚ) / (b₁ k : ℚ) :=
+        div_nonneg (Nat.cast_nonneg _) (Nat.cast_nonneg _)
+      have hr2nn : (0 : ℚ) ≤ (a₂ k : ℚ) / (b₂ k : ℚ) :=
+        div_nonneg (Nat.cast_nonneg _) (Nat.cast_nonneg _)
+      rw [max_eq_left (show ((-1 : ℚ) ^ (1 : ℕ)) * ((a₂ k : ℚ) / (b₂ k : ℚ)) ≤
+        ((-1 : ℚ) ^ (0 : ℕ)) * ((a₁ k : ℚ) / (b₁ k : ℚ)) by
+        simp; linarith)]
+    · -- (par₁=1, par₂=0): r₁ ≤ 0 ≤ r₂. chooseR1 = false.
+      have hbk : chooseR1 k = false := by
+        rw [hch_eq k]; simp [hp1, hp2]
+      simp only [hbk, cond_false]
+      rw [pow_red (s₂ k), hp1, hp2]
+      have hr1nn : (0 : ℚ) ≤ (a₁ k : ℚ) / (b₁ k : ℚ) :=
+        div_nonneg (Nat.cast_nonneg _) (Nat.cast_nonneg _)
+      have hr2nn : (0 : ℚ) ≤ (a₂ k : ℚ) / (b₂ k : ℚ) :=
+        div_nonneg (Nat.cast_nonneg _) (Nat.cast_nonneg _)
+      rw [max_eq_right (show ((-1 : ℚ) ^ (1 : ℕ)) * ((a₁ k : ℚ) / (b₁ k : ℚ)) ≤
+        ((-1 : ℚ) ^ (0 : ℕ)) * ((a₂ k : ℚ) / (b₂ k : ℚ)) by
+        simp; linarith)]
+    · -- (par₁=1, par₂=1): both nonpos; chooseR1 ↔ a₁·b₂ ≤ a₂·b₁.
+      by_cases hle_case : a₁ k * b₂ k ≤ a₂ k * b₁ k
+      · have hbk : chooseR1 k = true := by
+          rw [hch_eq k]; simp [hp1, hp2, hle_case]
+        simp only [hbk, cond_true]
+        rw [pow_red (s₁ k), hp1, hp2]
+        have hr1le : (a₁ k : ℚ) / (b₁ k : ℚ) ≤ (a₂ k : ℚ) / (b₂ k : ℚ) := by
+          rw [div_le_div_iff₀ hb₁ℚ hb₂ℚ]
+          exact_mod_cast hle_case
+        rw [max_eq_left (by linarith)]
+      · have hlt : a₂ k * b₁ k < a₁ k * b₂ k := lt_of_not_ge hle_case
+        have hbk : chooseR1 k = false := by
+          rw [hch_eq k]; simp [hp1, hp2, hle_case]
+        simp only [hbk, cond_false]
+        rw [pow_red (s₂ k), hp1, hp2]
+        have hr2le : (a₂ k : ℚ) / (b₂ k : ℚ) ≤ (a₁ k : ℚ) / (b₁ k : ℚ) := by
+          rw [div_le_div_iff₀ hb₂ℚ hb₁ℚ]
+          exact_mod_cast hlt.le
+        rw [max_eq_right (by linarith)]
+
+/-- Closure of `IsComputableSeqRat` under pointwise binary `min`.
+
+Dual of `.max`. The discriminator `chooseR1 k` is `true` iff
+`min (r₁ k) (r₂ k) = r₁ k`. Decision tree:
+
+- both parities equal and even: `chooseR1 ↔ a₁·b₂ ≤ a₂·b₁`,
+- both parities equal and odd:  `chooseR1 ↔ a₁·b₂ ≥ a₂·b₁`,
+- different parities:           `chooseR1 ↔ s₁ % 2 = 1` (i.e. r₁ ≤ 0 ≤ r₂).
+
+The proof structure is identical to `.max` with `max_eq_left`/`max_eq_right`
+swapped for `min_eq_left`/`min_eq_right` and the inner cross-product
+comparisons swapped between the two same-parity branches. -/
+theorem min
+    {r₁ r₂ : ℕ → ℚ}
+    (h₁ : IsComputableSeqRat r₁) (h₂ : IsComputableSeqRat r₂) :
+    IsComputableSeqRat (fun k => Min.min (r₁ k) (r₂ k)) := by
+  obtain ⟨a₁, b₁, s₁, ha₁, hb₁, hs₁, hne₁, heq₁⟩ := h₁
+  obtain ⟨a₂, b₂, s₂, ha₂, hb₂, hs₂, hne₂, heq₂⟩ := h₂
+  have hp₁ : Computable (fun k => a₁ k * b₂ k) :=
+    Primrec.nat_mul.to_comp.comp ha₁ hb₂
+  have hp₂ : Computable (fun k => a₂ k * b₁ k) :=
+    Primrec.nat_mul.to_comp.comp ha₂ hb₁
+  have hpar₁ : Computable (fun k => s₁ k % 2) :=
+    Primrec.nat_mod.to_comp.comp hs₁ (Computable.const 2)
+  have hpar₂ : Computable (fun k => s₂ k % 2) :=
+    Primrec.nat_mod.to_comp.comp hs₂ (Computable.const 2)
+  -- Boolean discriminator: `chooseR1 k = true` iff `min (r₁ k) (r₂ k) = r₁ k`.
+  set chooseR1 : ℕ → Bool := fun k =>
+    bif decide (s₁ k % 2 = s₂ k % 2) then
+      (bif decide (s₁ k % 2 = 0) then
+        decide (a₁ k * b₂ k ≤ a₂ k * b₁ k)
+      else
+        decide (a₁ k * b₂ k ≥ a₂ k * b₁ k))
+    else
+      decide (s₁ k % 2 = 1)
+    with hchooseR1_def
+  have hbeq_par : Computable (fun k => decide (s₁ k % 2 = s₂ k % 2)) :=
+    Primrec.beq.to_comp.comp hpar₁ hpar₂
+  have hbeq_par1zero : Computable (fun k => decide (s₁ k % 2 = 0)) :=
+    Primrec.beq.to_comp.comp hpar₁ (Computable.const 0)
+  have hbeq_par1one : Computable (fun k => decide (s₁ k % 2 = 1)) :=
+    Primrec.beq.to_comp.comp hpar₁ (Computable.const 1)
+  have hge : Computable (fun k => decide (a₁ k * b₂ k ≥ a₂ k * b₁ k)) := by
+    have : Primrec₂ (fun p q : ℕ => decide (p ≥ q)) :=
+      Primrec.nat_le.swap.decide
+    exact this.to_comp.comp hp₁ hp₂
+  have hle : Computable (fun k => decide (a₁ k * b₂ k ≤ a₂ k * b₁ k)) := by
+    have : Primrec₂ (fun p q : ℕ => decide (p ≤ q)) :=
+      Primrec.nat_le.decide
+    exact this.to_comp.comp hp₁ hp₂
+  have hchooseR1 : Computable chooseR1 :=
+    Computable.cond hbeq_par (Computable.cond hbeq_par1zero hle hge) hbeq_par1one
+  refine ⟨
+    fun k => bif chooseR1 k then a₁ k else a₂ k,
+    fun k => bif chooseR1 k then b₁ k else b₂ k,
+    fun k => bif chooseR1 k then s₁ k else s₂ k,
+    Computable.cond hchooseR1 ha₁ ha₂,
+    Computable.cond hchooseR1 hb₁ hb₂,
+    Computable.cond hchooseR1 hs₁ hs₂,
+    ?_, ?_⟩
+  · intro k
+    cases hbk : chooseR1 k <;> simp [hbk, hne₁ k, hne₂ k]
+  · intro k
+    show Min.min (r₁ k) (r₂ k) = _
+    rw [heq₁ k, heq₂ k]
+    have hb₁ℚ : (0 : ℚ) < b₁ k := by exact_mod_cast Nat.pos_of_ne_zero (hne₁ k)
+    have hb₂ℚ : (0 : ℚ) < b₂ k := by exact_mod_cast Nat.pos_of_ne_zero (hne₂ k)
+    have pow_red : ∀ n : ℕ, (-1 : ℚ) ^ n = (-1) ^ (n % 2) := by
+      intro n
+      conv_lhs => rw [← Nat.div_add_mod n 2, pow_add, pow_mul]
+      simp
+    rw [pow_red (s₁ k), pow_red (s₂ k)]
+    have hch_eq : ∀ k, chooseR1 k =
+        (bif decide (s₁ k % 2 = s₂ k % 2) then
+          (bif decide (s₁ k % 2 = 0) then
+            decide (a₁ k * b₂ k ≤ a₂ k * b₁ k)
+          else
+            decide (a₁ k * b₂ k ≥ a₂ k * b₁ k))
+        else
+          decide (s₁ k % 2 = 1)) :=
+      fun k => congrFun hchooseR1_def k
+    rcases Nat.mod_two_eq_zero_or_one (s₁ k) with hp1 | hp1 <;>
+      rcases Nat.mod_two_eq_zero_or_one (s₂ k) with hp2 | hp2
+    · -- (par₁=0, par₂=0): both nonneg; chooseR1 ↔ a₁·b₂ ≤ a₂·b₁.
+      by_cases hle_case : a₁ k * b₂ k ≤ a₂ k * b₁ k
+      · have hbk : chooseR1 k = true := by
+          rw [hch_eq k]; simp [hp1, hp2, hle_case]
+        simp only [hbk, cond_true]
+        rw [pow_red (s₁ k), hp1, hp2]
+        have hr1le : (a₁ k : ℚ) / (b₁ k : ℚ) ≤ (a₂ k : ℚ) / (b₂ k : ℚ) := by
+          rw [div_le_div_iff₀ hb₁ℚ hb₂ℚ]
+          exact_mod_cast hle_case
+        rw [min_eq_left (by linarith)]
+      · have hlt : a₂ k * b₁ k < a₁ k * b₂ k := lt_of_not_ge hle_case
+        have hbk : chooseR1 k = false := by
+          rw [hch_eq k]; simp [hp1, hp2, hle_case]
+        simp only [hbk, cond_false]
+        rw [pow_red (s₂ k), hp1, hp2]
+        have hr2le : (a₂ k : ℚ) / (b₂ k : ℚ) ≤ (a₁ k : ℚ) / (b₁ k : ℚ) := by
+          rw [div_le_div_iff₀ hb₂ℚ hb₁ℚ]
+          exact_mod_cast hlt.le
+        rw [min_eq_right (by linarith)]
+    · -- (par₁=0, par₂=1): r₁ ≥ 0 ≥ r₂. chooseR1 = false (r₂ is the min).
+      have hbk : chooseR1 k = false := by
+        rw [hch_eq k]; simp [hp1, hp2]
+      simp only [hbk, cond_false]
+      rw [pow_red (s₂ k), hp1, hp2]
+      have hr1nn : (0 : ℚ) ≤ (a₁ k : ℚ) / (b₁ k : ℚ) :=
+        div_nonneg (Nat.cast_nonneg _) (Nat.cast_nonneg _)
+      have hr2nn : (0 : ℚ) ≤ (a₂ k : ℚ) / (b₂ k : ℚ) :=
+        div_nonneg (Nat.cast_nonneg _) (Nat.cast_nonneg _)
+      rw [min_eq_right (show ((-1 : ℚ) ^ (1 : ℕ)) * ((a₂ k : ℚ) / (b₂ k : ℚ)) ≤
+        ((-1 : ℚ) ^ (0 : ℕ)) * ((a₁ k : ℚ) / (b₁ k : ℚ)) by
+        simp; linarith)]
+    · -- (par₁=1, par₂=0): r₁ ≤ 0 ≤ r₂. chooseR1 = true (r₁ is the min).
+      have hbk : chooseR1 k = true := by
+        rw [hch_eq k]; simp [hp1, hp2]
+      simp only [hbk, cond_true]
+      rw [pow_red (s₁ k), hp1, hp2]
+      have hr1nn : (0 : ℚ) ≤ (a₁ k : ℚ) / (b₁ k : ℚ) :=
+        div_nonneg (Nat.cast_nonneg _) (Nat.cast_nonneg _)
+      have hr2nn : (0 : ℚ) ≤ (a₂ k : ℚ) / (b₂ k : ℚ) :=
+        div_nonneg (Nat.cast_nonneg _) (Nat.cast_nonneg _)
+      rw [min_eq_left (show ((-1 : ℚ) ^ (1 : ℕ)) * ((a₁ k : ℚ) / (b₁ k : ℚ)) ≤
+        ((-1 : ℚ) ^ (0 : ℕ)) * ((a₂ k : ℚ) / (b₂ k : ℚ)) by
+        simp; linarith)]
+    · -- (par₁=1, par₂=1): both nonpos; chooseR1 ↔ a₁·b₂ ≥ a₂·b₁.
+      by_cases hge_case : a₁ k * b₂ k ≥ a₂ k * b₁ k
+      · have hbk : chooseR1 k = true := by
+          rw [hch_eq k]; simp [hp1, hp2, hge_case]
+        simp only [hbk, cond_true]
+        rw [pow_red (s₁ k), hp1, hp2]
+        have hr2le : (a₂ k : ℚ) / (b₂ k : ℚ) ≤ (a₁ k : ℚ) / (b₁ k : ℚ) := by
+          rw [div_le_div_iff₀ hb₂ℚ hb₁ℚ]
+          exact_mod_cast hge_case
+        rw [min_eq_left (by linarith)]
+      · have hlt : a₁ k * b₂ k < a₂ k * b₁ k := lt_of_not_ge hge_case
+        have hbk : chooseR1 k = false := by
+          rw [hch_eq k]; simp [hp1, hp2, hge_case]
+        simp only [hbk, cond_false]
+        rw [pow_red (s₂ k), hp1, hp2]
+        have hr1le : (a₁ k : ℚ) / (b₁ k : ℚ) ≤ (a₂ k : ℚ) / (b₂ k : ℚ) := by
+          rw [div_le_div_iff₀ hb₁ℚ hb₂ℚ]
+          exact_mod_cast hlt.le
+        rw [min_eq_right (by linarith)]
+
+/-- Closure of `IsComputableSeqRat` under pointwise absolute value.
+
+Witness: keep `(a, b)` unchanged; replace the sign sequence by the constant
+zero. The identity reduces to `|(-1 : ℚ)^{s k} · (a k / b k)| = a k / b k`
+via `abs_mul`, `abs_pow`, `|(-1 : ℚ)| = 1`, and nonnegativity of the cast
+rational `(a k : ℚ) / (b k : ℚ)`. -/
+theorem abs {r : ℕ → ℚ} (h : IsComputableSeqRat r) :
+    IsComputableSeqRat (fun k => |r k|) := by
+  obtain ⟨a, b, s, ha, hb, hs, hne, heq⟩ := h
+  refine ⟨a, b, fun _ => 0, ha, hb, Computable.const 0, hne, fun k => ?_⟩
+  show |r k| = (-1 : ℚ) ^ (0 : ℕ) * ((a k : ℚ) / (b k : ℚ))
+  rw [heq k, abs_mul, abs_pow,
+      show |(-1 : ℚ)| = 1 from by norm_num,
+      one_pow, one_mul, pow_zero, one_mul,
+      abs_of_nonneg (div_nonneg (Nat.cast_nonneg _) (Nat.cast_nonneg _))]
+
 /-- Closure of `IsComputableSeqRat` under precomposition with a computable
 re-indexing `σ : ℕ → ℕ`. Witness: each ingredient `(a, b, s)` of `r` is
 precomposed with `σ`; the recursion-theoretic data structure of

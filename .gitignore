@@ -32,3 +32,6 @@ archive/raw/*.jsonl.tmp
 
 # Local-only Claude Code overrides (commit settings.json, not the .local override)
 .claude/settings.local.json
+
+# Transient agent worktrees (managed by `git worktree`; harness-locked while in use)
+.claude/worktrees/

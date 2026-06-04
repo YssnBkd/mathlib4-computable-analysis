@@ -82,6 +82,40 @@
   Precompose each component $(a, b, s)$ of the witness with $\sigma$. Closure of \texttt{Computable} under composition (\texttt{Computable.comp}) supplies the recursion-theoretic data; the value identity and $b \ne 0$ transport pointwise through $\sigma$.
 \end{proof}
 
+\begin{lemma}
+  \label{lem:l1_isComputableSeqRat_max}
+  \lean{ComputableAnalysis.L1.IsComputableSeqRat.max}
+  \leanok
+  \uses{def:l1_isComputableSeqRat}
+  \texttt{IsComputableSeqRat} is closed under pointwise maximum: if $h_i : \texttt{IsComputableSeqRat}\,r_i$ for $i \in \{1,2\}$, then $\lambda k.\,\max(r_1\,k,\,r_2\,k)$ is computable.
+\end{lemma}
+\begin{proof}\leanok
+  The witness $(\mathrm{newA}, \mathrm{newB}, \mathrm{newS})$ is gated by a Boolean function $\mathrm{chooseR1} : \mathbb{N} \to \mathtt{Bool}$, with $\mathrm{chooseR1}\,k = \mathtt{true}$ iff $\max(r_1\,k,\,r_2\,k) = r_1\,k$. The Boolean is defined by a four-parity case-split on $(s_1\,k \bmod 2,\, s_2\,k \bmod 2)$ paired with a cross-product comparison $a_1\,k \cdot b_2\,k \gtrless a_2\,k \cdot b_1\,k$; each ingredient is then $\mathsf{cond}\,(\mathrm{chooseR1}\,k)\,(\cdot_1)\,(\cdot_2)$, recursive by closure of \texttt{Computable} under $\mathsf{cond}$. The defining rational identity reduces, in each parity leaf, to \texttt{max\_eq\_left} (or \texttt{max\_eq\_right}) after a \texttt{pow\_red} collapse of the $(-1)^{s\,k}$ factors and the matching cross-product inequality.
+\end{proof}
+
+\begin{lemma}
+  \label{lem:l1_isComputableSeqRat_min}
+  \lean{ComputableAnalysis.L1.IsComputableSeqRat.min}
+  \leanok
+  \uses{def:l1_isComputableSeqRat}
+  \texttt{IsComputableSeqRat} is closed under pointwise minimum: if $h_i : \texttt{IsComputableSeqRat}\,r_i$ for $i \in \{1,2\}$, then $\lambda k.\,\min(r_1\,k,\,r_2\,k)$ is computable.
+\end{lemma}
+\begin{proof}\leanok
+  \uses{lem:l1_isComputableSeqRat_max}
+  Dual of \Cref{lem:l1_isComputableSeqRat_max} with $\mathrm{chooseR1}$ inverted: the same four-parity case-split on $(s_1\,k \bmod 2,\, s_2\,k \bmod 2)$ governs the dispatch, but the inner cross-product inequality direction is swapped, and the mixed-parity branch picks the negative input ($s_1\,k \bmod 2 = 1$). Each parity leaf reduces to \texttt{min\_eq\_left}/\texttt{min\_eq\_right} after the same $(-1)^{s\,k}$ \texttt{pow\_red} collapse.
+\end{proof}
+
+\begin{lemma}
+  \label{lem:l1_isComputableSeqRat_abs}
+  \lean{ComputableAnalysis.L1.IsComputableSeqRat.abs}
+  \leanok
+  \uses{def:l1_isComputableSeqRat}
+  \texttt{IsComputableSeqRat} is closed under pointwise absolute value: if $h : \texttt{IsComputableSeqRat}\,r$, then $\lambda k.\,|r\,k|$ is computable.
+\end{lemma}
+\begin{proof}\leanok
+  Keep the magnitude witness $(a, b)$ of the input verbatim and replace the sign sequence by the constant $0$. The defining identity reduces $|(-1)^{s\,k} \cdot (a\,k / b\,k)| = a\,k / b\,k$ via \texttt{abs\_mul}, \texttt{abs\_pow}, the rational identity $|(-1 : \mathbb{Q})| = 1$, and nonnegativity of $(a\,k : \mathbb{Q}) / (b\,k : \mathbb{Q})$ (numerator and denominator are natural casts). A \texttt{show} step first beta-reduces the $(\lambda k.\,|r\,k|)\,k$ lambda before invoking the input identity \texttt{heq}.
+\end{proof}
+
 \begin{definition}
   \label{def:l1_isComputableReal}
   \lean{ComputableAnalysis.L1.IsComputableReal}

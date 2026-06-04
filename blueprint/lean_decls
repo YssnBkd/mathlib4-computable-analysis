@@ -22,9 +22,14 @@ ComputableAnalysis.L1.isComputableSeqReal_const_rat
 ComputableAnalysis.L1.IsComputableSeqRat.add
 ComputableAnalysis.L1.IsComputableSeqRat.mul
 ComputableAnalysis.L1.IsComputableSeqRat.comp
+ComputableAnalysis.L1.IsComputableSeqRat.max
+ComputableAnalysis.L1.IsComputableSeqRat.min
+ComputableAnalysis.L1.IsComputableSeqRat.abs
 ComputableAnalysis.L1.IsComputableReal
 ComputableAnalysis.L1.IsComputableReal.ofRat
 ComputableAnalysis.L1.IsComputableReal.zero
 ComputableAnalysis.L3.ComputabilityStructure
 ComputableAnalysis.L4.isComputableSeqCMap_linearCombination
 ComputableAnalysis.L4.computabilityStructureCMap_of
+ComputableAnalysis.L4.isComputableSeqCMap_of_effectiveLimit
+ComputableAnalysis.L4.isComputableSeqCMap_norm

@@ -616,6 +616,649 @@ def IsComputableSeqCMap (f : ℕ → C(Set.Icc α β, ℝ)) : Prop :=
     Computable d ∧
     ∀ n k, ‖f n - polyApproxCMap (α := α) (β := β) a d n k‖ ≤ 1 / 2 ^ k
 
+/-- **C[a,b] computability — Axiom 1 (Linear Forms).** P-R Ch. 2:66-72.
+
+Given a fixed rational bound `B ≥ max(|α|, |β|)`, the C[a,b]-sequence
+predicate `IsComputableSeqCMap` is closed under finite linear combinations
+with computable rational scalar arrays. This is the A1 instance field of
+`computabilityStructureCMap_of` extracted as a named, sorry-free lemma so
+that the blueprint's `lem:l4_cmap_axiom1` can `\lean{}`-link directly to
+it without inheriting `sorryAx` from the sibling A2/A3 fields (see
+`docs/PITFALLS.md §7`).
+
+Proof shape (rounds `l4-cmap-axiom-linearity-cont` and
+`l4-cmap-axiom-linearity-bound`): witnesses for the linear combination are
+obtained by applying the same finite combination to the witness polynomials
+of `x` and `y`. A per-level precision pad
+`M(n, m) := m + (d n + 1) + bound_max n + 2` absorbs both the per-summand
+norm bound (controlled by `B`) and the arity, turning the polynomial
+triangle inequality into the required `1 / 2 ^ m` estimate. -/
+theorem isComputableSeqCMap_linearCombination
+    (B : ℕ) (hα_le : |α| ≤ (B : ℝ)) (hβ_le : |β| ≤ (B : ℝ)) :
+    ∀ (x y : ℕ → C(Set.Icc α β, ℝ))
+      (coefα coefβ : ℕ × ℕ → ℝ) (d : ℕ → ℕ),
+      IsComputableSeqCMap x → IsComputableSeqCMap y →
+      ScalarComputableSeq.IsComputableSeq (fun n => coefα (Nat.unpair n)) →
+      ScalarComputableSeq.IsComputableSeq (fun n => coefβ (Nat.unpair n)) →
+      Computable d →
+      IsComputableSeqCMap
+        (fun n => ∑ k ∈ Finset.range (d n + 1),
+            (coefα (n, k) • x k + coefβ (n, k) • y k)) := by
+  -- Destructure all 5 hypotheses.
+  intro x y coefα coefβ d hx hy hcoefα hcoefβ hd
+  obtain ⟨aX, dX, hflat_X, hd_X, hbnd_X⟩ := hx
+  obtain ⟨aY, dY, hflat_Y, hd_Y, hbnd_Y⟩ := hy
+  obtain ⟨αR, hflat_αR, hbnd_αR⟩ := hcoefα
+  obtain ⟨βR, hflat_βR, hbnd_βR⟩ := hcoefβ
+  -- iter-10: extract inner recursion-theoretic witnesses for the norm-bound work.
+  -- Each `_a`/`_b`/`_s` is a Computable ℕ → ℕ function; the `_a` components
+  -- serve as ℕ-upper-bounds on `|aX(...)|`, `|αR(...)|` etc. (since for q : ℚ
+  -- with q = (-1)^s · (a/b), |q| ≤ a/b ≤ a when b ≥ 1, treating a, b as reals).
+  -- Re-introduce the outer hypotheses so iter-09's IsComputableSeqRat proof
+  -- still type-checks with the same `hflat_X` etc. names.
+  obtain ⟨aX_a, aX_b, aX_s, h_aX_a, h_aX_b, h_aX_s, h_aX_bne, h_aX_eq⟩ := hflat_X
+  have hflat_X : IsComputableSeqRat (fun m => aX ((Nat.unpair m).1,
+      (Nat.unpair (Nat.unpair m).2).1, (Nat.unpair (Nat.unpair m).2).2)) :=
+    ⟨aX_a, aX_b, aX_s, h_aX_a, h_aX_b, h_aX_s, h_aX_bne, h_aX_eq⟩
+  obtain ⟨aY_a, aY_b, aY_s, h_aY_a, h_aY_b, h_aY_s, h_aY_bne, h_aY_eq⟩ := hflat_Y
+  have hflat_Y : IsComputableSeqRat (fun m => aY ((Nat.unpair m).1,
+      (Nat.unpair (Nat.unpair m).2).1, (Nat.unpair (Nat.unpair m).2).2)) :=
+    ⟨aY_a, aY_b, aY_s, h_aY_a, h_aY_b, h_aY_s, h_aY_bne, h_aY_eq⟩
+  obtain ⟨αR_a, αR_b, αR_s, h_αR_a, h_αR_b, h_αR_s, h_αR_bne, h_αR_eq⟩ := hflat_αR
+  have hflat_αR : IsComputableDoubleSeqRat αR :=
+    ⟨αR_a, αR_b, αR_s, h_αR_a, h_αR_b, h_αR_s, h_αR_bne, h_αR_eq⟩
+  obtain ⟨βR_a, βR_b, βR_s, h_βR_a, h_βR_b, h_βR_s, h_βR_bne, h_βR_eq⟩ := hflat_βR
+  have hflat_βR : IsComputableDoubleSeqRat βR :=
+    ⟨βR_a, βR_b, βR_s, h_βR_a, h_βR_b, h_βR_s, h_βR_bne, h_βR_eq⟩
+  -- iter-11: simple bound helpers via composition of inner-`_a` witnesses
+  -- with `Primrec₂.natPair`. These give Computable ℕ-upper-bounds on
+  -- |aX(k, 0, j)|, |aY(k, 0, j)|, |αR(Nat.pair n k, 0)|, |βR(Nat.pair n k, 0)|.
+  let bound_aX_at_0 : ℕ × ℕ → ℕ := fun kj =>
+    aX_a (Nat.pair kj.1 (Nat.pair 0 kj.2))
+  have h_bound_aX_at_0 : Computable bound_aX_at_0 := by
+    show Computable (fun kj : ℕ × ℕ => aX_a (Nat.pair kj.1 (Nat.pair 0 kj.2)))
+    have h_inner : Computable (fun kj : ℕ × ℕ => Nat.pair 0 kj.2) :=
+      Primrec₂.natPair.to_comp.comp (Computable.const 0) Computable.snd
+    have h_outer : Computable (fun kj : ℕ × ℕ => Nat.pair kj.1 (Nat.pair 0 kj.2)) :=
+      Primrec₂.natPair.to_comp.comp Computable.fst h_inner
+    exact h_aX_a.comp h_outer
+  let bound_aY_at_0 : ℕ × ℕ → ℕ := fun kj =>
+    aY_a (Nat.pair kj.1 (Nat.pair 0 kj.2))
+  have h_bound_aY_at_0 : Computable bound_aY_at_0 := by
+    show Computable (fun kj : ℕ × ℕ => aY_a (Nat.pair kj.1 (Nat.pair 0 kj.2)))
+    have h_inner : Computable (fun kj : ℕ × ℕ => Nat.pair 0 kj.2) :=
+      Primrec₂.natPair.to_comp.comp (Computable.const 0) Computable.snd
+    have h_outer : Computable (fun kj : ℕ × ℕ => Nat.pair kj.1 (Nat.pair 0 kj.2)) :=
+      Primrec₂.natPair.to_comp.comp Computable.fst h_inner
+    exact h_aY_a.comp h_outer
+  let bound_αR_at_0 : ℕ × ℕ → ℕ := fun nk =>
+    αR_a (Nat.pair (Nat.pair nk.1 nk.2) 0)
+  have h_bound_αR_at_0 : Computable bound_αR_at_0 := by
+    show Computable (fun nk : ℕ × ℕ => αR_a (Nat.pair (Nat.pair nk.1 nk.2) 0))
+    have h_pair_nk : Computable (fun nk : ℕ × ℕ => Nat.pair nk.1 nk.2) :=
+      Primrec₂.natPair.to_comp.comp Computable.fst Computable.snd
+    have h_outer : Computable (fun nk : ℕ × ℕ => Nat.pair (Nat.pair nk.1 nk.2) 0) :=
+      Primrec₂.natPair.to_comp.comp h_pair_nk (Computable.const 0)
+    exact h_αR_a.comp h_outer
+  let bound_βR_at_0 : ℕ × ℕ → ℕ := fun nk =>
+    βR_a (Nat.pair (Nat.pair nk.1 nk.2) 0)
+  have h_bound_βR_at_0 : Computable bound_βR_at_0 := by
+    show Computable (fun nk : ℕ × ℕ => βR_a (Nat.pair (Nat.pair nk.1 nk.2) 0))
+    have h_pair_nk : Computable (fun nk : ℕ × ℕ => Nat.pair nk.1 nk.2) :=
+      Primrec₂.natPair.to_comp.comp Computable.fst Computable.snd
+    have h_outer : Computable (fun nk : ℕ × ℕ => Nat.pair (Nat.pair nk.1 nk.2) 0) :=
+      Primrec₂.natPair.to_comp.comp h_pair_nk (Computable.const 0)
+    exact h_βR_a.comp h_outer
+  -- iter-11: B^j as a Computable function of j, via `Computable.nat_rec`.
+  have h_Bpow : Computable (fun j : ℕ => B^j) := by
+    have hh : Computable₂ (fun (_ : ℕ) (yih : ℕ × ℕ) => yih.2 * B) := by
+      show Computable (fun p : ℕ × (ℕ × ℕ) => p.2.2 * B)
+      exact Primrec.nat_mul.to_comp.comp (Computable.snd.comp Computable.snd)
+        (Computable.const B)
+    have h_rec := Computable.nat_rec Computable.id (Computable.const (1 : ℕ)) hh
+    refine h_rec.of_eq fun j => ?_
+    show Nat.rec 1 (fun y IH => (y, IH).2 * B) j = B^j
+    induction j with
+    | zero => rfl
+    | succ j IH =>
+      show Nat.rec 1 (fun y IH' => (y, IH').2 * B) j * B = B^(j + 1)
+      rw [IH, pow_succ]
+  -- iter-11: bound_x_k via `Computable.nat_rec` on `(dX (k, 0)).succ`.
+  -- bound_x_k k := 1 + Σ_j ∈ Finset.range (dX(k, 0) + 1), bound_aX_at_0 (k, j) * B^j.
+  let bound_x_k : ℕ → ℕ := fun k =>
+    Nat.rec 1 (fun j acc => acc + bound_aX_at_0 (k, j) * B^j) ((dX (k, 0)).succ)
+  have h_bound_x_k : Computable bound_x_k := by
+    show Computable (fun k : ℕ =>
+      Nat.rec (motive := fun _ => ℕ) 1
+        (fun j acc => acc + bound_aX_at_0 (k, j) * B^j) ((dX (k, 0)).succ))
+    have hf : Computable (fun k : ℕ => (dX (k, 0)).succ) :=
+      Computable.succ.comp (hd_X.comp (Computable.id.pair (Computable.const 0)))
+    have hh : Computable₂ (fun (k : ℕ) (jacc : ℕ × ℕ) =>
+        jacc.2 + bound_aX_at_0 (k, jacc.1) * B^jacc.1) := by
+      show Computable (fun p : ℕ × (ℕ × ℕ) =>
+          p.2.2 + bound_aX_at_0 (p.1, p.2.1) * B^p.2.1)
+      have h_k : Computable (fun p : ℕ × (ℕ × ℕ) => p.1) := Computable.fst
+      have h_j : Computable (fun p : ℕ × (ℕ × ℕ) => p.2.1) :=
+        Computable.fst.comp Computable.snd
+      have h_acc : Computable (fun p : ℕ × (ℕ × ℕ) => p.2.2) :=
+        Computable.snd.comp Computable.snd
+      have h_pair_kj : Computable (fun p : ℕ × (ℕ × ℕ) => (p.1, p.2.1)) := h_k.pair h_j
+      have h_baX : Computable (fun p : ℕ × (ℕ × ℕ) => bound_aX_at_0 (p.1, p.2.1)) :=
+        h_bound_aX_at_0.comp h_pair_kj
+      have h_Bpow_j : Computable (fun p : ℕ × (ℕ × ℕ) => B^p.2.1) := h_Bpow.comp h_j
+      have h_prod : Computable (fun p : ℕ × (ℕ × ℕ) =>
+          bound_aX_at_0 (p.1, p.2.1) * B^p.2.1) :=
+        Primrec.nat_mul.to_comp.comp h_baX h_Bpow_j
+      exact Primrec.nat_add.to_comp.comp h_acc h_prod
+    exact Computable.nat_rec hf (Computable.const 1) hh
+  -- iter-11: bound_y_k mirrors bound_x_k.
+  let bound_y_k : ℕ → ℕ := fun k =>
+    Nat.rec 1 (fun j acc => acc + bound_aY_at_0 (k, j) * B^j) ((dY (k, 0)).succ)
+  have h_bound_y_k : Computable bound_y_k := by
+    show Computable (fun k : ℕ =>
+      Nat.rec (motive := fun _ => ℕ) 1
+        (fun j acc => acc + bound_aY_at_0 (k, j) * B^j) ((dY (k, 0)).succ))
+    have hf : Computable (fun k : ℕ => (dY (k, 0)).succ) :=
+      Computable.succ.comp (hd_Y.comp (Computable.id.pair (Computable.const 0)))
+    have hh : Computable₂ (fun (k : ℕ) (jacc : ℕ × ℕ) =>
+        jacc.2 + bound_aY_at_0 (k, jacc.1) * B^jacc.1) := by
+      show Computable (fun p : ℕ × (ℕ × ℕ) =>
+          p.2.2 + bound_aY_at_0 (p.1, p.2.1) * B^p.2.1)
+      have h_k : Computable (fun p : ℕ × (ℕ × ℕ) => p.1) := Computable.fst
+      have h_j : Computable (fun p : ℕ × (ℕ × ℕ) => p.2.1) :=
+        Computable.fst.comp Computable.snd
+      have h_acc : Computable (fun p : ℕ × (ℕ × ℕ) => p.2.2) :=
+        Computable.snd.comp Computable.snd
+      have h_pair_kj : Computable (fun p : ℕ × (ℕ × ℕ) => (p.1, p.2.1)) := h_k.pair h_j
+      have h_baY : Computable (fun p : ℕ × (ℕ × ℕ) => bound_aY_at_0 (p.1, p.2.1)) :=
+        h_bound_aY_at_0.comp h_pair_kj
+      have h_Bpow_j : Computable (fun p : ℕ × (ℕ × ℕ) => B^p.2.1) := h_Bpow.comp h_j
+      have h_prod : Computable (fun p : ℕ × (ℕ × ℕ) =>
+          bound_aY_at_0 (p.1, p.2.1) * B^p.2.1) :=
+        Primrec.nat_mul.to_comp.comp h_baY h_Bpow_j
+      exact Primrec.nat_add.to_comp.comp h_acc h_prod
+    exact Computable.nat_rec hf (Computable.const 1) hh
+  -- iter-12: per-k crude rational bound, as a ℕ-upper-bound on
+  -- ‖x_k‖_∞ + ‖y_k‖_∞ + |αR(.., 0)| + |βR(.., 0)| + 6 (the 6 absorbs additive constants).
+  let stuff_per_k : ℕ × ℕ → ℕ := fun nk =>
+    bound_x_k nk.2 + bound_y_k nk.2 + bound_αR_at_0 nk + bound_βR_at_0 nk + 6
+  have h_stuff_per_k : Computable stuff_per_k := by
+    show Computable (fun nk : ℕ × ℕ =>
+      bound_x_k nk.2 + bound_y_k nk.2 + bound_αR_at_0 nk + bound_βR_at_0 nk + 6)
+    have h_bx : Computable (fun nk : ℕ × ℕ => bound_x_k nk.2) :=
+      h_bound_x_k.comp Computable.snd
+    have h_by : Computable (fun nk : ℕ × ℕ => bound_y_k nk.2) :=
+      h_bound_y_k.comp Computable.snd
+    have h1 := Primrec.nat_add.to_comp.comp h_bx h_by
+    have h2 := Primrec.nat_add.to_comp.comp h1 h_bound_αR_at_0
+    have h3 := Primrec.nat_add.to_comp.comp h2 h_bound_βR_at_0
+    exact Primrec.nat_add.to_comp.comp h3 (Computable.const 6)
+  -- iter-12: max over k ∈ Finset.range (d n + 1) of stuff_per_k (n, k), as a ℕ.
+  -- Built by Computable.nat_rec on (d n).succ, step is `max acc (stuff_per_k (n, k))`.
+  let bound_max : ℕ → ℕ := fun n =>
+    Nat.rec 0 (fun k acc => max acc (stuff_per_k (n, k))) ((d n).succ)
+  have h_bound_max : Computable bound_max := by
+    show Computable (fun n : ℕ =>
+      Nat.rec (motive := fun _ => ℕ) 0
+        (fun k acc => max acc (stuff_per_k (n, k))) ((d n).succ))
+    have hf : Computable (fun n : ℕ => (d n).succ) := Computable.succ.comp hd
+    have hh : Computable₂ (fun (n : ℕ) (kacc : ℕ × ℕ) =>
+        max kacc.2 (stuff_per_k (n, kacc.1))) := by
+      show Computable (fun p : ℕ × (ℕ × ℕ) =>
+        max p.2.2 (stuff_per_k (p.1, p.2.1)))
+      have h_n : Computable (fun p : ℕ × (ℕ × ℕ) => p.1) := Computable.fst
+      have h_k : Computable (fun p : ℕ × (ℕ × ℕ) => p.2.1) :=
+        Computable.fst.comp Computable.snd
+      have h_acc : Computable (fun p : ℕ × (ℕ × ℕ) => p.2.2) :=
+        Computable.snd.comp Computable.snd
+      have h_pair_nk : Computable (fun p : ℕ × (ℕ × ℕ) => (p.1, p.2.1)) := h_n.pair h_k
+      have h_stuff : Computable (fun p : ℕ × (ℕ × ℕ) => stuff_per_k (p.1, p.2.1)) :=
+        h_stuff_per_k.comp h_pair_nk
+      exact Primrec.nat_max.to_comp.comp h_acc h_stuff
+    exact Computable.nat_rec hf (Computable.const 0) hh
+  -- iter-06/12: witness skeleton. Precision pad upgraded (iter-12) to incorporate
+  -- bound_max so the norm bound goes through (`M = m + (d n + 1) + bound_max n + 2`).
+  let M : ℕ × ℕ → ℕ := fun nm => nm.2 + (d nm.1 + 1) + bound_max nm.1 + 2
+  -- Degree bound: max over k ∈ range(d n + 1) of max(dX(k, M), dY(k, M)).
+  -- Built by Nat.rec on the upper bound, accumulating max.
+  let dS : ℕ × ℕ → ℕ := fun nm =>
+    Nat.rec 0 (fun k acc => max acc (max (dX (k, M nm)) (dY (k, M nm))))
+      ((d nm.1).succ)
+  -- Padcoeff: zeroes the coefficient past the per-k degree bound.
+  -- Uses `bif decide` rather than `if` to match the form `ite_rat` produces;
+  -- semantically identical to `if ... then ... else 0` since `≤` is decidable on ℕ.
+  let pad_X : ℕ × ℕ → ℕ → ℚ := fun km j =>
+    bif decide (j ≤ dX km) then aX (km.1, km.2, j) else 0
+  let pad_Y : ℕ × ℕ → ℕ → ℚ := fun km j =>
+    bif decide (j ≤ dY km) then aY (km.1, km.2, j) else 0
+  -- Coefficient triple-sequence aS, expressed as a `Finset.sum` over k.
+  -- (Mathematically equivalent to the `Nat.rec` form; `Finset.sum` enables
+  -- direct application of `finsetSum_rat` for the IsComputableSeqRat proof.)
+  let aS : ℕ × ℕ × ℕ → ℚ := fun nmj =>
+    let n := nmj.1; let m := nmj.2.1; let j := nmj.2.2
+    ∑ k ∈ Finset.range (d n + 1),
+      (αR (Nat.pair n k, M (n, m)) * pad_X (k, M (n, m)) j
+       + βR (Nat.pair n k, M (n, m)) * pad_Y (k, M (n, m)) j)
+  -- iter-07: prove `Computable M` and `Computable dS`, then refine ⟨aS, dS, ?_, hd_S, ?_⟩.
+  -- Computability of M.
+  have hM : Computable M := by
+    show Computable (fun nm : ℕ × ℕ => nm.2 + (d nm.1 + 1) + bound_max nm.1 + 2)
+    have h_dnm : Computable (fun nm : ℕ × ℕ => d nm.1) := hd.comp Computable.fst
+    have h_dnm_succ : Computable (fun nm : ℕ × ℕ => d nm.1 + 1) :=
+      Computable.succ.comp h_dnm
+    have h_bm : Computable (fun nm : ℕ × ℕ => bound_max nm.1) :=
+      h_bound_max.comp Computable.fst
+    have h_sum1 : Computable (fun nm : ℕ × ℕ => nm.2 + (d nm.1 + 1)) :=
+      Primrec.nat_add.to_comp.comp Computable.snd h_dnm_succ
+    have h_sum2 : Computable (fun nm : ℕ × ℕ => nm.2 + (d nm.1 + 1) + bound_max nm.1) :=
+      Primrec.nat_add.to_comp.comp h_sum1 h_bm
+    exact Primrec.nat_add.to_comp.comp h_sum2 (Computable.const 2)
+  -- Computability of dS via Computable.nat_rec on (d nm.1).succ.
+  have hd_S : Computable dS := by
+    show Computable (fun nm : ℕ × ℕ =>
+      Nat.rec (motive := fun _ => ℕ) 0
+        (fun k acc => max acc (max (dX (k, M nm)) (dY (k, M nm))))
+        ((d nm.1).succ))
+    have h_step : Computable₂ (fun (nm : ℕ × ℕ) (kacc : ℕ × ℕ) =>
+        max kacc.2 (max (dX (kacc.1, M nm)) (dY (kacc.1, M nm)))) := by
+      show Computable (fun p : (ℕ × ℕ) × (ℕ × ℕ) =>
+        max p.2.2 (max (dX (p.2.1, M p.1)) (dY (p.2.1, M p.1))))
+      have h_M : Computable (fun p : (ℕ × ℕ) × (ℕ × ℕ) => M p.1) :=
+        hM.comp Computable.fst
+      have h_k : Computable (fun p : (ℕ × ℕ) × (ℕ × ℕ) => p.2.1) :=
+        Computable.fst.comp Computable.snd
+      have h_acc : Computable (fun p : (ℕ × ℕ) × (ℕ × ℕ) => p.2.2) :=
+        Computable.snd.comp Computable.snd
+      have h_arg_kM : Computable (fun p : (ℕ × ℕ) × (ℕ × ℕ) => (p.2.1, M p.1)) :=
+        h_k.pair h_M
+      have h_dX_pkM : Computable (fun p : (ℕ × ℕ) × (ℕ × ℕ) => dX (p.2.1, M p.1)) :=
+        hd_X.comp h_arg_kM
+      have h_dY_pkM : Computable (fun p : (ℕ × ℕ) × (ℕ × ℕ) => dY (p.2.1, M p.1)) :=
+        hd_Y.comp h_arg_kM
+      have h_innermax : Computable (fun p : (ℕ × ℕ) × (ℕ × ℕ) =>
+          max (dX (p.2.1, M p.1)) (dY (p.2.1, M p.1))) :=
+        Primrec.nat_max.to_comp.comp h_dX_pkM h_dY_pkM
+      exact Primrec.nat_max.to_comp.comp h_acc h_innermax
+    exact Computable.nat_rec
+      (Computable.succ.comp (hd.comp Computable.fst))
+      (Computable.const (0 : ℕ)) h_step
+  -- Refine to ⟨aS, dS, ?_, hd_S, ?_⟩; sorry only the remaining norm bound.
+  refine ⟨aS, dS, ?_, hd_S, ?_⟩
+  · -- IsComputableSeqRat (flatten aS).
+    -- Apply `FinsetSumHelper.finsetSum_rat` with:
+    --   `n' outer := d (Nat.unpair outer).1`  (sum upper bound, Computable)
+    --   `r' (outer, k) := αR·pad_X + βR·pad_Y` with all indices decoded from outer.
+    -- Decoding helpers (Computable functions of p : ℕ).
+    have h_outer : Computable (fun p : ℕ => (Nat.unpair p).1) :=
+      Computable.fst.comp Computable.unpair
+    have h_k : Computable (fun p : ℕ => (Nat.unpair p).2) :=
+      Computable.snd.comp Computable.unpair
+    have h_n : Computable (fun p : ℕ => (Nat.unpair (Nat.unpair p).1).1) :=
+      Computable.fst.comp (Computable.unpair.comp h_outer)
+    have h_outer2 : Computable (fun p : ℕ => (Nat.unpair (Nat.unpair p).1).2) :=
+      Computable.snd.comp (Computable.unpair.comp h_outer)
+    have h_m : Computable (fun p : ℕ => (Nat.unpair (Nat.unpair (Nat.unpair p).1).2).1) :=
+      Computable.fst.comp (Computable.unpair.comp h_outer2)
+    have h_j : Computable (fun p : ℕ => (Nat.unpair (Nat.unpair (Nat.unpair p).1).2).2) :=
+      Computable.snd.comp (Computable.unpair.comp h_outer2)
+    -- Indexers for the closures.
+    have h_pair_nk : Computable (fun p : ℕ =>
+        Nat.pair ((Nat.unpair (Nat.unpair p).1).1) ((Nat.unpair p).2)) :=
+      Primrec₂.natPair.to_comp.comp h_n h_k
+    have h_M_nm : Computable (fun p : ℕ => M ((Nat.unpair (Nat.unpair p).1).1,
+        (Nat.unpair (Nat.unpair (Nat.unpair p).1).2).1)) :=
+      hM.comp (h_n.pair h_m)
+    have h_dX_km : Computable (fun p : ℕ => dX ((Nat.unpair p).2,
+        M ((Nat.unpair (Nat.unpair p).1).1,
+           (Nat.unpair (Nat.unpair (Nat.unpair p).1).2).1))) :=
+      hd_X.comp (h_k.pair h_M_nm)
+    have h_dY_km : Computable (fun p : ℕ => dY ((Nat.unpair p).2,
+        M ((Nat.unpair (Nat.unpair p).1).1,
+           (Nat.unpair (Nat.unpair (Nat.unpair p).1).2).1))) :=
+      hd_Y.comp (h_k.pair h_M_nm)
+    -- αR-term and βR-term via doubleApply.
+    have h_αR_term : IsComputableSeqRat (fun p : ℕ =>
+        αR (Nat.pair ((Nat.unpair (Nat.unpair p).1).1) ((Nat.unpair p).2),
+            M ((Nat.unpair (Nat.unpair p).1).1,
+               (Nat.unpair (Nat.unpair (Nat.unpair p).1).2).1))) :=
+      FinsetSumHelper.isComputableSeqRat_doubleApply hflat_αR h_pair_nk h_M_nm
+    have h_βR_term : IsComputableSeqRat (fun p : ℕ =>
+        βR (Nat.pair ((Nat.unpair (Nat.unpair p).1).1) ((Nat.unpair p).2),
+            M ((Nat.unpair (Nat.unpair p).1).1,
+               (Nat.unpair (Nat.unpair (Nat.unpair p).1).2).1))) :=
+      FinsetSumHelper.isComputableSeqRat_doubleApply hflat_βR h_pair_nk h_M_nm
+    -- aX (k, M, j) and aY (k, M, j) via tripleApply.
+    have h_aX_kMj : IsComputableSeqRat (fun p : ℕ =>
+        aX ((Nat.unpair p).2,
+            M ((Nat.unpair (Nat.unpair p).1).1,
+               (Nat.unpair (Nat.unpair (Nat.unpair p).1).2).1),
+            (Nat.unpair (Nat.unpair (Nat.unpair p).1).2).2)) :=
+      FinsetSumHelper.isComputableSeqRat_tripleApply hflat_X h_k h_M_nm h_j
+    have h_aY_kMj : IsComputableSeqRat (fun p : ℕ =>
+        aY ((Nat.unpair p).2,
+            M ((Nat.unpair (Nat.unpair p).1).1,
+               (Nat.unpair (Nat.unpair (Nat.unpair p).1).2).1),
+            (Nat.unpair (Nat.unpair (Nat.unpair p).1).2).2)) :=
+      FinsetSumHelper.isComputableSeqRat_tripleApply hflat_Y h_k h_M_nm h_j
+    -- Conditions for ite_rat.
+    have h_cond_X : Computable (fun p : ℕ =>
+        decide ((Nat.unpair (Nat.unpair (Nat.unpair p).1).2).2 ≤
+          dX ((Nat.unpair p).2,
+              M ((Nat.unpair (Nat.unpair p).1).1,
+                 (Nat.unpair (Nat.unpair (Nat.unpair p).1).2).1)))) := by
+      have h_le : Primrec₂ (fun a b : ℕ => decide (a ≤ b)) := Primrec.nat_le.decide
+      exact h_le.to_comp.comp h_j h_dX_km
+    have h_cond_Y : Computable (fun p : ℕ =>
+        decide ((Nat.unpair (Nat.unpair (Nat.unpair p).1).2).2 ≤
+          dY ((Nat.unpair p).2,
+              M ((Nat.unpair (Nat.unpair p).1).1,
+                 (Nat.unpair (Nat.unpair (Nat.unpair p).1).2).1)))) := by
+      have h_le : Primrec₂ (fun a b : ℕ => decide (a ≤ b)) := Primrec.nat_le.decide
+      exact h_le.to_comp.comp h_j h_dY_km
+    -- pad_X and pad_Y as IsComputableSeqRat via ite_rat.
+    have h_pad_X_seq : IsComputableSeqRat (fun p : ℕ =>
+        pad_X ((Nat.unpair p).2,
+               M ((Nat.unpair (Nat.unpair p).1).1,
+                  (Nat.unpair (Nat.unpair (Nat.unpair p).1).2).1))
+              (Nat.unpair (Nat.unpair (Nat.unpair p).1).2).2) :=
+      FinsetSumHelper.ite_rat h_aX_kMj (isComputableSeqRat_const 0) h_cond_X
+    have h_pad_Y_seq : IsComputableSeqRat (fun p : ℕ =>
+        pad_Y ((Nat.unpair p).2,
+               M ((Nat.unpair (Nat.unpair p).1).1,
+                  (Nat.unpair (Nat.unpair (Nat.unpair p).1).2).1))
+              (Nat.unpair (Nat.unpair (Nat.unpair p).1).2).2) :=
+      FinsetSumHelper.ite_rat h_aY_kMj (isComputableSeqRat_const 0) h_cond_Y
+    -- αR · pad_X and βR · pad_Y via .mul.
+    have h_αR_padX := h_αR_term.mul h_pad_X_seq
+    have h_βR_padY := h_βR_term.mul h_pad_Y_seq
+    -- Sum via .add.
+    have h_r_flat := h_αR_padX.add h_βR_padY
+    -- Computable upper bound for finsetSum_rat.
+    have hn' : Computable (fun outer : ℕ => d (Nat.unpair outer).1) :=
+      hd.comp (Computable.fst.comp Computable.unpair)
+    -- Cast h_r_flat (which has function-level + / *) into IsComputableDoubleSeqRat r'
+    -- for an explicit r'. The cast is defeq modulo Pi.add_apply / Pi.mul_apply + beta.
+    have hr' : IsComputableDoubleSeqRat (fun pair : ℕ × ℕ =>
+        αR (Nat.pair (Nat.unpair pair.1).1 pair.2,
+            M ((Nat.unpair pair.1).1, (Nat.unpair (Nat.unpair pair.1).2).1)) *
+        pad_X (pair.2, M ((Nat.unpair pair.1).1,
+                           (Nat.unpair (Nat.unpair pair.1).2).1))
+              (Nat.unpair (Nat.unpair pair.1).2).2 +
+        βR (Nat.pair (Nat.unpair pair.1).1 pair.2,
+            M ((Nat.unpair pair.1).1, (Nat.unpair (Nat.unpair pair.1).2).1)) *
+        pad_Y (pair.2, M ((Nat.unpair pair.1).1,
+                           (Nat.unpair (Nat.unpair pair.1).2).1))
+              (Nat.unpair (Nat.unpair pair.1).2).2) := by
+      show IsComputableSeqRat _
+      convert h_r_flat using 1
+    -- Construct the witness.
+    exact FinsetSumHelper.finsetSum_rat hr' hn'
+  · -- iter-14+: norm bound `‖s n - polyApproxCMap aS dS n m‖ ≤ 1/2^m`
+    -- Strategy (full proof deferred to follow-up round `l4-cmap-axiom-linearity-bound`;
+    -- see `claims/l4-cmap-axiom-linearity/axiom_linearity.md` for the 6-step outline):
+    --   1. Reduce ContinuousMap-norm to pointwise: `‖f - g‖ ≤ ε ↔ ∀ x, |f x - g x| ≤ ε`
+    --      (Mathlib: `ContinuousMap.norm_le_iff` for nonempty compact domain, or
+    --      `BoundedContinuousFunction.norm_le_iff` after isometric embedding).
+    --   2. Polynomial-expansion identity: `polyApproxCMap aS dS n m (x_*) =
+    --      Σ_k (αR · polyApproxCMap aX dX k M(n,m) + βR · polyApproxCMap aY dY k M(n,m))(x_*)`
+    --      via `Finset.sum_comm` + the padcoeff identity
+    --      (Σ_{j ≤ dS} pad_X = polyApprox aX dX k M).
+    --   3. Triangle inequality on `Σ_k (coefα·x_k - αR·polyApprox aX dX k M)`.
+    --   4. Per-k summand bound via `hbnd_αR`, `hbnd_X`, `bound_x_k`, `bound_αR_at_0`,
+    --      and `hα_le`, `hβ_le` to bound `‖x_k‖_∞ ≤ bound_x_k k`.
+    --   5. Σ_k bound by `(d n + 1) · bound_max(n)`.
+    --   6. Close: `2^M ≥ 4 · (d n + 1) · bound_max(n)` by M's formula.
+    --
+    intro n m
+    refine (ContinuousMap.norm_le _ (by positivity)).mpr (fun w => ?_)
+    rw [Real.norm_eq_abs]
+    -- Step 2 prep: each summand degree dX k, dY k at precision M(n,m) is ≤ dS(n,m).
+    have hge_dS : ∀ k, k ≤ d n →
+        dX (k, M (n, m)) ≤ dS (n, m) ∧ dY (k, M (n, m)) ≤ dS (n, m) := by
+      intro k hk
+      have hrec := le_natRec_max (fun k => max (dX (k, M (n, m))) (dY (k, M (n, m)))) k
+        (d n).succ (Nat.lt_succ_of_le hk)
+      exact ⟨le_trans (le_max_left _ _) hrec, le_trans (le_max_right _ _) hrec⟩
+    -- Step 2: polynomial-expansion identity for the approximant value at w.
+    have hPval : (polyApproxCMap aS dS n m) w =
+        ∑ k ∈ Finset.range (d n + 1),
+          ((αR (Nat.pair n k, M (n, m)) : ℝ) * (polyApproxCMap aX dX k (M (n, m))) w
+            + (βR (Nat.pair n k, M (n, m)) : ℝ) * (polyApproxCMap aY dY k (M (n, m))) w) := by
+      rw [polyApproxCMap_eval]
+      exact polyApproxCMap_conv_eval aX aY dX dY αR βR n (M (n, m)) (d n) (dS (n, m)) hge_dS w
+    -- LHS combination value at w.
+    have hsval : (∑ k ∈ Finset.range (d n + 1),
+          (coefα (n, k) • x k + coefβ (n, k) • y k)) w
+        = ∑ k ∈ Finset.range (d n + 1),
+            (coefα (n, k) * (x k) w + coefβ (n, k) * (y k) w) := by
+      simp only [ContinuousMap.coe_sum, Finset.sum_apply, ContinuousMap.add_apply,
+        ContinuousMap.smul_apply, smul_eq_mul]
+    -- Step 3: combine into a single sum of per-k differences (avoids applying the
+    -- ContinuousMap subtraction to `w` directly, which left the term at metavar type).
+    rw [ContinuousMap.sub_apply, hsval, hPval, ← Finset.sum_sub_distrib]
+    -- Step 5 prep: each `stuff_per_k (n, k)` is dominated by `bound_max n`.
+    have hstuff_le : ∀ k ∈ Finset.range (d n + 1),
+        (stuff_per_k (n, k) : ℝ) ≤ (bound_max n : ℝ) := by
+      intro k hk
+      have hrec := le_natRec_max (fun k => stuff_per_k (n, k)) k (d n).succ
+        (Finset.mem_range.mp hk)
+      exact_mod_cast hrec
+    -- Step 4: per-k summand bound `|F_k - G_k| ≤ 2^{-M(n,m)} · stuff_per_k (n, k)`.
+    have hperk : ∀ k ∈ Finset.range (d n + 1),
+        |(coefα (n, k) * (x k) w + coefβ (n, k) * (y k) w)
+          - ((αR (Nat.pair n k, M (n, m)) : ℝ) * (polyApproxCMap aX dX k (M (n, m))) w
+              + (βR (Nat.pair n k, M (n, m)) : ℝ) * (polyApproxCMap aY dY k (M (n, m))) w)|
+          ≤ (1 / 2 ^ (M (n, m))) * (stuff_per_k (n, k) : ℝ) := by
+      intro k hk
+      have hεpos : (0 : ℝ) ≤ 1 / 2 ^ (M (n, m)) := by positivity
+      have hone_le : (1 : ℝ) / 2 ^ (M (n, m)) ≤ 1 := by
+        rw [div_le_one (by positivity)]; exact one_le_pow₀ (by norm_num)
+      -- ε-closeness of the X-coefficient and X-approximant (orientation as `perk_bound` wants).
+      have hclose_X : |(x k) w - (polyApproxCMap aX dX k (M (n, m))) w|
+          ≤ 1 / 2 ^ (M (n, m)) := by
+        have h := (x k - polyApproxCMap aX dX k (M (n, m))).norm_coe_le_norm w
+        rw [ContinuousMap.sub_apply, Real.norm_eq_abs] at h
+        exact le_trans h (hbnd_X k (M (n, m)))
+      have hαr_close : |(αR (Nat.pair n k, M (n, m)) : ℝ) - coefα (n, k)|
+          ≤ 1 / 2 ^ (M (n, m)) := by
+        have h := hbnd_αR (Nat.pair n k) (M (n, m)); simpa only [Nat.unpair_pair] using h
+      -- |coefα| bound via the precision-0 rational approximant.
+      have hcα_bd : |coefα (n, k)| ≤ (↑(bound_αR_at_0 (n, k)) : ℝ) + 1 := by
+        have heq := h_αR_eq (Nat.pair (Nat.pair n k) 0)
+        simp only [Nat.unpair_pair] at heq
+        have habs : |(αR (Nat.pair n k, 0) : ℝ)| ≤ (↑(bound_αR_at_0 (n, k)) : ℝ) := by
+          rw [heq]
+          exact_mod_cast abs_cast_neg_one_pow_div_le (αR_a (Nat.pair (Nat.pair n k) 0))
+            (αR_b (Nat.pair (Nat.pair n k) 0)) (αR_s (Nat.pair (Nat.pair n k) 0))
+            (h_αR_bne (Nat.pair (Nat.pair n k) 0))
+        have hclose0 := hbnd_αR (Nat.pair n k) 0
+        simp only [Nat.unpair_pair, pow_zero, div_one] at hclose0
+        have h1 := abs_sub_abs_le_abs_sub (coefα (n, k)) ((αR (Nat.pair n k, 0) : ℝ))
+        rw [abs_sub_comm (coefα (n, k)) ((αR (Nat.pair n k, 0) : ℝ))] at h1
+        linarith [h1, habs, hclose0]
+      -- |polyApproxCMap aX dX k M(n,m)|_w bound:
+      -- precision-M ≤ ‖x k‖+1 ≤ ‖poly_0‖+2 ≤ bound_x_k+2.
+      have hpXk_bd : |(polyApproxCMap aX dX k (M (n, m))) w| ≤ (↑(bound_x_k k) : ℝ) + 2 := by
+        have hpw_le : |(polyApproxCMap aX dX k (M (n, m))) w|
+            ≤ ‖polyApproxCMap (α := α) (β := β) aX dX k (M (n, m))‖ := by
+          have h := (polyApproxCMap aX dX k (M (n, m))).norm_coe_le_norm w
+          rwa [Real.norm_eq_abs] at h
+        have hnorm_M : ‖polyApproxCMap (α := α) (β := β) aX dX k (M (n, m))‖ ≤ ‖x k‖ + 1 := by
+          have hb := hbnd_X k (M (n, m))
+          have hnn := norm_sub_norm_le (polyApproxCMap aX dX k (M (n, m))) (x k)
+          rw [norm_sub_rev] at hnn
+          linarith [hnn, hb, hone_le]
+        have hnorm_xk : ‖x k‖ ≤ ‖polyApproxCMap (α := α) (β := β) aX dX k 0‖ + 1 := by
+          have hb := hbnd_X k 0
+          rw [pow_zero, div_one] at hb
+          have hnn := norm_sub_norm_le (x k) (polyApproxCMap aX dX k 0)
+          linarith [hnn, hb]
+        have hC : ∀ j, |(aX (k, 0, j) : ℝ)| ≤ (↑(bound_aX_at_0 (k, j)) : ℝ) := by
+          intro j
+          have heq := h_aX_eq (Nat.pair k (Nat.pair 0 j))
+          simp only [Nat.unpair_pair] at heq
+          rw [heq]
+          exact_mod_cast abs_cast_neg_one_pow_div_le (aX_a (Nat.pair k (Nat.pair 0 j)))
+            (aX_b (Nat.pair k (Nat.pair 0 j))) (aX_s (Nat.pair k (Nat.pair 0 j)))
+            (h_aX_bne (Nat.pair k (Nat.pair 0 j)))
+        have hbx : bound_x_k k
+            = 1 + ∑ j ∈ Finset.range (dX (k, 0) + 1), bound_aX_at_0 (k, j) * B ^ j := by
+          show Nat.rec 1 (fun j acc => acc + bound_aX_at_0 (k, j) * B ^ j) ((dX (k, 0)).succ)
+              = 1 + ∑ j ∈ Finset.range (dX (k, 0) + 1), bound_aX_at_0 (k, j) * B ^ j
+          exact natRec_add_eq_sum 1 (fun j => bound_aX_at_0 (k, j) * B ^ j) ((dX (k, 0)).succ)
+        have hnorm_p0 : ‖polyApproxCMap (α := α) (β := β) aX dX k 0‖ ≤ (↑(bound_x_k k) : ℝ) := by
+          have hmain : ‖polyApproxCMap (α := α) (β := β) aX dX k 0‖
+              ≤ ∑ j ∈ Finset.range (dX (k, 0) + 1),
+                  (↑(bound_aX_at_0 (k, j)) : ℝ) * (B : ℝ) ^ j :=
+            polyApproxCMap_norm_le_sum aX dX k 0 B hα_le hβ_le
+              (fun j => (↑(bound_aX_at_0 (k, j)) : ℝ)) (fun _ => by positivity) hC
+          have hcast : (↑(bound_x_k k) : ℝ)
+              = 1 + ∑ j ∈ Finset.range (dX (k, 0) + 1),
+                  (↑(bound_aX_at_0 (k, j)) : ℝ) * (B : ℝ) ^ j := by
+            rw [hbx]; push_cast; ring
+          rw [hcast]; linarith [hmain]
+        calc |(polyApproxCMap aX dX k (M (n, m))) w|
+            ≤ ‖polyApproxCMap (α := α) (β := β) aX dX k (M (n, m))‖ := hpw_le
+          _ ≤ ‖x k‖ + 1 := hnorm_M
+          _ ≤ (‖polyApproxCMap (α := α) (β := β) aX dX k 0‖ + 1) + 1 := by linarith [hnorm_xk]
+          _ ≤ ((↑(bound_x_k k) : ℝ) + 1) + 1 := by linarith [hnorm_p0]
+          _ = (↑(bound_x_k k) : ℝ) + 2 := by ring
+      -- Y-side mirror of the four X-side bounds.
+      have hclose_Y : |(y k) w - (polyApproxCMap aY dY k (M (n, m))) w|
+          ≤ 1 / 2 ^ (M (n, m)) := by
+        have h := (y k - polyApproxCMap aY dY k (M (n, m))).norm_coe_le_norm w
+        rw [ContinuousMap.sub_apply, Real.norm_eq_abs] at h
+        exact le_trans h (hbnd_Y k (M (n, m)))
+      have hβr_close : |(βR (Nat.pair n k, M (n, m)) : ℝ) - coefβ (n, k)|
+          ≤ 1 / 2 ^ (M (n, m)) := by
+        have h := hbnd_βR (Nat.pair n k) (M (n, m)); simpa only [Nat.unpair_pair] using h
+      have hcβ_bd : |coefβ (n, k)| ≤ (↑(bound_βR_at_0 (n, k)) : ℝ) + 1 := by
+        have heq := h_βR_eq (Nat.pair (Nat.pair n k) 0)
+        simp only [Nat.unpair_pair] at heq
+        have habs : |(βR (Nat.pair n k, 0) : ℝ)| ≤ (↑(bound_βR_at_0 (n, k)) : ℝ) := by
+          rw [heq]
+          exact_mod_cast abs_cast_neg_one_pow_div_le (βR_a (Nat.pair (Nat.pair n k) 0))
+            (βR_b (Nat.pair (Nat.pair n k) 0)) (βR_s (Nat.pair (Nat.pair n k) 0))
+            (h_βR_bne (Nat.pair (Nat.pair n k) 0))
+        have hclose0 := hbnd_βR (Nat.pair n k) 0
+        simp only [Nat.unpair_pair, pow_zero, div_one] at hclose0
+        have h1 := abs_sub_abs_le_abs_sub (coefβ (n, k)) ((βR (Nat.pair n k, 0) : ℝ))
+        rw [abs_sub_comm (coefβ (n, k)) ((βR (Nat.pair n k, 0) : ℝ))] at h1
+        linarith [h1, habs, hclose0]
+      have hpYk_bd : |(polyApproxCMap aY dY k (M (n, m))) w| ≤ (↑(bound_y_k k) : ℝ) + 2 := by
+        have hpw_le : |(polyApproxCMap aY dY k (M (n, m))) w|
+            ≤ ‖polyApproxCMap (α := α) (β := β) aY dY k (M (n, m))‖ := by
+          have h := (polyApproxCMap aY dY k (M (n, m))).norm_coe_le_norm w
+          rwa [Real.norm_eq_abs] at h
+        have hnorm_M : ‖polyApproxCMap (α := α) (β := β) aY dY k (M (n, m))‖ ≤ ‖y k‖ + 1 := by
+          have hb := hbnd_Y k (M (n, m))
+          have hnn := norm_sub_norm_le (polyApproxCMap aY dY k (M (n, m))) (y k)
+          rw [norm_sub_rev] at hnn
+          linarith [hnn, hb, hone_le]
+        have hnorm_yk : ‖y k‖ ≤ ‖polyApproxCMap (α := α) (β := β) aY dY k 0‖ + 1 := by
+          have hb := hbnd_Y k 0
+          rw [pow_zero, div_one] at hb
+          have hnn := norm_sub_norm_le (y k) (polyApproxCMap aY dY k 0)
+          linarith [hnn, hb]
+        have hC : ∀ j, |(aY (k, 0, j) : ℝ)| ≤ (↑(bound_aY_at_0 (k, j)) : ℝ) := by
+          intro j
+          have heq := h_aY_eq (Nat.pair k (Nat.pair 0 j))
+          simp only [Nat.unpair_pair] at heq
+          rw [heq]
+          exact_mod_cast abs_cast_neg_one_pow_div_le (aY_a (Nat.pair k (Nat.pair 0 j)))
+            (aY_b (Nat.pair k (Nat.pair 0 j))) (aY_s (Nat.pair k (Nat.pair 0 j)))
+            (h_aY_bne (Nat.pair k (Nat.pair 0 j)))
+        have hby : bound_y_k k
+            = 1 + ∑ j ∈ Finset.range (dY (k, 0) + 1), bound_aY_at_0 (k, j) * B ^ j := by
+          show Nat.rec 1 (fun j acc => acc + bound_aY_at_0 (k, j) * B ^ j) ((dY (k, 0)).succ)
+              = 1 + ∑ j ∈ Finset.range (dY (k, 0) + 1), bound_aY_at_0 (k, j) * B ^ j
+          exact natRec_add_eq_sum 1 (fun j => bound_aY_at_0 (k, j) * B ^ j) ((dY (k, 0)).succ)
+        have hnorm_p0 : ‖polyApproxCMap (α := α) (β := β) aY dY k 0‖ ≤ (↑(bound_y_k k) : ℝ) := by
+          have hmain : ‖polyApproxCMap (α := α) (β := β) aY dY k 0‖
+              ≤ ∑ j ∈ Finset.range (dY (k, 0) + 1),
+                  (↑(bound_aY_at_0 (k, j)) : ℝ) * (B : ℝ) ^ j :=
+            polyApproxCMap_norm_le_sum aY dY k 0 B hα_le hβ_le
+              (fun j => (↑(bound_aY_at_0 (k, j)) : ℝ)) (fun _ => by positivity) hC
+          have hcast : (↑(bound_y_k k) : ℝ)
+              = 1 + ∑ j ∈ Finset.range (dY (k, 0) + 1),
+                  (↑(bound_aY_at_0 (k, j)) : ℝ) * (B : ℝ) ^ j := by
+            rw [hby]; push_cast; ring
+          rw [hcast]; linarith [hmain]
+        calc |(polyApproxCMap aY dY k (M (n, m))) w|
+            ≤ ‖polyApproxCMap (α := α) (β := β) aY dY k (M (n, m))‖ := hpw_le
+          _ ≤ ‖y k‖ + 1 := hnorm_M
+          _ ≤ (‖polyApproxCMap (α := α) (β := β) aY dY k 0‖ + 1) + 1 := by linarith [hnorm_yk]
+          _ ≤ ((↑(bound_y_k k) : ℝ) + 1) + 1 := by linarith [hnorm_p0]
+          _ = (↑(bound_y_k k) : ℝ) + 2 := by ring
+      -- Per-k product bounds via `perk_bound`, for X and Y.
+      have hX := perk_bound (coefα (n, k)) ((x k) w)
+        ((αR (Nat.pair n k, M (n, m)) : ℝ)) ((polyApproxCMap aX dX k (M (n, m))) w)
+        (1 / 2 ^ (M (n, m))) ((↑(bound_αR_at_0 (n, k)) : ℝ) + 1) ((↑(bound_x_k k) : ℝ) + 2)
+        hεpos (by positivity) hclose_X hαr_close hcα_bd hpXk_bd
+      have hY := perk_bound (coefβ (n, k)) ((y k) w)
+        ((βR (Nat.pair n k, M (n, m)) : ℝ)) ((polyApproxCMap aY dY k (M (n, m))) w)
+        (1 / 2 ^ (M (n, m))) ((↑(bound_βR_at_0 (n, k)) : ℝ) + 1) ((↑(bound_y_k k) : ℝ) + 2)
+        hεpos (by positivity) hclose_Y hβr_close hcβ_bd hpYk_bd
+      have hstuff_cast : (stuff_per_k (n, k) : ℝ)
+          = (↑(bound_x_k k) : ℝ) + ↑(bound_y_k k) + ↑(bound_αR_at_0 (n, k))
+            + ↑(bound_βR_at_0 (n, k)) + 6 := by
+        show ((bound_x_k k + bound_y_k k + bound_αR_at_0 (n, k) + bound_βR_at_0 (n, k) + 6 : ℕ)
+            : ℝ) = (↑(bound_x_k k) : ℝ) + ↑(bound_y_k k) + ↑(bound_αR_at_0 (n, k))
+              + ↑(bound_βR_at_0 (n, k)) + 6
+        push_cast; ring
+      calc |(coefα (n, k) * (x k) w + coefβ (n, k) * (y k) w)
+              - ((αR (Nat.pair n k, M (n, m)) : ℝ) * (polyApproxCMap aX dX k (M (n, m))) w
+                  + (βR (Nat.pair n k, M (n, m)) : ℝ) * (polyApproxCMap aY dY k (M (n, m))) w)|
+          = |(coefα (n, k) * (x k) w
+                - (αR (Nat.pair n k, M (n, m)) : ℝ) * (polyApproxCMap aX dX k (M (n, m))) w)
+              + (coefβ (n, k) * (y k) w
+                - (βR (Nat.pair n k, M (n, m)) : ℝ)
+                  * (polyApproxCMap aY dY k (M (n, m))) w)| := by
+            congr 1; ring
+        _ ≤ |coefα (n, k) * (x k) w
+                - (αR (Nat.pair n k, M (n, m)) : ℝ) * (polyApproxCMap aX dX k (M (n, m))) w|
+            + |coefβ (n, k) * (y k) w
+                - (βR (Nat.pair n k, M (n, m)) : ℝ) * (polyApproxCMap aY dY k (M (n, m))) w| :=
+            abs_add_le _ _
+        _ ≤ (1 / 2 ^ (M (n, m)))
+              * (((↑(bound_αR_at_0 (n, k)) : ℝ) + 1) + ((↑(bound_x_k k) : ℝ) + 2))
+            + (1 / 2 ^ (M (n, m)))
+              * (((↑(bound_βR_at_0 (n, k)) : ℝ) + 1) + ((↑(bound_y_k k) : ℝ) + 2)) :=
+            add_le_add hX hY
+        _ = (1 / 2 ^ (M (n, m))) * (stuff_per_k (n, k) : ℝ) := by
+            rw [hstuff_cast]; ring
+    -- Final assembly: triangle ⇒ Σ-bound ⇒ close-out by M's formula.
+    calc |∑ k ∈ Finset.range (d n + 1),
+            ((coefα (n, k) * (x k) w + coefβ (n, k) * (y k) w)
+              - ((αR (Nat.pair n k, M (n, m)) : ℝ) * (polyApproxCMap aX dX k (M (n, m))) w
+                  + (βR (Nat.pair n k, M (n, m)) : ℝ) * (polyApproxCMap aY dY k (M (n, m))) w))|
+        ≤ ∑ k ∈ Finset.range (d n + 1),
+            |(coefα (n, k) * (x k) w + coefβ (n, k) * (y k) w)
+              - ((αR (Nat.pair n k, M (n, m)) : ℝ) * (polyApproxCMap aX dX k (M (n, m))) w
+                  + (βR (Nat.pair n k, M (n, m)) : ℝ) * (polyApproxCMap aY dY k (M (n, m))) w)| :=
+          Finset.abs_sum_le_sum_abs _ _
+      _ ≤ ∑ k ∈ Finset.range (d n + 1), (1 / 2 ^ (M (n, m))) * (stuff_per_k (n, k) : ℝ) :=
+          Finset.sum_le_sum hperk
+      _ = (1 / 2 ^ (M (n, m))) * ∑ k ∈ Finset.range (d n + 1), (stuff_per_k (n, k) : ℝ) := by
+          rw [Finset.mul_sum]
+      _ ≤ (1 / 2 ^ (M (n, m))) * ((d n + 1 : ℝ) * (bound_max n : ℝ)) := by
+          apply mul_le_mul_of_nonneg_left _ (by positivity)
+          calc ∑ k ∈ Finset.range (d n + 1), (stuff_per_k (n, k) : ℝ)
+              ≤ ∑ k ∈ Finset.range (d n + 1), (bound_max n : ℝ) := Finset.sum_le_sum hstuff_le
+            _ = (d n + 1 : ℝ) * (bound_max n : ℝ) := by
+                rw [Finset.sum_const, Finset.card_range, nsmul_eq_mul]; push_cast; ring
+      _ ≤ 1 / 2 ^ m := by
+          have hmpos : (0 : ℝ) < 2 ^ m := by positivity
+          have hMpos : (0 : ℝ) < 2 ^ (M (n, m)) := by positivity
+          rw [le_div_iff₀ hmpos, one_div_mul_eq_div, div_mul_eq_mul_div, div_le_one hMpos]
+          have hMunfold : (2 : ℝ) ^ (M (n, m)) = 2 ^ (m + (d n + 1) + bound_max n + 2) := rfl
+          rw [hMunfold]
+          have hkey := closeout_nat (d n) (bound_max n) m
+          calc (d n + 1 : ℝ) * (bound_max n : ℝ) * 2 ^ m
+              = (((d n + 1) * bound_max n * 2 ^ m : ℕ) : ℝ) := by push_cast; ring
+            _ ≤ ((2 ^ (m + (d n + 1) + bound_max n + 2) : ℕ) : ℝ) := by exact_mod_cast hkey
+            _ = (2 : ℝ) ^ (m + (d n + 1) + bound_max n + 2) := by push_cast; ring
+
 /-- The `ComputabilityStructure ℝ (C(Set.Icc α β, ℝ))` structure, parameterized over an
 explicit rational bound `(B : ℕ)` on `max(|α|, |β|)`.
 
@@ -640,621 +1283,8 @@ ref for "axiom 1 trivial / axiom 2 = Ch. 0 Thm 4 / axiom 3 = Ch. 0 Thm 7":
     (B : ℕ) (hα_le : |α| ≤ (B : ℝ)) (hβ_le : |β| ≤ (B : ℝ)) :
     ComputabilityStructure ℝ (C(Set.Icc α β, ℝ)) where
   IsComputableSeq := IsComputableSeqCMap
-  isComputableSeq_linearCombination := by
-    -- Destructure all 5 hypotheses.
-    intro x y coefα coefβ d hx hy hcoefα hcoefβ hd
-    obtain ⟨aX, dX, hflat_X, hd_X, hbnd_X⟩ := hx
-    obtain ⟨aY, dY, hflat_Y, hd_Y, hbnd_Y⟩ := hy
-    obtain ⟨αR, hflat_αR, hbnd_αR⟩ := hcoefα
-    obtain ⟨βR, hflat_βR, hbnd_βR⟩ := hcoefβ
-    -- iter-10: extract inner recursion-theoretic witnesses for the norm-bound work.
-    -- Each `_a`/`_b`/`_s` is a Computable ℕ → ℕ function; the `_a` components
-    -- serve as ℕ-upper-bounds on `|aX(...)|`, `|αR(...)|` etc. (since for q : ℚ
-    -- with q = (-1)^s · (a/b), |q| ≤ a/b ≤ a when b ≥ 1, treating a, b as reals).
-    -- Re-introduce the outer hypotheses so iter-09's IsComputableSeqRat proof
-    -- still type-checks with the same `hflat_X` etc. names.
-    obtain ⟨aX_a, aX_b, aX_s, h_aX_a, h_aX_b, h_aX_s, h_aX_bne, h_aX_eq⟩ := hflat_X
-    have hflat_X : IsComputableSeqRat (fun m => aX ((Nat.unpair m).1,
-        (Nat.unpair (Nat.unpair m).2).1, (Nat.unpair (Nat.unpair m).2).2)) :=
-      ⟨aX_a, aX_b, aX_s, h_aX_a, h_aX_b, h_aX_s, h_aX_bne, h_aX_eq⟩
-    obtain ⟨aY_a, aY_b, aY_s, h_aY_a, h_aY_b, h_aY_s, h_aY_bne, h_aY_eq⟩ := hflat_Y
-    have hflat_Y : IsComputableSeqRat (fun m => aY ((Nat.unpair m).1,
-        (Nat.unpair (Nat.unpair m).2).1, (Nat.unpair (Nat.unpair m).2).2)) :=
-      ⟨aY_a, aY_b, aY_s, h_aY_a, h_aY_b, h_aY_s, h_aY_bne, h_aY_eq⟩
-    obtain ⟨αR_a, αR_b, αR_s, h_αR_a, h_αR_b, h_αR_s, h_αR_bne, h_αR_eq⟩ := hflat_αR
-    have hflat_αR : IsComputableDoubleSeqRat αR :=
-      ⟨αR_a, αR_b, αR_s, h_αR_a, h_αR_b, h_αR_s, h_αR_bne, h_αR_eq⟩
-    obtain ⟨βR_a, βR_b, βR_s, h_βR_a, h_βR_b, h_βR_s, h_βR_bne, h_βR_eq⟩ := hflat_βR
-    have hflat_βR : IsComputableDoubleSeqRat βR :=
-      ⟨βR_a, βR_b, βR_s, h_βR_a, h_βR_b, h_βR_s, h_βR_bne, h_βR_eq⟩
-    -- iter-11: simple bound helpers via composition of inner-`_a` witnesses
-    -- with `Primrec₂.natPair`. These give Computable ℕ-upper-bounds on
-    -- |aX(k, 0, j)|, |aY(k, 0, j)|, |αR(Nat.pair n k, 0)|, |βR(Nat.pair n k, 0)|.
-    let bound_aX_at_0 : ℕ × ℕ → ℕ := fun kj =>
-      aX_a (Nat.pair kj.1 (Nat.pair 0 kj.2))
-    have h_bound_aX_at_0 : Computable bound_aX_at_0 := by
-      show Computable (fun kj : ℕ × ℕ => aX_a (Nat.pair kj.1 (Nat.pair 0 kj.2)))
-      have h_inner : Computable (fun kj : ℕ × ℕ => Nat.pair 0 kj.2) :=
-        Primrec₂.natPair.to_comp.comp (Computable.const 0) Computable.snd
-      have h_outer : Computable (fun kj : ℕ × ℕ => Nat.pair kj.1 (Nat.pair 0 kj.2)) :=
-        Primrec₂.natPair.to_comp.comp Computable.fst h_inner
-      exact h_aX_a.comp h_outer
-    let bound_aY_at_0 : ℕ × ℕ → ℕ := fun kj =>
-      aY_a (Nat.pair kj.1 (Nat.pair 0 kj.2))
-    have h_bound_aY_at_0 : Computable bound_aY_at_0 := by
-      show Computable (fun kj : ℕ × ℕ => aY_a (Nat.pair kj.1 (Nat.pair 0 kj.2)))
-      have h_inner : Computable (fun kj : ℕ × ℕ => Nat.pair 0 kj.2) :=
-        Primrec₂.natPair.to_comp.comp (Computable.const 0) Computable.snd
-      have h_outer : Computable (fun kj : ℕ × ℕ => Nat.pair kj.1 (Nat.pair 0 kj.2)) :=
-        Primrec₂.natPair.to_comp.comp Computable.fst h_inner
-      exact h_aY_a.comp h_outer
-    let bound_αR_at_0 : ℕ × ℕ → ℕ := fun nk =>
-      αR_a (Nat.pair (Nat.pair nk.1 nk.2) 0)
-    have h_bound_αR_at_0 : Computable bound_αR_at_0 := by
-      show Computable (fun nk : ℕ × ℕ => αR_a (Nat.pair (Nat.pair nk.1 nk.2) 0))
-      have h_pair_nk : Computable (fun nk : ℕ × ℕ => Nat.pair nk.1 nk.2) :=
-        Primrec₂.natPair.to_comp.comp Computable.fst Computable.snd
-      have h_outer : Computable (fun nk : ℕ × ℕ => Nat.pair (Nat.pair nk.1 nk.2) 0) :=
-        Primrec₂.natPair.to_comp.comp h_pair_nk (Computable.const 0)
-      exact h_αR_a.comp h_outer
-    let bound_βR_at_0 : ℕ × ℕ → ℕ := fun nk =>
-      βR_a (Nat.pair (Nat.pair nk.1 nk.2) 0)
-    have h_bound_βR_at_0 : Computable bound_βR_at_0 := by
-      show Computable (fun nk : ℕ × ℕ => βR_a (Nat.pair (Nat.pair nk.1 nk.2) 0))
-      have h_pair_nk : Computable (fun nk : ℕ × ℕ => Nat.pair nk.1 nk.2) :=
-        Primrec₂.natPair.to_comp.comp Computable.fst Computable.snd
-      have h_outer : Computable (fun nk : ℕ × ℕ => Nat.pair (Nat.pair nk.1 nk.2) 0) :=
-        Primrec₂.natPair.to_comp.comp h_pair_nk (Computable.const 0)
-      exact h_βR_a.comp h_outer
-    -- iter-11: B^j as a Computable function of j, via `Computable.nat_rec`.
-    have h_Bpow : Computable (fun j : ℕ => B^j) := by
-      have hh : Computable₂ (fun (_ : ℕ) (yih : ℕ × ℕ) => yih.2 * B) := by
-        show Computable (fun p : ℕ × (ℕ × ℕ) => p.2.2 * B)
-        exact Primrec.nat_mul.to_comp.comp (Computable.snd.comp Computable.snd)
-          (Computable.const B)
-      have h_rec := Computable.nat_rec Computable.id (Computable.const (1 : ℕ)) hh
-      refine h_rec.of_eq fun j => ?_
-      show Nat.rec 1 (fun y IH => (y, IH).2 * B) j = B^j
-      induction j with
-      | zero => rfl
-      | succ j IH =>
-        show Nat.rec 1 (fun y IH' => (y, IH').2 * B) j * B = B^(j + 1)
-        rw [IH, pow_succ]
-    -- iter-11: bound_x_k via `Computable.nat_rec` on `(dX (k, 0)).succ`.
-    -- bound_x_k k := 1 + Σ_j ∈ Finset.range (dX(k, 0) + 1), bound_aX_at_0 (k, j) * B^j.
-    let bound_x_k : ℕ → ℕ := fun k =>
-      Nat.rec 1 (fun j acc => acc + bound_aX_at_0 (k, j) * B^j) ((dX (k, 0)).succ)
-    have h_bound_x_k : Computable bound_x_k := by
-      show Computable (fun k : ℕ =>
-        Nat.rec (motive := fun _ => ℕ) 1
-          (fun j acc => acc + bound_aX_at_0 (k, j) * B^j) ((dX (k, 0)).succ))
-      have hf : Computable (fun k : ℕ => (dX (k, 0)).succ) :=
-        Computable.succ.comp (hd_X.comp (Computable.id.pair (Computable.const 0)))
-      have hh : Computable₂ (fun (k : ℕ) (jacc : ℕ × ℕ) =>
-          jacc.2 + bound_aX_at_0 (k, jacc.1) * B^jacc.1) := by
-        show Computable (fun p : ℕ × (ℕ × ℕ) =>
-            p.2.2 + bound_aX_at_0 (p.1, p.2.1) * B^p.2.1)
-        have h_k : Computable (fun p : ℕ × (ℕ × ℕ) => p.1) := Computable.fst
-        have h_j : Computable (fun p : ℕ × (ℕ × ℕ) => p.2.1) :=
-          Computable.fst.comp Computable.snd
-        have h_acc : Computable (fun p : ℕ × (ℕ × ℕ) => p.2.2) :=
-          Computable.snd.comp Computable.snd
-        have h_pair_kj : Computable (fun p : ℕ × (ℕ × ℕ) => (p.1, p.2.1)) := h_k.pair h_j
-        have h_baX : Computable (fun p : ℕ × (ℕ × ℕ) => bound_aX_at_0 (p.1, p.2.1)) :=
-          h_bound_aX_at_0.comp h_pair_kj
-        have h_Bpow_j : Computable (fun p : ℕ × (ℕ × ℕ) => B^p.2.1) := h_Bpow.comp h_j
-        have h_prod : Computable (fun p : ℕ × (ℕ × ℕ) =>
-            bound_aX_at_0 (p.1, p.2.1) * B^p.2.1) :=
-          Primrec.nat_mul.to_comp.comp h_baX h_Bpow_j
-        exact Primrec.nat_add.to_comp.comp h_acc h_prod
-      exact Computable.nat_rec hf (Computable.const 1) hh
-    -- iter-11: bound_y_k mirrors bound_x_k.
-    let bound_y_k : ℕ → ℕ := fun k =>
-      Nat.rec 1 (fun j acc => acc + bound_aY_at_0 (k, j) * B^j) ((dY (k, 0)).succ)
-    have h_bound_y_k : Computable bound_y_k := by
-      show Computable (fun k : ℕ =>
-        Nat.rec (motive := fun _ => ℕ) 1
-          (fun j acc => acc + bound_aY_at_0 (k, j) * B^j) ((dY (k, 0)).succ))
-      have hf : Computable (fun k : ℕ => (dY (k, 0)).succ) :=
-        Computable.succ.comp (hd_Y.comp (Computable.id.pair (Computable.const 0)))
-      have hh : Computable₂ (fun (k : ℕ) (jacc : ℕ × ℕ) =>
-          jacc.2 + bound_aY_at_0 (k, jacc.1) * B^jacc.1) := by
-        show Computable (fun p : ℕ × (ℕ × ℕ) =>
-            p.2.2 + bound_aY_at_0 (p.1, p.2.1) * B^p.2.1)
-        have h_k : Computable (fun p : ℕ × (ℕ × ℕ) => p.1) := Computable.fst
-        have h_j : Computable (fun p : ℕ × (ℕ × ℕ) => p.2.1) :=
-          Computable.fst.comp Computable.snd
-        have h_acc : Computable (fun p : ℕ × (ℕ × ℕ) => p.2.2) :=
-          Computable.snd.comp Computable.snd
-        have h_pair_kj : Computable (fun p : ℕ × (ℕ × ℕ) => (p.1, p.2.1)) := h_k.pair h_j
-        have h_baY : Computable (fun p : ℕ × (ℕ × ℕ) => bound_aY_at_0 (p.1, p.2.1)) :=
-          h_bound_aY_at_0.comp h_pair_kj
-        have h_Bpow_j : Computable (fun p : ℕ × (ℕ × ℕ) => B^p.2.1) := h_Bpow.comp h_j
-        have h_prod : Computable (fun p : ℕ × (ℕ × ℕ) =>
-            bound_aY_at_0 (p.1, p.2.1) * B^p.2.1) :=
-          Primrec.nat_mul.to_comp.comp h_baY h_Bpow_j
-        exact Primrec.nat_add.to_comp.comp h_acc h_prod
-      exact Computable.nat_rec hf (Computable.const 1) hh
-    -- iter-12: per-k crude rational bound, as a ℕ-upper-bound on
-    -- ‖x_k‖_∞ + ‖y_k‖_∞ + |αR(.., 0)| + |βR(.., 0)| + 6 (the 6 absorbs additive constants).
-    let stuff_per_k : ℕ × ℕ → ℕ := fun nk =>
-      bound_x_k nk.2 + bound_y_k nk.2 + bound_αR_at_0 nk + bound_βR_at_0 nk + 6
-    have h_stuff_per_k : Computable stuff_per_k := by
-      show Computable (fun nk : ℕ × ℕ =>
-        bound_x_k nk.2 + bound_y_k nk.2 + bound_αR_at_0 nk + bound_βR_at_0 nk + 6)
-      have h_bx : Computable (fun nk : ℕ × ℕ => bound_x_k nk.2) :=
-        h_bound_x_k.comp Computable.snd
-      have h_by : Computable (fun nk : ℕ × ℕ => bound_y_k nk.2) :=
-        h_bound_y_k.comp Computable.snd
-      have h1 := Primrec.nat_add.to_comp.comp h_bx h_by
-      have h2 := Primrec.nat_add.to_comp.comp h1 h_bound_αR_at_0
-      have h3 := Primrec.nat_add.to_comp.comp h2 h_bound_βR_at_0
-      exact Primrec.nat_add.to_comp.comp h3 (Computable.const 6)
-    -- iter-12: max over k ∈ Finset.range (d n + 1) of stuff_per_k (n, k), as a ℕ.
-    -- Built by Computable.nat_rec on (d n).succ, step is `max acc (stuff_per_k (n, k))`.
-    let bound_max : ℕ → ℕ := fun n =>
-      Nat.rec 0 (fun k acc => max acc (stuff_per_k (n, k))) ((d n).succ)
-    have h_bound_max : Computable bound_max := by
-      show Computable (fun n : ℕ =>
-        Nat.rec (motive := fun _ => ℕ) 0
-          (fun k acc => max acc (stuff_per_k (n, k))) ((d n).succ))
-      have hf : Computable (fun n : ℕ => (d n).succ) := Computable.succ.comp hd
-      have hh : Computable₂ (fun (n : ℕ) (kacc : ℕ × ℕ) =>
-          max kacc.2 (stuff_per_k (n, kacc.1))) := by
-        show Computable (fun p : ℕ × (ℕ × ℕ) =>
-          max p.2.2 (stuff_per_k (p.1, p.2.1)))
-        have h_n : Computable (fun p : ℕ × (ℕ × ℕ) => p.1) := Computable.fst
-        have h_k : Computable (fun p : ℕ × (ℕ × ℕ) => p.2.1) :=
-          Computable.fst.comp Computable.snd
-        have h_acc : Computable (fun p : ℕ × (ℕ × ℕ) => p.2.2) :=
-          Computable.snd.comp Computable.snd
-        have h_pair_nk : Computable (fun p : ℕ × (ℕ × ℕ) => (p.1, p.2.1)) := h_n.pair h_k
-        have h_stuff : Computable (fun p : ℕ × (ℕ × ℕ) => stuff_per_k (p.1, p.2.1)) :=
-          h_stuff_per_k.comp h_pair_nk
-        exact Primrec.nat_max.to_comp.comp h_acc h_stuff
-      exact Computable.nat_rec hf (Computable.const 0) hh
-    -- iter-06/12: witness skeleton. Precision pad upgraded (iter-12) to incorporate
-    -- bound_max so the norm bound goes through (`M = m + (d n + 1) + bound_max n + 2`).
-    let M : ℕ × ℕ → ℕ := fun nm => nm.2 + (d nm.1 + 1) + bound_max nm.1 + 2
-    -- Degree bound: max over k ∈ range(d n + 1) of max(dX(k, M), dY(k, M)).
-    -- Built by Nat.rec on the upper bound, accumulating max.
-    let dS : ℕ × ℕ → ℕ := fun nm =>
-      Nat.rec 0 (fun k acc => max acc (max (dX (k, M nm)) (dY (k, M nm))))
-        ((d nm.1).succ)
-    -- Padcoeff: zeroes the coefficient past the per-k degree bound.
-    -- Uses `bif decide` rather than `if` to match the form `ite_rat` produces;
-    -- semantically identical to `if ... then ... else 0` since `≤` is decidable on ℕ.
-    let pad_X : ℕ × ℕ → ℕ → ℚ := fun km j =>
-      bif decide (j ≤ dX km) then aX (km.1, km.2, j) else 0
-    let pad_Y : ℕ × ℕ → ℕ → ℚ := fun km j =>
-      bif decide (j ≤ dY km) then aY (km.1, km.2, j) else 0
-    -- Coefficient triple-sequence aS, expressed as a `Finset.sum` over k.
-    -- (Mathematically equivalent to the `Nat.rec` form; `Finset.sum` enables
-    -- direct application of `finsetSum_rat` for the IsComputableSeqRat proof.)
-    let aS : ℕ × ℕ × ℕ → ℚ := fun nmj =>
-      let n := nmj.1; let m := nmj.2.1; let j := nmj.2.2
-      ∑ k ∈ Finset.range (d n + 1),
-        (αR (Nat.pair n k, M (n, m)) * pad_X (k, M (n, m)) j
-         + βR (Nat.pair n k, M (n, m)) * pad_Y (k, M (n, m)) j)
-    -- iter-07: prove `Computable M` and `Computable dS`, then refine ⟨aS, dS, ?_, hd_S, ?_⟩.
-    -- Computability of M.
-    have hM : Computable M := by
-      show Computable (fun nm : ℕ × ℕ => nm.2 + (d nm.1 + 1) + bound_max nm.1 + 2)
-      have h_dnm : Computable (fun nm : ℕ × ℕ => d nm.1) := hd.comp Computable.fst
-      have h_dnm_succ : Computable (fun nm : ℕ × ℕ => d nm.1 + 1) :=
-        Computable.succ.comp h_dnm
-      have h_bm : Computable (fun nm : ℕ × ℕ => bound_max nm.1) :=
-        h_bound_max.comp Computable.fst
-      have h_sum1 : Computable (fun nm : ℕ × ℕ => nm.2 + (d nm.1 + 1)) :=
-        Primrec.nat_add.to_comp.comp Computable.snd h_dnm_succ
-      have h_sum2 : Computable (fun nm : ℕ × ℕ => nm.2 + (d nm.1 + 1) + bound_max nm.1) :=
-        Primrec.nat_add.to_comp.comp h_sum1 h_bm
-      exact Primrec.nat_add.to_comp.comp h_sum2 (Computable.const 2)
-    -- Computability of dS via Computable.nat_rec on (d nm.1).succ.
-    have hd_S : Computable dS := by
-      show Computable (fun nm : ℕ × ℕ =>
-        Nat.rec (motive := fun _ => ℕ) 0
-          (fun k acc => max acc (max (dX (k, M nm)) (dY (k, M nm))))
-          ((d nm.1).succ))
-      have h_step : Computable₂ (fun (nm : ℕ × ℕ) (kacc : ℕ × ℕ) =>
-          max kacc.2 (max (dX (kacc.1, M nm)) (dY (kacc.1, M nm)))) := by
-        show Computable (fun p : (ℕ × ℕ) × (ℕ × ℕ) =>
-          max p.2.2 (max (dX (p.2.1, M p.1)) (dY (p.2.1, M p.1))))
-        have h_M : Computable (fun p : (ℕ × ℕ) × (ℕ × ℕ) => M p.1) :=
-          hM.comp Computable.fst
-        have h_k : Computable (fun p : (ℕ × ℕ) × (ℕ × ℕ) => p.2.1) :=
-          Computable.fst.comp Computable.snd
-        have h_acc : Computable (fun p : (ℕ × ℕ) × (ℕ × ℕ) => p.2.2) :=
-          Computable.snd.comp Computable.snd
-        have h_arg_kM : Computable (fun p : (ℕ × ℕ) × (ℕ × ℕ) => (p.2.1, M p.1)) :=
-          h_k.pair h_M
-        have h_dX_pkM : Computable (fun p : (ℕ × ℕ) × (ℕ × ℕ) => dX (p.2.1, M p.1)) :=
-          hd_X.comp h_arg_kM
-        have h_dY_pkM : Computable (fun p : (ℕ × ℕ) × (ℕ × ℕ) => dY (p.2.1, M p.1)) :=
-          hd_Y.comp h_arg_kM
-        have h_innermax : Computable (fun p : (ℕ × ℕ) × (ℕ × ℕ) =>
-            max (dX (p.2.1, M p.1)) (dY (p.2.1, M p.1))) :=
-          Primrec.nat_max.to_comp.comp h_dX_pkM h_dY_pkM
-        exact Primrec.nat_max.to_comp.comp h_acc h_innermax
-      exact Computable.nat_rec
-        (Computable.succ.comp (hd.comp Computable.fst))
-        (Computable.const (0 : ℕ)) h_step
-    -- Refine to ⟨aS, dS, ?_, hd_S, ?_⟩; sorry only the remaining norm bound.
-    refine ⟨aS, dS, ?_, hd_S, ?_⟩
-    · -- IsComputableSeqRat (flatten aS).
-      -- Apply `FinsetSumHelper.finsetSum_rat` with:
-      --   `n' outer := d (Nat.unpair outer).1`  (sum upper bound, Computable)
-      --   `r' (outer, k) := αR·pad_X + βR·pad_Y` with all indices decoded from outer.
-      -- Decoding helpers (Computable functions of p : ℕ).
-      have h_outer : Computable (fun p : ℕ => (Nat.unpair p).1) :=
-        Computable.fst.comp Computable.unpair
-      have h_k : Computable (fun p : ℕ => (Nat.unpair p).2) :=
-        Computable.snd.comp Computable.unpair
-      have h_n : Computable (fun p : ℕ => (Nat.unpair (Nat.unpair p).1).1) :=
-        Computable.fst.comp (Computable.unpair.comp h_outer)
-      have h_outer2 : Computable (fun p : ℕ => (Nat.unpair (Nat.unpair p).1).2) :=
-        Computable.snd.comp (Computable.unpair.comp h_outer)
-      have h_m : Computable (fun p : ℕ => (Nat.unpair (Nat.unpair (Nat.unpair p).1).2).1) :=
-        Computable.fst.comp (Computable.unpair.comp h_outer2)
-      have h_j : Computable (fun p : ℕ => (Nat.unpair (Nat.unpair (Nat.unpair p).1).2).2) :=
-        Computable.snd.comp (Computable.unpair.comp h_outer2)
-      -- Indexers for the closures.
-      have h_pair_nk : Computable (fun p : ℕ =>
-          Nat.pair ((Nat.unpair (Nat.unpair p).1).1) ((Nat.unpair p).2)) :=
-        Primrec₂.natPair.to_comp.comp h_n h_k
-      have h_M_nm : Computable (fun p : ℕ => M ((Nat.unpair (Nat.unpair p).1).1,
-          (Nat.unpair (Nat.unpair (Nat.unpair p).1).2).1)) :=
-        hM.comp (h_n.pair h_m)
-      have h_dX_km : Computable (fun p : ℕ => dX ((Nat.unpair p).2,
-          M ((Nat.unpair (Nat.unpair p).1).1,
-             (Nat.unpair (Nat.unpair (Nat.unpair p).1).2).1))) :=
-        hd_X.comp (h_k.pair h_M_nm)
-      have h_dY_km : Computable (fun p : ℕ => dY ((Nat.unpair p).2,
-          M ((Nat.unpair (Nat.unpair p).1).1,
-             (Nat.unpair (Nat.unpair (Nat.unpair p).1).2).1))) :=
-        hd_Y.comp (h_k.pair h_M_nm)
-      -- αR-term and βR-term via doubleApply.
-      have h_αR_term : IsComputableSeqRat (fun p : ℕ =>
-          αR (Nat.pair ((Nat.unpair (Nat.unpair p).1).1) ((Nat.unpair p).2),
-              M ((Nat.unpair (Nat.unpair p).1).1,
-                 (Nat.unpair (Nat.unpair (Nat.unpair p).1).2).1))) :=
-        FinsetSumHelper.isComputableSeqRat_doubleApply hflat_αR h_pair_nk h_M_nm
-      have h_βR_term : IsComputableSeqRat (fun p : ℕ =>
-          βR (Nat.pair ((Nat.unpair (Nat.unpair p).1).1) ((Nat.unpair p).2),
-              M ((Nat.unpair (Nat.unpair p).1).1,
-                 (Nat.unpair (Nat.unpair (Nat.unpair p).1).2).1))) :=
-        FinsetSumHelper.isComputableSeqRat_doubleApply hflat_βR h_pair_nk h_M_nm
-      -- aX (k, M, j) and aY (k, M, j) via tripleApply.
-      have h_aX_kMj : IsComputableSeqRat (fun p : ℕ =>
-          aX ((Nat.unpair p).2,
-              M ((Nat.unpair (Nat.unpair p).1).1,
-                 (Nat.unpair (Nat.unpair (Nat.unpair p).1).2).1),
-              (Nat.unpair (Nat.unpair (Nat.unpair p).1).2).2)) :=
-        FinsetSumHelper.isComputableSeqRat_tripleApply hflat_X h_k h_M_nm h_j
-      have h_aY_kMj : IsComputableSeqRat (fun p : ℕ =>
-          aY ((Nat.unpair p).2,
-              M ((Nat.unpair (Nat.unpair p).1).1,
-                 (Nat.unpair (Nat.unpair (Nat.unpair p).1).2).1),
-              (Nat.unpair (Nat.unpair (Nat.unpair p).1).2).2)) :=
-        FinsetSumHelper.isComputableSeqRat_tripleApply hflat_Y h_k h_M_nm h_j
-      -- Conditions for ite_rat.
-      have h_cond_X : Computable (fun p : ℕ =>
-          decide ((Nat.unpair (Nat.unpair (Nat.unpair p).1).2).2 ≤
-            dX ((Nat.unpair p).2,
-                M ((Nat.unpair (Nat.unpair p).1).1,
-                   (Nat.unpair (Nat.unpair (Nat.unpair p).1).2).1)))) := by
-        have h_le : Primrec₂ (fun a b : ℕ => decide (a ≤ b)) := Primrec.nat_le.decide
-        exact h_le.to_comp.comp h_j h_dX_km
-      have h_cond_Y : Computable (fun p : ℕ =>
-          decide ((Nat.unpair (Nat.unpair (Nat.unpair p).1).2).2 ≤
-            dY ((Nat.unpair p).2,
-                M ((Nat.unpair (Nat.unpair p).1).1,
-                   (Nat.unpair (Nat.unpair (Nat.unpair p).1).2).1)))) := by
-        have h_le : Primrec₂ (fun a b : ℕ => decide (a ≤ b)) := Primrec.nat_le.decide
-        exact h_le.to_comp.comp h_j h_dY_km
-      -- pad_X and pad_Y as IsComputableSeqRat via ite_rat.
-      have h_pad_X_seq : IsComputableSeqRat (fun p : ℕ =>
-          pad_X ((Nat.unpair p).2,
-                 M ((Nat.unpair (Nat.unpair p).1).1,
-                    (Nat.unpair (Nat.unpair (Nat.unpair p).1).2).1))
-                (Nat.unpair (Nat.unpair (Nat.unpair p).1).2).2) :=
-        FinsetSumHelper.ite_rat h_aX_kMj (isComputableSeqRat_const 0) h_cond_X
-      have h_pad_Y_seq : IsComputableSeqRat (fun p : ℕ =>
-          pad_Y ((Nat.unpair p).2,
-                 M ((Nat.unpair (Nat.unpair p).1).1,
-                    (Nat.unpair (Nat.unpair (Nat.unpair p).1).2).1))
-                (Nat.unpair (Nat.unpair (Nat.unpair p).1).2).2) :=
-        FinsetSumHelper.ite_rat h_aY_kMj (isComputableSeqRat_const 0) h_cond_Y
-      -- αR · pad_X and βR · pad_Y via .mul.
-      have h_αR_padX := h_αR_term.mul h_pad_X_seq
-      have h_βR_padY := h_βR_term.mul h_pad_Y_seq
-      -- Sum via .add.
-      have h_r_flat := h_αR_padX.add h_βR_padY
-      -- Computable upper bound for finsetSum_rat.
-      have hn' : Computable (fun outer : ℕ => d (Nat.unpair outer).1) :=
-        hd.comp (Computable.fst.comp Computable.unpair)
-      -- Cast h_r_flat (which has function-level + / *) into IsComputableDoubleSeqRat r'
-      -- for an explicit r'. The cast is defeq modulo Pi.add_apply / Pi.mul_apply + beta.
-      have hr' : IsComputableDoubleSeqRat (fun pair : ℕ × ℕ =>
-          αR (Nat.pair (Nat.unpair pair.1).1 pair.2,
-              M ((Nat.unpair pair.1).1, (Nat.unpair (Nat.unpair pair.1).2).1)) *
-          pad_X (pair.2, M ((Nat.unpair pair.1).1,
-                             (Nat.unpair (Nat.unpair pair.1).2).1))
-                (Nat.unpair (Nat.unpair pair.1).2).2 +
-          βR (Nat.pair (Nat.unpair pair.1).1 pair.2,
-              M ((Nat.unpair pair.1).1, (Nat.unpair (Nat.unpair pair.1).2).1)) *
-          pad_Y (pair.2, M ((Nat.unpair pair.1).1,
-                             (Nat.unpair (Nat.unpair pair.1).2).1))
-                (Nat.unpair (Nat.unpair pair.1).2).2) := by
-        show IsComputableSeqRat _
-        convert h_r_flat using 1
-      -- Construct the witness.
-      exact FinsetSumHelper.finsetSum_rat hr' hn'
-    · -- iter-14+: norm bound `‖s n - polyApproxCMap aS dS n m‖ ≤ 1/2^m`
-      -- Strategy (full proof deferred to follow-up round `l4-cmap-axiom-linearity-bound`;
-      -- see `claims/l4-cmap-axiom-linearity/axiom_linearity.md` for the 6-step outline):
-      --   1. Reduce ContinuousMap-norm to pointwise: `‖f - g‖ ≤ ε ↔ ∀ x, |f x - g x| ≤ ε`
-      --      (Mathlib: `ContinuousMap.norm_le_iff` for nonempty compact domain, or
-      --      `BoundedContinuousFunction.norm_le_iff` after isometric embedding).
-      --   2. Polynomial-expansion identity: `polyApproxCMap aS dS n m (x_*) =
-      --      Σ_k (αR · polyApproxCMap aX dX k M(n,m) + βR · polyApproxCMap aY dY k M(n,m))(x_*)`
-      --      via `Finset.sum_comm` + the padcoeff identity
-      --      (Σ_{j ≤ dS} pad_X = polyApprox aX dX k M).
-      --   3. Triangle inequality on `Σ_k (coefα·x_k - αR·polyApprox aX dX k M)`.
-      --   4. Per-k summand bound via `hbnd_αR`, `hbnd_X`, `bound_x_k`, `bound_αR_at_0`,
-      --      and `hα_le`, `hβ_le` to bound `‖x_k‖_∞ ≤ bound_x_k k`.
-      --   5. Σ_k bound by `(d n + 1) · bound_max(n)`.
-      --   6. Close: `2^M ≥ 4 · (d n + 1) · bound_max(n)` by M's formula.
-      --
-      intro n m
-      refine (ContinuousMap.norm_le _ (by positivity)).mpr (fun w => ?_)
-      rw [Real.norm_eq_abs]
-      -- Step 2 prep: each summand degree dX k, dY k at precision M(n,m) is ≤ dS(n,m).
-      have hge_dS : ∀ k, k ≤ d n →
-          dX (k, M (n, m)) ≤ dS (n, m) ∧ dY (k, M (n, m)) ≤ dS (n, m) := by
-        intro k hk
-        have hrec := le_natRec_max (fun k => max (dX (k, M (n, m))) (dY (k, M (n, m)))) k
-          (d n).succ (Nat.lt_succ_of_le hk)
-        exact ⟨le_trans (le_max_left _ _) hrec, le_trans (le_max_right _ _) hrec⟩
-      -- Step 2: polynomial-expansion identity for the approximant value at w.
-      have hPval : (polyApproxCMap aS dS n m) w =
-          ∑ k ∈ Finset.range (d n + 1),
-            ((αR (Nat.pair n k, M (n, m)) : ℝ) * (polyApproxCMap aX dX k (M (n, m))) w
-              + (βR (Nat.pair n k, M (n, m)) : ℝ) * (polyApproxCMap aY dY k (M (n, m))) w) := by
-        rw [polyApproxCMap_eval]
-        exact polyApproxCMap_conv_eval aX aY dX dY αR βR n (M (n, m)) (d n) (dS (n, m)) hge_dS w
-      -- LHS combination value at w.
-      have hsval : (∑ k ∈ Finset.range (d n + 1),
-            (coefα (n, k) • x k + coefβ (n, k) • y k)) w
-          = ∑ k ∈ Finset.range (d n + 1),
-              (coefα (n, k) * (x k) w + coefβ (n, k) * (y k) w) := by
-        simp only [ContinuousMap.coe_sum, Finset.sum_apply, ContinuousMap.add_apply,
-          ContinuousMap.smul_apply, smul_eq_mul]
-      -- Step 3: combine into a single sum of per-k differences (avoids applying the
-      -- ContinuousMap subtraction to `w` directly, which left the term at metavar type).
-      rw [ContinuousMap.sub_apply, hsval, hPval, ← Finset.sum_sub_distrib]
-      -- Step 5 prep: each `stuff_per_k (n, k)` is dominated by `bound_max n`.
-      have hstuff_le : ∀ k ∈ Finset.range (d n + 1),
-          (stuff_per_k (n, k) : ℝ) ≤ (bound_max n : ℝ) := by
-        intro k hk
-        have hrec := le_natRec_max (fun k => stuff_per_k (n, k)) k (d n).succ
-          (Finset.mem_range.mp hk)
-        exact_mod_cast hrec
-      -- Step 4: per-k summand bound `|F_k - G_k| ≤ 2^{-M(n,m)} · stuff_per_k (n, k)`.
-      have hperk : ∀ k ∈ Finset.range (d n + 1),
-          |(coefα (n, k) * (x k) w + coefβ (n, k) * (y k) w)
-            - ((αR (Nat.pair n k, M (n, m)) : ℝ) * (polyApproxCMap aX dX k (M (n, m))) w
-                + (βR (Nat.pair n k, M (n, m)) : ℝ) * (polyApproxCMap aY dY k (M (n, m))) w)|
-            ≤ (1 / 2 ^ (M (n, m))) * (stuff_per_k (n, k) : ℝ) := by
-        intro k hk
-        have hεpos : (0 : ℝ) ≤ 1 / 2 ^ (M (n, m)) := by positivity
-        have hone_le : (1 : ℝ) / 2 ^ (M (n, m)) ≤ 1 := by
-          rw [div_le_one (by positivity)]; exact one_le_pow₀ (by norm_num)
-        -- ε-closeness of the X-coefficient and X-approximant (orientation as `perk_bound` wants).
-        have hclose_X : |(x k) w - (polyApproxCMap aX dX k (M (n, m))) w|
-            ≤ 1 / 2 ^ (M (n, m)) := by
-          have h := (x k - polyApproxCMap aX dX k (M (n, m))).norm_coe_le_norm w
-          rw [ContinuousMap.sub_apply, Real.norm_eq_abs] at h
-          exact le_trans h (hbnd_X k (M (n, m)))
-        have hαr_close : |(αR (Nat.pair n k, M (n, m)) : ℝ) - coefα (n, k)|
-            ≤ 1 / 2 ^ (M (n, m)) := by
-          have h := hbnd_αR (Nat.pair n k) (M (n, m)); simpa only [Nat.unpair_pair] using h
-        -- |coefα| bound via the precision-0 rational approximant.
-        have hcα_bd : |coefα (n, k)| ≤ (↑(bound_αR_at_0 (n, k)) : ℝ) + 1 := by
-          have heq := h_αR_eq (Nat.pair (Nat.pair n k) 0)
-          simp only [Nat.unpair_pair] at heq
-          have habs : |(αR (Nat.pair n k, 0) : ℝ)| ≤ (↑(bound_αR_at_0 (n, k)) : ℝ) := by
-            rw [heq]
-            exact_mod_cast abs_cast_neg_one_pow_div_le (αR_a (Nat.pair (Nat.pair n k) 0))
-              (αR_b (Nat.pair (Nat.pair n k) 0)) (αR_s (Nat.pair (Nat.pair n k) 0))
-              (h_αR_bne (Nat.pair (Nat.pair n k) 0))
-          have hclose0 := hbnd_αR (Nat.pair n k) 0
-          simp only [Nat.unpair_pair, pow_zero, div_one] at hclose0
-          have h1 := abs_sub_abs_le_abs_sub (coefα (n, k)) ((αR (Nat.pair n k, 0) : ℝ))
-          rw [abs_sub_comm (coefα (n, k)) ((αR (Nat.pair n k, 0) : ℝ))] at h1
-          linarith [h1, habs, hclose0]
-        -- |polyApproxCMap aX dX k M(n,m)|_w bound:
-        -- precision-M ≤ ‖x k‖+1 ≤ ‖poly_0‖+2 ≤ bound_x_k+2.
-        have hpXk_bd : |(polyApproxCMap aX dX k (M (n, m))) w| ≤ (↑(bound_x_k k) : ℝ) + 2 := by
-          have hpw_le : |(polyApproxCMap aX dX k (M (n, m))) w|
-              ≤ ‖polyApproxCMap (α := α) (β := β) aX dX k (M (n, m))‖ := by
-            have h := (polyApproxCMap aX dX k (M (n, m))).norm_coe_le_norm w
-            rwa [Real.norm_eq_abs] at h
-          have hnorm_M : ‖polyApproxCMap (α := α) (β := β) aX dX k (M (n, m))‖ ≤ ‖x k‖ + 1 := by
-            have hb := hbnd_X k (M (n, m))
-            have hnn := norm_sub_norm_le (polyApproxCMap aX dX k (M (n, m))) (x k)
-            rw [norm_sub_rev] at hnn
-            linarith [hnn, hb, hone_le]
-          have hnorm_xk : ‖x k‖ ≤ ‖polyApproxCMap (α := α) (β := β) aX dX k 0‖ + 1 := by
-            have hb := hbnd_X k 0
-            rw [pow_zero, div_one] at hb
-            have hnn := norm_sub_norm_le (x k) (polyApproxCMap aX dX k 0)
-            linarith [hnn, hb]
-          have hC : ∀ j, |(aX (k, 0, j) : ℝ)| ≤ (↑(bound_aX_at_0 (k, j)) : ℝ) := by
-            intro j
-            have heq := h_aX_eq (Nat.pair k (Nat.pair 0 j))
-            simp only [Nat.unpair_pair] at heq
-            rw [heq]
-            exact_mod_cast abs_cast_neg_one_pow_div_le (aX_a (Nat.pair k (Nat.pair 0 j)))
-              (aX_b (Nat.pair k (Nat.pair 0 j))) (aX_s (Nat.pair k (Nat.pair 0 j)))
-              (h_aX_bne (Nat.pair k (Nat.pair 0 j)))
-          have hbx : bound_x_k k
-              = 1 + ∑ j ∈ Finset.range (dX (k, 0) + 1), bound_aX_at_0 (k, j) * B ^ j := by
-            show Nat.rec 1 (fun j acc => acc + bound_aX_at_0 (k, j) * B ^ j) ((dX (k, 0)).succ)
-                = 1 + ∑ j ∈ Finset.range (dX (k, 0) + 1), bound_aX_at_0 (k, j) * B ^ j
-            exact natRec_add_eq_sum 1 (fun j => bound_aX_at_0 (k, j) * B ^ j) ((dX (k, 0)).succ)
-          have hnorm_p0 : ‖polyApproxCMap (α := α) (β := β) aX dX k 0‖ ≤ (↑(bound_x_k k) : ℝ) := by
-            have hmain : ‖polyApproxCMap (α := α) (β := β) aX dX k 0‖
-                ≤ ∑ j ∈ Finset.range (dX (k, 0) + 1),
-                    (↑(bound_aX_at_0 (k, j)) : ℝ) * (B : ℝ) ^ j :=
-              polyApproxCMap_norm_le_sum aX dX k 0 B hα_le hβ_le
-                (fun j => (↑(bound_aX_at_0 (k, j)) : ℝ)) (fun _ => by positivity) hC
-            have hcast : (↑(bound_x_k k) : ℝ)
-                = 1 + ∑ j ∈ Finset.range (dX (k, 0) + 1),
-                    (↑(bound_aX_at_0 (k, j)) : ℝ) * (B : ℝ) ^ j := by
-              rw [hbx]; push_cast; ring
-            rw [hcast]; linarith [hmain]
-          calc |(polyApproxCMap aX dX k (M (n, m))) w|
-              ≤ ‖polyApproxCMap (α := α) (β := β) aX dX k (M (n, m))‖ := hpw_le
-            _ ≤ ‖x k‖ + 1 := hnorm_M
-            _ ≤ (‖polyApproxCMap (α := α) (β := β) aX dX k 0‖ + 1) + 1 := by linarith [hnorm_xk]
-            _ ≤ ((↑(bound_x_k k) : ℝ) + 1) + 1 := by linarith [hnorm_p0]
-            _ = (↑(bound_x_k k) : ℝ) + 2 := by ring
-        -- Y-side mirror of the four X-side bounds.
-        have hclose_Y : |(y k) w - (polyApproxCMap aY dY k (M (n, m))) w|
-            ≤ 1 / 2 ^ (M (n, m)) := by
-          have h := (y k - polyApproxCMap aY dY k (M (n, m))).norm_coe_le_norm w
-          rw [ContinuousMap.sub_apply, Real.norm_eq_abs] at h
-          exact le_trans h (hbnd_Y k (M (n, m)))
-        have hβr_close : |(βR (Nat.pair n k, M (n, m)) : ℝ) - coefβ (n, k)|
-            ≤ 1 / 2 ^ (M (n, m)) := by
-          have h := hbnd_βR (Nat.pair n k) (M (n, m)); simpa only [Nat.unpair_pair] using h
-        have hcβ_bd : |coefβ (n, k)| ≤ (↑(bound_βR_at_0 (n, k)) : ℝ) + 1 := by
-          have heq := h_βR_eq (Nat.pair (Nat.pair n k) 0)
-          simp only [Nat.unpair_pair] at heq
-          have habs : |(βR (Nat.pair n k, 0) : ℝ)| ≤ (↑(bound_βR_at_0 (n, k)) : ℝ) := by
-            rw [heq]
-            exact_mod_cast abs_cast_neg_one_pow_div_le (βR_a (Nat.pair (Nat.pair n k) 0))
-              (βR_b (Nat.pair (Nat.pair n k) 0)) (βR_s (Nat.pair (Nat.pair n k) 0))
-              (h_βR_bne (Nat.pair (Nat.pair n k) 0))
-          have hclose0 := hbnd_βR (Nat.pair n k) 0
-          simp only [Nat.unpair_pair, pow_zero, div_one] at hclose0
-          have h1 := abs_sub_abs_le_abs_sub (coefβ (n, k)) ((βR (Nat.pair n k, 0) : ℝ))
-          rw [abs_sub_comm (coefβ (n, k)) ((βR (Nat.pair n k, 0) : ℝ))] at h1
-          linarith [h1, habs, hclose0]
-        have hpYk_bd : |(polyApproxCMap aY dY k (M (n, m))) w| ≤ (↑(bound_y_k k) : ℝ) + 2 := by
-          have hpw_le : |(polyApproxCMap aY dY k (M (n, m))) w|
-              ≤ ‖polyApproxCMap (α := α) (β := β) aY dY k (M (n, m))‖ := by
-            have h := (polyApproxCMap aY dY k (M (n, m))).norm_coe_le_norm w
-            rwa [Real.norm_eq_abs] at h
-          have hnorm_M : ‖polyApproxCMap (α := α) (β := β) aY dY k (M (n, m))‖ ≤ ‖y k‖ + 1 := by
-            have hb := hbnd_Y k (M (n, m))
-            have hnn := norm_sub_norm_le (polyApproxCMap aY dY k (M (n, m))) (y k)
-            rw [norm_sub_rev] at hnn
-            linarith [hnn, hb, hone_le]
-          have hnorm_yk : ‖y k‖ ≤ ‖polyApproxCMap (α := α) (β := β) aY dY k 0‖ + 1 := by
-            have hb := hbnd_Y k 0
-            rw [pow_zero, div_one] at hb
-            have hnn := norm_sub_norm_le (y k) (polyApproxCMap aY dY k 0)
-            linarith [hnn, hb]
-          have hC : ∀ j, |(aY (k, 0, j) : ℝ)| ≤ (↑(bound_aY_at_0 (k, j)) : ℝ) := by
-            intro j
-            have heq := h_aY_eq (Nat.pair k (Nat.pair 0 j))
-            simp only [Nat.unpair_pair] at heq
-            rw [heq]
-            exact_mod_cast abs_cast_neg_one_pow_div_le (aY_a (Nat.pair k (Nat.pair 0 j)))
-              (aY_b (Nat.pair k (Nat.pair 0 j))) (aY_s (Nat.pair k (Nat.pair 0 j)))
-              (h_aY_bne (Nat.pair k (Nat.pair 0 j)))
-          have hby : bound_y_k k
-              = 1 + ∑ j ∈ Finset.range (dY (k, 0) + 1), bound_aY_at_0 (k, j) * B ^ j := by
-            show Nat.rec 1 (fun j acc => acc + bound_aY_at_0 (k, j) * B ^ j) ((dY (k, 0)).succ)
-                = 1 + ∑ j ∈ Finset.range (dY (k, 0) + 1), bound_aY_at_0 (k, j) * B ^ j
-            exact natRec_add_eq_sum 1 (fun j => bound_aY_at_0 (k, j) * B ^ j) ((dY (k, 0)).succ)
-          have hnorm_p0 : ‖polyApproxCMap (α := α) (β := β) aY dY k 0‖ ≤ (↑(bound_y_k k) : ℝ) := by
-            have hmain : ‖polyApproxCMap (α := α) (β := β) aY dY k 0‖
-                ≤ ∑ j ∈ Finset.range (dY (k, 0) + 1),
-                    (↑(bound_aY_at_0 (k, j)) : ℝ) * (B : ℝ) ^ j :=
-              polyApproxCMap_norm_le_sum aY dY k 0 B hα_le hβ_le
-                (fun j => (↑(bound_aY_at_0 (k, j)) : ℝ)) (fun _ => by positivity) hC
-            have hcast : (↑(bound_y_k k) : ℝ)
-                = 1 + ∑ j ∈ Finset.range (dY (k, 0) + 1),
-                    (↑(bound_aY_at_0 (k, j)) : ℝ) * (B : ℝ) ^ j := by
-              rw [hby]; push_cast; ring
-            rw [hcast]; linarith [hmain]
-          calc |(polyApproxCMap aY dY k (M (n, m))) w|
-              ≤ ‖polyApproxCMap (α := α) (β := β) aY dY k (M (n, m))‖ := hpw_le
-            _ ≤ ‖y k‖ + 1 := hnorm_M
-            _ ≤ (‖polyApproxCMap (α := α) (β := β) aY dY k 0‖ + 1) + 1 := by linarith [hnorm_yk]
-            _ ≤ ((↑(bound_y_k k) : ℝ) + 1) + 1 := by linarith [hnorm_p0]
-            _ = (↑(bound_y_k k) : ℝ) + 2 := by ring
-        -- Per-k product bounds via `perk_bound`, for X and Y.
-        have hX := perk_bound (coefα (n, k)) ((x k) w)
-          ((αR (Nat.pair n k, M (n, m)) : ℝ)) ((polyApproxCMap aX dX k (M (n, m))) w)
-          (1 / 2 ^ (M (n, m))) ((↑(bound_αR_at_0 (n, k)) : ℝ) + 1) ((↑(bound_x_k k) : ℝ) + 2)
-          hεpos (by positivity) hclose_X hαr_close hcα_bd hpXk_bd
-        have hY := perk_bound (coefβ (n, k)) ((y k) w)
-          ((βR (Nat.pair n k, M (n, m)) : ℝ)) ((polyApproxCMap aY dY k (M (n, m))) w)
-          (1 / 2 ^ (M (n, m))) ((↑(bound_βR_at_0 (n, k)) : ℝ) + 1) ((↑(bound_y_k k) : ℝ) + 2)
-          hεpos (by positivity) hclose_Y hβr_close hcβ_bd hpYk_bd
-        have hstuff_cast : (stuff_per_k (n, k) : ℝ)
-            = (↑(bound_x_k k) : ℝ) + ↑(bound_y_k k) + ↑(bound_αR_at_0 (n, k))
-              + ↑(bound_βR_at_0 (n, k)) + 6 := by
-          show ((bound_x_k k + bound_y_k k + bound_αR_at_0 (n, k) + bound_βR_at_0 (n, k) + 6 : ℕ)
-              : ℝ) = (↑(bound_x_k k) : ℝ) + ↑(bound_y_k k) + ↑(bound_αR_at_0 (n, k))
-                + ↑(bound_βR_at_0 (n, k)) + 6
-          push_cast; ring
-        calc |(coefα (n, k) * (x k) w + coefβ (n, k) * (y k) w)
-                - ((αR (Nat.pair n k, M (n, m)) : ℝ) * (polyApproxCMap aX dX k (M (n, m))) w
-                    + (βR (Nat.pair n k, M (n, m)) : ℝ) * (polyApproxCMap aY dY k (M (n, m))) w)|
-            = |(coefα (n, k) * (x k) w
-                  - (αR (Nat.pair n k, M (n, m)) : ℝ) * (polyApproxCMap aX dX k (M (n, m))) w)
-                + (coefβ (n, k) * (y k) w
-                  - (βR (Nat.pair n k, M (n, m)) : ℝ)
-                    * (polyApproxCMap aY dY k (M (n, m))) w)| := by
-              congr 1; ring
-          _ ≤ |coefα (n, k) * (x k) w
-                  - (αR (Nat.pair n k, M (n, m)) : ℝ) * (polyApproxCMap aX dX k (M (n, m))) w|
-              + |coefβ (n, k) * (y k) w
-                  - (βR (Nat.pair n k, M (n, m)) : ℝ) * (polyApproxCMap aY dY k (M (n, m))) w| :=
-              abs_add_le _ _
-          _ ≤ (1 / 2 ^ (M (n, m)))
-                * (((↑(bound_αR_at_0 (n, k)) : ℝ) + 1) + ((↑(bound_x_k k) : ℝ) + 2))
-              + (1 / 2 ^ (M (n, m)))
-                * (((↑(bound_βR_at_0 (n, k)) : ℝ) + 1) + ((↑(bound_y_k k) : ℝ) + 2)) :=
-              add_le_add hX hY
-          _ = (1 / 2 ^ (M (n, m))) * (stuff_per_k (n, k) : ℝ) := by
-              rw [hstuff_cast]; ring
-      -- Final assembly: triangle ⇒ Σ-bound ⇒ close-out by M's formula.
-      calc |∑ k ∈ Finset.range (d n + 1),
-              ((coefα (n, k) * (x k) w + coefβ (n, k) * (y k) w)
-                - ((αR (Nat.pair n k, M (n, m)) : ℝ) * (polyApproxCMap aX dX k (M (n, m))) w
-                    + (βR (Nat.pair n k, M (n, m)) : ℝ) * (polyApproxCMap aY dY k (M (n, m))) w))|
-          ≤ ∑ k ∈ Finset.range (d n + 1),
-              |(coefα (n, k) * (x k) w + coefβ (n, k) * (y k) w)
-                - ((αR (Nat.pair n k, M (n, m)) : ℝ) * (polyApproxCMap aX dX k (M (n, m))) w
-                    + (βR (Nat.pair n k, M (n, m)) : ℝ) * (polyApproxCMap aY dY k (M (n, m))) w)| :=
-            Finset.abs_sum_le_sum_abs _ _
-        _ ≤ ∑ k ∈ Finset.range (d n + 1), (1 / 2 ^ (M (n, m))) * (stuff_per_k (n, k) : ℝ) :=
-            Finset.sum_le_sum hperk
-        _ = (1 / 2 ^ (M (n, m))) * ∑ k ∈ Finset.range (d n + 1), (stuff_per_k (n, k) : ℝ) := by
-            rw [Finset.mul_sum]
-        _ ≤ (1 / 2 ^ (M (n, m))) * ((d n + 1 : ℝ) * (bound_max n : ℝ)) := by
-            apply mul_le_mul_of_nonneg_left _ (by positivity)
-            calc ∑ k ∈ Finset.range (d n + 1), (stuff_per_k (n, k) : ℝ)
-                ≤ ∑ k ∈ Finset.range (d n + 1), (bound_max n : ℝ) := Finset.sum_le_sum hstuff_le
-              _ = (d n + 1 : ℝ) * (bound_max n : ℝ) := by
-                  rw [Finset.sum_const, Finset.card_range, nsmul_eq_mul]; push_cast; ring
-        _ ≤ 1 / 2 ^ m := by
-            have hmpos : (0 : ℝ) < 2 ^ m := by positivity
-            have hMpos : (0 : ℝ) < 2 ^ (M (n, m)) := by positivity
-            rw [le_div_iff₀ hmpos, one_div_mul_eq_div, div_mul_eq_mul_div, div_le_one hMpos]
-            have hMunfold : (2 : ℝ) ^ (M (n, m)) = 2 ^ (m + (d n + 1) + bound_max n + 2) := rfl
-            rw [hMunfold]
-            have hkey := closeout_nat (d n) (bound_max n) m
-            calc (d n + 1 : ℝ) * (bound_max n : ℝ) * 2 ^ m
-                = (((d n + 1) * bound_max n * 2 ^ m : ℕ) : ℝ) := by push_cast; ring
-              _ ≤ ((2 ^ (m + (d n + 1) + bound_max n + 2) : ℕ) : ℝ) := by exact_mod_cast hkey
-              _ = (2 : ℝ) ^ (m + (d n + 1) + bound_max n + 2) := by push_cast; ring
+  isComputableSeq_linearCombination :=
+    isComputableSeqCMap_linearCombination B hα_le hβ_le
   isComputableSeq_of_effectiveLimit := by
     -- TODO(/formalize L4 CMap): A2 = Ch. 0 Theorem 4 (Pour-El & Richards, "effective limits
     -- of computable sequences of continuous functions are computable"). Under our predicate:

@@ -12,6 +12,12 @@ code* — useful when they accelerate getting working Lean, otherwise skip them.
 The Lean type-checker is the final arbiter; Mathlib community review (Zulip) is
 the human arbiter.
 
+## Agent model
+
+**Every agent on this project must run on the `claude-opus-4-8` model**, including any
+subagents it spawns. Do not dispatch work on a lighter or cheaper model — the
+Lean/Mathlib proof reasoning requires full Opus capability.
+
 ## Core architectural commitments
 
 These are the technical decisions that shape the public API. They are

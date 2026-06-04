@@ -2,6 +2,29 @@
 
 % P-R reference: Chapter 2, examples 2.1, 2.4-2.5, literature/papers/PourEl-Richards-chapt2.md.
 
+\begin{lemma}
+  \label{lem:l4_cmap_axiom1}
+  \lean{ComputableAnalysis.L4.isComputableSeqCMap_linearCombination}
+  \leanok
+  \uses{def:l3_computabilityStructure, def:l1_isComputableSeqRat}
+  Fix real endpoints $\alpha, \beta \in \mathbb{R}$ and a rational bound $B \in \mathbb{N}$ with $|\alpha| \le B$ and $|\beta| \le B$. The C[a,b]-sequence predicate \texttt{IsComputableSeqCMap} on $C([\alpha,\beta], \mathbb{R})$ is closed under finite linear combinations with computable rational scalar arrays: given $(x_n), (y_n)$ both \texttt{IsComputableSeqCMap}, computable scalar double-arrays $\alpha', \beta' : \mathbb{N} \times \mathbb{N} \to \mathbb{R}$ (in the \texttt{ScalarComputableSeq}~$\mathbb{R}$ sense, after \texttt{Nat.unpair} re-indexing), and a computable arity $d : \mathbb{N} \to \mathbb{N}$, the sequence
+  \[ s_n := \sum_{k = 0}^{d(n)} \bigl( \alpha'(n, k) \cdot x_k + \beta'(n, k) \cdot y_k \bigr) \]
+  satisfies \texttt{IsComputableSeqCMap}. This is the C[a,b] specialisation of P-R Axiom~1 (Linear Forms), P-R Ch.\,2:66--72.
+\end{lemma}
+\begin{proof}
+  \leanok
+  \uses{lem:l1_isComputableSeqRat_add, lem:l1_isComputableSeqRat_mul, lem:l1_isComputableSeqRat_comp}
+  The witness construction is direct. Let $(a^X, d^X)$ and $(a^Y, d^Y)$ be the polynomial-approximant witnesses for $(x_n), (y_n)$, with $\|x_n - p^X_{n,m}\|_\infty \le 2^{-m}$ etc., where $p^X_{n,m}$ denotes the polynomial $\sum_{j \le d^X(n,m)} a^X(n,m,j) \cdot t^j$ on $[\alpha,\beta]$. Define the combined polynomial
+  \[ p^s_{n,m} := \sum_{k=0}^{d(n)} \bigl( \alpha'(n,k) \cdot p^X_{k, M(n,m)} + \beta'(n,k) \cdot p^Y_{k, M(n,m)} \bigr) \]
+  with precision pad $M(n,m) := m + (d(n) + 1) + \mathrm{bound\_max}(n) + 2$, where $\mathrm{bound\_max}(n)$ is a uniform $\mathbb{N}$-upper-bound combining the per-$k$ norms and coefficient magnitudes for both legs of the linear combination (computed in Lean as the sum $\mathrm{bound\_x\_k} + \mathrm{bound\_y\_k} + \mathrm{bound\_\alpha R\_at\_0} + \mathrm{bound\_\beta R\_at\_0} + 6$, recovered from the inner $a$-witnesses of the L1 \texttt{IsComputableSeqRat} data).
+
+  \emph{Computability of the witness array.} The rational double-sequence underlying $p^s_{n,m}$ is built from $a^X, a^Y, \alpha', \beta'$ via finite sums and products, after the polynomial multiplication $\alpha'(n,k) \cdot \sum_j a^X(k,M,j) t^j$ expands to a degree-by-degree convolution. Closure of \texttt{IsComputableSeqRat} under pointwise addition (\Cref{lem:l1_isComputableSeqRat_add}), multiplication (\Cref{lem:l1_isComputableSeqRat_mul}), and precomposition with a computable re-indexing (\Cref{lem:l1_isComputableSeqRat_comp}) supplies the recursion-theoretic witness. The bound $d^s_{n,m} := d(n) + \max_{k \le d(n)}(d^X(k,M) + d^Y(k,M))$ is computable by hypothesis on $d, d^X, d^Y$.
+
+  \emph{Norm bound.} By the triangle inequality and homogeneity of the sup-norm, each summand $|\alpha'(n,k)| \cdot \|x_k - p^X_{k,M(n,m)}\|_\infty + |\beta'(n,k)| \cdot \|y_k - p^Y_{k,M(n,m)}\|_\infty$ is bounded by $\mathrm{bound\_max}(n) \cdot 2^{-M(n,m)}$ (using the per-$k$ closure of $\mathrm{bound\_max}(n)$ over both legs), hence
+  \[ \|s_n - p^s_{n,m}\|_\infty \le \sum_{k=0}^{d(n)} \mathrm{bound\_max}(n) \cdot 2^{-M(n,m)} = (d(n) + 1) \cdot \mathrm{bound\_max}(n) \cdot 2^{-M(n,m)}. \]
+  The pad's definition of $M(n,m)$ is chosen so that $(d(n)+1) \cdot \mathrm{bound\_max}(n) \cdot 2^{m - M(n,m)} \le 1$, yielding $\|s_n - p^s_{n,m}\|_\infty \le 2^{-m}$. The Lean proof's \texttt{closeout\_nat} lemma (\texttt{CMap.lean:477}) discharges this final arithmetic inequality.
+\end{proof}
+
 \begin{theorem}
   \label{thm:l4_cmap_instance}
   \lean{ComputableAnalysis.L4.computabilityStructureCMap_of}
@@ -9,21 +32,11 @@
   $C([a,b], \mathbb{R})$ with the sup-norm carries a \texttt{ComputabilityStructure}~$\mathbb{R}$, where a sequence $(s_n)$ in $C[a,b]$ is computable iff there is a computable double array of rational-coefficient polynomials $p_{n,m}$ with $\|s_n - p_{n,m}\|_\infty \le 2^{-m}$ for all $n,m$. The construction is parameterized by an explicit rational bound $B \ge \max(|a|,|b|)$, matching P-R Ch.\,2:128's restriction to recursive endpoints. P-R Ch.\,2:141--153.
 \end{theorem}
 \begin{proof}
-  \uses{def:l1_isComputableSeqReal}
+  \uses{lem:l4_cmap_axiom1, def:l1_isComputableSeqReal}
   The three structure fields are verified separately.
-  \emph{Linearity} (P-R Axiom~1, Linear Forms): given computable polynomial
-  approximants for $(x_n)$ and $(y_n)$ and computable rational scalar arrays
-  $\alpha, \beta$, the finite combination $\sum_{k\le d(n)} \alpha_{n,k} x_k +
-  \beta_{n,k} y_k$ is approximated by the same combination of the approximating
-  polynomials. A precision pad $M(n,m)$ absorbing the per-summand coefficient and
-  sup-norm bounds turns the triangle inequality into the required $2^{-m}$
-  estimate.
-  \emph{Effective limit} (P-R Axiom~2): the diagonal of a computably-Cauchy
-  double array of polynomial approximants is again a polynomial approximant of
-  the limit (P-R Ch.\,0 Thm.\,4).
-  \emph{Computable norm} (P-R Axiom~3): $\|s_n\|_\infty = \lim_m \|p_{n,m}\|_\infty$
-  and the sup-norm of a rational polynomial on $[a,b]$ is a computable real, so
-  the norms form a computable sequence of reals (P-R Ch.\,0 Thm.\,7).
+  \emph{Linearity} (P-R Axiom~1, Linear Forms): by \Cref{lem:l4_cmap_axiom1}.
+  \emph{Effective limit} (P-R Axiom~2): the diagonal of a computably-Cauchy double array of polynomial approximants is again a polynomial approximant of the limit (P-R Ch.\,0 Thm.\,4).
+  \emph{Computable norm} (P-R Axiom~3): $\|s_n\|_\infty = \lim_m \|p_{n,m}\|_\infty$ and the sup-norm of a rational polynomial on $[a,b]$ is a computable real, so the norms form a computable sequence of reals (P-R Ch.\,0 Thm.\,7).
 \end{proof}
 
 \begin{theorem}

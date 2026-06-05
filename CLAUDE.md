@@ -211,7 +211,7 @@ Two GitHub Actions workflows, split by cadence (full rationale: `docs/CI.md`):
 - **`.github/workflows/blueprint.yml`** — fast, every push to `master`, ~3-5 min. Builds the Lean project and the blueprint web output; deploys to Pages. No Mathlib API docs.
 - **`.github/workflows/docs.yml`** — slow, on tags matching `v*` / `release-*`, ~15-20 min. Builds Lean + blueprint + full Mathlib-linked API docs via `leanprover-community/docgen-action`.
 
-Live: `https://yssnbkd.github.io/mathlib4-computable-analysis/` (blueprint home, dep graph at `/dep_graph_document.html`). API docs at `/docs/` only between tag deploy and next push to `master`.
+Live: `https://yssnbkd.github.io/mathlib4-computable-analysis/blueprint/` (blueprint home, dep graph at `/blueprint/dep_graph_document.html`). The Pages site is served under the `/blueprint/` subpath — the bare repo-root URL 404s. API docs at `/docs/` only between tag deploy and next push to `master`.
 
 Don't wait for CI to validate code. Local `lake build` is sub-minute incremental; CI is the final sanity check, not the inner loop.
 

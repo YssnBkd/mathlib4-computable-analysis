@@ -108,6 +108,94 @@ def IsComputableSeqReal (x : ℕ → ℝ) : Prop :=
     IsComputableDoubleSeqRat r ∧
     ∀ n k, |((r (n, k) : ℝ)) - x n| ≤ 1 / 2 ^ k
 
+/-! ## §2.5 — Closure under effective convergence (P-R Ch. 0 Proposition 1)
+
+This is the *rational-input specialization* of Pour-El & Richards Ch. 0
+Proposition 1 (chapt0:246). The full P-R statement takes a computable double
+sequence of *reals* `{x_{n,k}}` and concludes the limit `{x_n}` is a computable
+sequence of reals. Here we take a computable double sequence of *rationals*
+`(r_{n,k})` with an effective modulus `e` such that `k ≥ e(n, N)` implies
+`|r_{n,k} − x_n| ≤ 2⁻ᴺ`, and conclude `IsComputableSeqReal x`.
+
+This is the workhorse form used by the chapter-0 theorems (Th. 5 on integration,
+Th. 7 on maxima, the Effective Density Lemma): each constructs a *rational*
+approximant double sequence with an effective modulus rather than the full
+double-real form. The general-real version follows from this lemma by
+extracting Def-5a-witness rationals from each `x_{n,k}` and applying — deferred
+to a downstream L1 milestone once `IsComputableDoubleSeqReal` is in scope.
+
+**Bound cleanup**: P-R's general-real Prop 1 (chapt0:268-269) concludes
+`|r'_{n,N} − x_n| ≤ 2 · 2⁻ᴺ` because it incurs both the
+rational-approximant-of-real error and the convergence-modulus error. Our
+rational specialization skips the first term, so the conclusion is the
+cleaner `≤ 1 / 2^N` form (= `2⁻ᴺ`), matching `IsComputableSeqReal`'s Def-5a
+shape verbatim.
+
+**Convention**: `e : ℕ × ℕ → ℕ` is the *effective*-in-`n` modulus form per
+P-R chapt0:220-223 ("`effectively in n` means governed by a recursive
+function of `n`"). A uniform-in-`n` corollary `e : ℕ → ℕ` is the trivial
+specialization `e (n, N) := e' N` and is not separately stated. -/
+
+/-- **Pour-El & Richards Ch. 0 Proposition 1** (Closure under effective
+convergence), rational-input specialization. Quote at
+`literature/papers/PourEl-Richards-chapt0.md:246`:
+
+> "Let `{x_{n,k}}` be a computable double sequence of real numbers which
+> converges as `k → ∞` to a sequence `{x_n}`, effectively in `k` and `n`.
+> Then `{x_n}` is computable."
+
+Concretely: if `(r_{n,k}) : ℕ × ℕ → ℚ` is `IsComputableDoubleSeqRat` and
+`e : ℕ × ℕ → ℕ` is `Computable` with `k ≥ e(n, N) → |r_{n,k} − x n| ≤ 2⁻ᴺ`,
+then `x : ℕ → ℝ` is `IsComputableSeqReal`.
+
+**Proof** (P-R chapt0:260-272): take the subsequence `r'_{n,k} := r_{n, e(n,k)}`.
+By the hypothesis at `N := k` and `k_input := e(n, k)` (so `k_input ≥ e(n, N)`
+trivially), `|r'_{n,k} − x n| ≤ 2⁻ᵏ`. The double sequence `r'` is computable
+because `r` is and the reindexing `σ m := Nat.pair (Nat.unpair m).1 (e (Nat.unpair m))`
+is Computable (composition of `Computable.fst`, `Computable.unpair`, `he`, and
+`Primrec₂.natPair.to_comp`). -/
+theorem isComputableSeqReal_of_effectiveConvergence
+    {r : ℕ × ℕ → ℚ} (hr : IsComputableDoubleSeqRat r)
+    {x : ℕ → ℝ}
+    {e : ℕ × ℕ → ℕ} (he : Computable e)
+    (hconv : ∀ n N k, k ≥ e (n, N) →
+      |((r (n, k) : ℝ)) - x n| ≤ (1 : ℝ) / 2 ^ N) :
+    IsComputableSeqReal x := by
+  -- Diagonalised witness: r' (n, k) := r (n, e (n, k)).
+  refine ⟨fun p => r (p.1, e p), ?_, ?_⟩
+  · -- Computability of r'. Unfolding `IsComputableDoubleSeqRat r'` gives
+    -- `IsComputableSeqRat (fun m => r ((Nat.unpair m).1, e (Nat.unpair m)))`.
+    -- Build via `hr.comp hσ` for a Computable reindex `σ : ℕ → ℕ`.
+    change IsComputableSeqRat
+      (fun m : ℕ => r ((Nat.unpair m).1, e (Nat.unpair m)))
+    have h_fst : Computable (fun m : ℕ => (Nat.unpair m).1) :=
+      Computable.fst.comp Computable.unpair
+    have h_e_unp : Computable (fun m : ℕ => e (Nat.unpair m)) :=
+      he.comp Computable.unpair
+    have hσ : Computable (fun m : ℕ =>
+        Nat.pair (Nat.unpair m).1 (e (Nat.unpair m))) :=
+      Primrec₂.natPair.to_comp.comp h_fst h_e_unp
+    -- Inline `IsComputableSeqRat.comp`'s body. `IsComputableSeqRat` is a
+    -- `def` unfolding to `Exists`; Lean's parser interprets
+    -- `IsComputableSeqRat.comp` as `Function.comp` of the predicate (treating
+    -- `IsComputableSeqRat` as a term `(ℕ → ℚ) → Prop`). The destructure-then-
+    -- rebuild idiom matches the rest of the §4 closure lemmas.
+    have hflat : IsComputableSeqRat (fun m : ℕ => r (Nat.unpair m)) := hr
+    obtain ⟨a, b, sgn, ha, hb, hsgn, hne, heq⟩ := hflat
+    have key : IsComputableSeqRat (fun m : ℕ =>
+        r (Nat.unpair (Nat.pair (Nat.unpair m).1 (e (Nat.unpair m))))) := by
+      refine ⟨fun m => a (Nat.pair (Nat.unpair m).1 (e (Nat.unpair m))),
+              fun m => b (Nat.pair (Nat.unpair m).1 (e (Nat.unpair m))),
+              fun m => sgn (Nat.pair (Nat.unpair m).1 (e (Nat.unpair m))),
+              ha.comp hσ, hb.comp hσ, hsgn.comp hσ,
+              fun m => hne _, fun m => heq _⟩
+    convert key using 1
+    funext m
+    simp [Nat.unpair_pair]
+  · -- Bound: `|r' (n, k) − x n| ≤ 1/2^k` from `hconv` at `N := k`, input `e(n, k)`.
+    intro n k
+    exact hconv n k (e (n, k)) le_rfl
+
 /-! ## §3 — Basic sanity lemmas (statements only; proofs are downstream L1 work)
 
 These are deliberately *stated* here so downstream layers can cite them; the
@@ -331,6 +419,31 @@ theorem mul
   rw [pow_add]
   push_cast
   field_simp
+
+/-- Closure of `IsComputableSeqRat` under pointwise negation. Witness: flip
+the sign parity by `+1`, keeping `(a, b)`. The identity
+`-q = (-1)^{s + 1} · (a/b)` reduces via `pow_succ` + `ring`. -/
+theorem neg
+    {r : ℕ → ℚ} (h : IsComputableSeqRat r) :
+    IsComputableSeqRat (fun k => - r k) := by
+  obtain ⟨a, b, s, ha, hb, hs, hne, heq⟩ := h
+  refine ⟨a, b, fun k => s k + 1, ha, hb, Computable.succ.comp hs, hne, fun k => ?_⟩
+  show -r k = (-1 : ℚ) ^ (s k + 1) * ((a k : ℚ) / (b k : ℚ))
+  rw [heq k, pow_succ]
+  ring
+
+/-- Closure of `IsComputableSeqRat` under pointwise subtraction. Implemented as
+`r₁ + (- r₂)` via `IsComputableSeqRat.add` and `IsComputableSeqRat.neg`. -/
+theorem sub
+    {r₁ r₂ : ℕ → ℚ}
+    (h₁ : IsComputableSeqRat r₁) (h₂ : IsComputableSeqRat r₂) :
+    IsComputableSeqRat (fun k => r₁ k - r₂ k) := by
+  have hadd : IsComputableSeqRat (r₁ + (fun k => - r₂ k)) :=
+    IsComputableSeqRat.add h₁ (IsComputableSeqRat.neg h₂)
+  convert hadd using 1
+  funext k
+  show r₁ k - r₂ k = r₁ k + (- r₂ k)
+  ring
 
 /-- Closure of `IsComputableSeqRat` under pointwise binary `max`.
 

@@ -162,6 +162,132 @@ theorem isComputableSeqRat_doubleApply
 
 ---
 
+## Idiom: pushing a Nat-or-positional bound through a cast-mismatching lemma
+
+When a Mathlib lemma takes a `ℕ`-valued parameter `C : ℕ` and the bound shape is `|x| ≤ ((C : ℕ) : ℝ)` but your in-scope hypothesis carries `(B : ℝ) + 1` instead of `((B + 1 : ℕ) : ℝ)`, the call fails with `type mismatch`. The two are equal but not syntactically defeq. Fix at the call site, not at the hypothesis site:
+
+```lean
+have h_lip := polyEval_lipschitz_real a d n K (B + 1) x.val (xQ Jstar)
+  (show |x.val| ≤ ((B + 1 : ℕ) : ℝ) by push_cast; exact h_x_abs_BP1)
+  (show |xQ Jstar| ≤ ((B + 1 : ℕ) : ℝ) by push_cast; exact h_xQJstar_BP1)
+push_cast at h_lip
+```
+
+The trick: the inline `show ((B + 1 : ℕ) : ℝ)` followed by `push_cast` rewrites the goal to `|x.val| ≤ (B : ℝ) + 1`, which matches the in-scope hypothesis. Then `push_cast at h_lip` normalizes the conclusion's `↑(B + 1) ^ (j-1)` back to `(↑B + 1) ^ (j-1)` so downstream consumers can use the bound. Without the trailing `push_cast at h_lip`, subsequent monotonicity steps (`mul_le_mul_of_nonneg_right h_Lip_real_le_nat`) fail with the symmetric mismatch.
+
+**Source**: `l4-cmap-axiom3-norm-resig` iter-10 (multiple `polyEval_lipschitz_real` invocations in `h_b1` and `h_b2`).
+
+---
+
+## Idiom: `Finset.le_sup'_iff` via `rw` + `exact ⟨..., ..., ...⟩`
+
+For sup' lower bounds `a ≤ s.sup' H f`, use the tactic form (not term mode):
+
+```lean
+have h_a_le_sup : a ≤ s.sup' H f := by
+  rw [Finset.le_sup'_iff]
+  exact ⟨b, hb_mem, h_a_le_f_b⟩
+```
+
+The term-mode `Finset.le_sup'_iff.mpr ⟨...⟩` fails with `Unknown constant` in some positions even though the lemma exists; the `rw + exact` form always works.
+
+**Source**: `l4-cmap-axiom3-norm-resig` iter-10 (`h_sNK_nn` and `h_rEntry_Jstar_le_sup`).
+
+---
+
+## Idiom: heartbeat-heavy theorems
+
+For theorems with proof bodies > ~400 lines, default 200k heartbeats are exhausted by cumulative whnf during elaboration. Bump locally via `set_option ... in`, but position it correctly — `set_option ... in` must come *before* any docstring on the theorem:
+
+```lean
+set_option maxHeartbeats 1600000 in
+/-- Docstring for the theorem. -/
+theorem foo : ... := by ...
+```
+
+NOT after the docstring (parser error). The `in` makes the whole `theorem foo` declaration carry the heartbeat bump.
+
+**Source**: `l4-cmap-axiom3-norm-resig` iter-10 (A3 body ~600 lines).
+
+---
+
+## Idiom: midpoint case-split for tightening degenerate bounds
+
+When a proof's degenerate case threatens to violate the modulus tolerance (e.g., `3/2^mm` exceeds `2/2^K`), case-split on whether the variable lies on the left or right half of an interval:
+
+```lean
+by_cases h_x_mid : x.val ≤ (α + β) / 2
+· -- left half: pick J* := 0, |x.val - xQ 0| = |x.val - α'| ≤ 2/2^mm.
+  refine ⟨0, by omega, ?_⟩
+  ...
+· push_neg at h_x_mid  -- right half
+  -- pick J* := kg, |x.val - xQ kg| = |x.val - β'| ≤ 2/2^mm.
+  refine ⟨kg, le_refl _, ?_⟩
+  ...
+```
+
+This converts a worst-case `3/2^mm` bound (when the variable could be anywhere) to a worst-case `2/2^mm` bound (in each half). Avoids needing a tighter Lipschitz lemma.
+
+**Source**: `l4-cmap-axiom3-norm-resig` iter-10 (`h_b2` degenerate case `α' ≥ β'`).
+
+---
+
+## Idiom: `Set.projIcc` for clamping with a `hαβ` proof
+
+When you need to clamp `x : ℝ` to `[α, β]` and have `hαβ : α ≤ β`, use `Set.projIcc α β hαβ x : Set.Icc α β`. The `.val` projection gives `max α (min β x)`. Three-case bound:
+
+```lean
+have h_clamp : |x - (Set.projIcc α β hαβ x).val| ≤ ε := by
+  by_cases h1 : x < α
+  · have h_eq : (Set.projIcc α β hαβ x).val = α := by
+      rw [Set.coe_projIcc, max_eq_left]
+      calc min β x ≤ x := min_le_right _ _
+        _ ≤ α := h1.le
+    rw [h_eq, abs_of_neg (by linarith)]; <bound>
+  · push_neg at h1
+    by_cases h2 : β < x
+    · have h_eq : (Set.projIcc α β hαβ x).val = β := by
+        rw [Set.coe_projIcc, min_eq_left h2.le, max_eq_right hαβ]
+      rw [h_eq, abs_of_pos (by linarith)]; <bound>
+    · push_neg at h2
+      have h_eq : (Set.projIcc α β hαβ x).val = x := by
+        rw [Set.coe_projIcc, min_eq_right h2, max_eq_right h1]
+      rw [h_eq, sub_self, abs_zero]; <nonneg>
+```
+
+The structure is reusable any time you need to project to a closed interval with explicit bounds derived from the side of the projection.
+
+**Source**: `l4-cmap-axiom3-norm-resig` iter-10 (`h_clamp_close` in A3 body).
+
+---
+
+## Idiom: `Nat.floor` rounding for grid covers
+
+To cover `t ∈ [0, 1]` with `kg + 1` grid points and bound the rounding error:
+
+```lean
+set Jstar : ℕ := Nat.floor ((kg : ℝ) * t) with hJstar_def
+have h_Jstar_R_le : (Jstar : ℝ) ≤ (kg : ℝ) * t := Nat.floor_le h_kg_t_nn
+have h_Jstar_lt : (kg : ℝ) * t < (Jstar : ℝ) + 1 := Nat.lt_floor_add_one _
+have h_Jstar_le_kg : Jstar ≤ kg := by
+  have h_kgt_le_kg : (kg : ℝ) * t ≤ (kg : ℝ) := by
+    have := mul_le_mul_of_nonneg_left h_t_le_one h_kg_real_pos.le
+    linarith
+  exact_mod_cast h_Jstar_R_le.trans h_kgt_le_kg
+have h_diff_le : t - (Jstar : ℝ) / (kg : ℝ) ≤ 1 / (kg : ℝ) := by
+  rw [sub_le_iff_le_add,
+      show (1 : ℝ) / (kg : ℝ) + (Jstar : ℝ) / (kg : ℝ)
+        = ((Jstar : ℝ) + 1) / (kg : ℝ) from by ring,
+      le_div_iff₀ h_kg_real_pos]
+  linarith
+```
+
+The result: `Jstar/kg ≤ t < (Jstar + 1)/kg`, so `|t - Jstar/kg| ≤ 1/kg`.
+
+**Source**: `l4-cmap-axiom3-norm-resig` iter-10 (`h_b2` non-degenerate floor-cover).
+
+---
+
 ## Cross-reference
 
 For each idiom, the symmetric pitfall it resolves is documented in [PITFALLS.md](PITFALLS.md). When debugging a proof error, search PITFALLS first; when planning a new proof, search this file first.

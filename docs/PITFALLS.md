@@ -154,4 +154,79 @@ and then close the goal-shape via `by linarith` after `(-1)^(0:ℕ) = 1` / `(-1)
 
 ## Cross-reference
 
-For the positive recipe that resolves each pitfall, see [LEAN-IDIOMS.md](LEAN-IDIOMS.md). Pitfalls #1, #3, #4 map to LEAN-IDIOMS §1–5; pitfall #2 maps to LEAN-IDIOMS §5; pitfalls #5 and #6 are procedural, resolved via the auto-memory `feedback_*` entries. Pitfall #7 is a Lean soundness-audit gotcha (no LEAN-IDIOMS counterpart yet); pitfall #8 is procedural — the `/goal` Stop-hook contract (`scripts/goal_stop_hook.py:257`, `.claude/agents/devils-advocate.md:38,69`). Pitfall #9 is a Mathlib naming-drift gotcha — same family as #1, but for order lemmas rather than `Primrec`/`Computable` primitives.
+For the positive recipe that resolves each pitfall, see [LEAN-IDIOMS.md](LEAN-IDIOMS.md). Pitfalls #1, #3, #4 map to LEAN-IDIOMS §1–5; pitfall #2 maps to LEAN-IDIOMS §5; pitfalls #5 and #6 are procedural, resolved via the auto-memory `feedback_*` entries. Pitfall #7 is a Lean soundness-audit gotcha (no LEAN-IDIOMS counterpart yet); pitfall #8 is procedural — the `/goal` Stop-hook contract (`scripts/goal_stop_hook.py:257`, `.claude/agents/devils-advocate.md:38,69`). Pitfall #9 is a Mathlib naming-drift gotcha — same family as #1, but for order lemmas rather than `Primrec`/`Computable` primitives. Pitfalls #10–#14 are A3-round-specific naming drifts and elaboration-order gotchas.
+
+---
+
+## 10. Order-lemma drift: `le_or_lt` is now `le_or_gt`
+
+**Pitfall**: `le_or_lt α' β'` errors with `Unknown identifier`. Renamed in Mathlib4 to `le_or_gt : a ≤ b ∨ b < a` (`.lake/packages/mathlib/Mathlib/Order/Defs/LinearOrder.lean:100`). The dual `lt_or_ge : a < b ∨ b ≤ a` is at line 97.
+
+**Workaround**: `rcases le_or_gt α' β' with h | h`.
+
+**Hit at**: `l4-cmap-axiom3-norm-resig` iter-10 (`h_min_αβ'`, `h_max_αβ'` in A3 body).
+
+---
+
+## 11. `Finset.le_sup'_iff.mpr` fails in term mode but works in tactic mode
+
+**Pitfall**: `have h : a ≤ s.sup' H f := Finset.le_sup'_iff.mpr ⟨b, hb_mem, h_le_f⟩` errors with `Unknown constant Finset.le_sup'_iff.mpr` — even though `Finset.le_sup'_iff` exists at `.lake/packages/mathlib/Mathlib/Data/Finset/Lattice/Fold.lean:732` and is widely used elsewhere. The same lemma applied via `rw` in tactic mode works.
+
+**Workaround**: always use the tactic form for sup' lower-bound proofs:
+```lean
+have h : a ≤ s.sup' H f := by
+  rw [Finset.le_sup'_iff]
+  exact ⟨b, hb_mem, h_le_f⟩
+```
+
+**Hit at**: `l4-cmap-axiom3-norm-resig` iter-10 (`h_sNK_nn` and `h_rEntry_Jstar_le_sup` in A3 body).
+
+---
+
+## 12. `set_option ... in` immediately after a docstring confuses the parser
+
+**Pitfall**:
+```lean
+/-- Docstring ... -/
+set_option maxHeartbeats 1600000 in
+theorem foo : ... := by ...
+```
+errors with `unexpected token 'set_option'; expected 'lemma'`. The parser treats the docstring as belonging to the *next* declaration, but `set_option ... in` is itself a directive, not a decl — so Lean expects `theorem`/`lemma`/`def` right after the docstring.
+
+**Workaround**: move `set_option ... in` BEFORE the docstring:
+```lean
+set_option maxHeartbeats 1600000 in
+/-- Docstring ... -/
+theorem foo : ... := by ...
+```
+
+**Hit at**: `l4-cmap-axiom3-norm-resig` iter-10 (A3 theorem required heartbeats bump for the ~600-line proof body).
+
+---
+
+## 13. `linarith` doesn't relate `c/2^N` and `1/2^N` as algebraic atoms
+
+**Pitfall**: `linarith` treats each fraction with `2^N`-denominator as an opaque atom. From `β - α ≤ 2 / 2^mm`, it cannot derive `(β - α)/2 ≤ 1 / 2^mm` because `1 / 2^mm` and `2 / 2^mm` are distinct atoms — `linarith` doesn't auto-recognize `2 / X = 2 · (1 / X)`.
+
+**Workaround**: provide the algebraic identity as an explicit hypothesis:
+```lean
+have h_eq : (2 : ℝ) / 2^mm = 2 * (1 / 2^mm) := by ring
+linarith [h_β_minus_α, h_eq]
+```
+
+**Hit at**: `l4-cmap-axiom3-norm-resig` iter-10 (degenerate-case midpoint argument in `h_b2`).
+
+---
+
+## 14. `xQ 0` β-reduces to `α' + ((0 : ℕ) : ℝ) / kg · ...` — `Nat.cast 0` doesn't auto-reduce
+
+**Pitfall**: writing `show α' + 0 / kg * (β' − α') = α'` after a `set xQ : ℕ → ℝ := fun J => ...` and querying at `xQ 0` errors with `not definitionally equal`. Lean's β-reduction of `xQ J` at `J := (0 : ℕ)` produces `α' + ((0 : ℕ) : ℝ) / kg * ...` — and `((0 : ℕ) : ℝ)` is `Nat.cast 0`, which doesn't reduce to `(0 : ℝ)` by defeq.
+
+**Workaround**: match the actual β-reduced form in `show`, then explicit cast normalization:
+```lean
+have h_xQ_0 : xQ 0 = α' := by
+  show α' + ((0 : ℕ) : ℝ) / (kg : ℝ) * (β' - α') = α'
+  rw [Nat.cast_zero]; ring
+```
+
+**Hit at**: `l4-cmap-axiom3-norm-resig` iter-10 (`h_xQ_0_eq` in degenerate-case A3 body).

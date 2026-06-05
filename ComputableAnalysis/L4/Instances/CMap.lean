@@ -5,6 +5,7 @@ Authors: The mathlib-computable-analysis contributors
 -/
 import Mathlib.Topology.ContinuousMap.Compact
 import Mathlib.Topology.ContinuousMap.Bounded.Normed
+import Mathlib.Order.PartialSups
 import ComputableAnalysis.L1.ComputableSeqReal
 import ComputableAnalysis.L3.ComputabilityStructure
 
@@ -380,6 +381,490 @@ theorem ite_rat
 
 end FinsetSumHelper
 
+/-! ## §0a — Private helper for A3 (TODO refactor → L1)
+
+Closure of `IsComputableSeqRat` under finite `Finset.sup'` (max) over a
+Computable-bounded range, the max-analogue of `FinsetSumHelper.finsetSum_rat`.
+Needed by A3 (`isComputableSeqCMap_norm`): the partial-maximum double sequence
+`s_{n,k} = max_{j ≤ k} |pₙₖ(grid j)|` is built by folding a Computable
+witness-triple max over `j`.
+
+Lives here (not L1) because L1 is in `forbid_writes` for the active round;
+slated for lifting to `IsComputableSeqRat.finsetSup'` in a follow-up L1 round. -/
+
+namespace FinsetMaxHelper
+
+open FinsetSumHelper (tripleToRat)
+
+/-- Boolean discriminator: `maxBool t₁ t₂ = true` iff the rational represented by
+`t₁` is `≥` the one represented by `t₂`. Same sign-aware decision tree as
+`IsComputableSeqRat.max`'s inline `chooseR1`
+(`ComputableAnalysis/L1/ComputableSeqReal.lean:457-465`), specialised to the
+witness-triple `(a, b, s) ↦ (-1)^s · (a / b)` encoding. -/
+def maxBool (t₁ t₂ : ℕ × ℕ × ℕ) : Bool :=
+  bif decide (t₁.2.2 % 2 = t₂.2.2 % 2) then
+    (bif decide (t₁.2.2 % 2 = 0) then
+      decide (t₁.1 * t₂.2.1 ≥ t₂.1 * t₁.2.1)
+    else
+      decide (t₁.1 * t₂.2.1 ≤ t₂.1 * t₁.2.1))
+  else
+    decide (t₁.2.2 % 2 = 0)
+
+/-- Witness-triple max via **wholesale selection**: return whichever input triple
+represents the larger rational, unchanged. Returning an input verbatim (rather
+than recombining `(a, b, s)` components as in the `add` case) keeps
+`maxTriple_b_ne_zero` a one-liner and reduces `maxTriple_correct` to a clean
+`⊔`-identity — sidestepping the component-recombination that stalled the iter-04
+attempt (`.goals/l4-cmap-axiom3-norm-resig/iter-04.md`). -/
+def maxTriple (t₁ t₂ : ℕ × ℕ × ℕ) : ℕ × ℕ × ℕ :=
+  bif maxBool t₁ t₂ then t₁ else t₂
+
+theorem maxTriple_b_ne_zero {t₁ t₂ : ℕ × ℕ × ℕ}
+    (hb₁ : t₁.2.1 ≠ 0) (hb₂ : t₂.2.1 ≠ 0) :
+    (maxTriple t₁ t₂).2.1 ≠ 0 := by
+  unfold maxTriple
+  cases maxBool t₁ t₂ with
+  | true => simpa using hb₁
+  | false => simpa using hb₂
+
+/-- Correctness: the represented rational of `maxTriple t₁ t₂` is the lattice
+`⊔` (= max) of the two represented rationals. Stated in `⊔` form so it composes
+directly with `Finset.sup'_insert` in `finsetMax_rat`'s fold. The proof is a
+4-way parity case-split mirroring `IsComputableSeqRat.max`
+(`ComputableSeqReal.lean:493-580`); each branch resolves to a single ℚ-inequality
+via `div_le_div_iff₀`. -/
+theorem maxTriple_correct {t₁ t₂ : ℕ × ℕ × ℕ}
+    (hb₁ : t₁.2.1 ≠ 0) (hb₂ : t₂.2.1 ≠ 0) :
+    tripleToRat (maxTriple t₁ t₂) = tripleToRat t₁ ⊔ tripleToRat t₂ := by
+  obtain ⟨a₁, b₁, s₁⟩ := t₁
+  obtain ⟨a₂, b₂, s₂⟩ := t₂
+  simp only at hb₁ hb₂
+  have hb₁q : (0 : ℚ) < (b₁ : ℚ) := by exact_mod_cast Nat.pos_of_ne_zero hb₁
+  have hb₂q : (0 : ℚ) < (b₂ : ℚ) := by exact_mod_cast Nat.pos_of_ne_zero hb₂
+  have pow_red : ∀ n : ℕ, (-1 : ℚ) ^ n = (-1) ^ (n % 2) := fun n => by
+    conv_lhs => rw [← Nat.div_add_mod n 2, pow_add, pow_mul]
+    simp
+  have hr1nn : (0 : ℚ) ≤ (a₁ : ℚ) / (b₁ : ℚ) :=
+    div_nonneg (Nat.cast_nonneg _) (Nat.cast_nonneg _)
+  have hr2nn : (0 : ℚ) ≤ (a₂ : ℚ) / (b₂ : ℚ) :=
+    div_nonneg (Nat.cast_nonneg _) (Nat.cast_nonneg _)
+  -- Parity-reduced value forms.
+  have hv1 : tripleToRat (a₁, b₁, s₁) = (-1) ^ (s₁ % 2) * ((a₁ : ℚ) / (b₁ : ℚ)) := by
+    simp only [tripleToRat]; rw [pow_red s₁]
+  have hv2 : tripleToRat (a₂, b₂, s₂) = (-1) ^ (s₂ % 2) * ((a₂ : ℚ) / (b₂ : ℚ)) := by
+    simp only [tripleToRat]; rw [pow_red s₂]
+  -- `maxBool` in explicit `bif` form (definitional).
+  have hch_eq : maxBool (a₁, b₁, s₁) (a₂, b₂, s₂) =
+      (bif decide (s₁ % 2 = s₂ % 2) then
+        (bif decide (s₁ % 2 = 0) then decide (a₁ * b₂ ≥ a₂ * b₁)
+          else decide (a₁ * b₂ ≤ a₂ * b₁))
+        else decide (s₁ % 2 = 0)) := rfl
+  rcases Nat.mod_two_eq_zero_or_one s₁ with hp1 | hp1 <;>
+    rcases Nat.mod_two_eq_zero_or_one s₂ with hp2 | hp2
+  · -- both even: `maxBool ↔ a₁·b₂ ≥ a₂·b₁`.
+    by_cases hge : a₁ * b₂ ≥ a₂ * b₁
+    · have hb : maxBool (a₁, b₁, s₁) (a₂, b₂, s₂) = true := by
+        rw [hch_eq]; simp [hp1, hp2, hge]
+      have hle : tripleToRat (a₂, b₂, s₂) ≤ tripleToRat (a₁, b₁, s₁) := by
+        rw [hv2, hv1, hp1, hp2]; simp only [pow_zero, one_mul]
+        rw [div_le_div_iff₀ hb₂q hb₁q]; exact_mod_cast hge
+      simp only [maxTriple, hb, cond_true]; exact (sup_eq_left.mpr hle).symm
+    · have hlt : a₁ * b₂ < a₂ * b₁ := lt_of_not_ge hge
+      have hb : maxBool (a₁, b₁, s₁) (a₂, b₂, s₂) = false := by
+        rw [hch_eq]; simp [hp1, hp2, hge]
+      have hle : tripleToRat (a₁, b₁, s₁) ≤ tripleToRat (a₂, b₂, s₂) := by
+        rw [hv1, hv2, hp1, hp2]; simp only [pow_zero, one_mul]
+        rw [div_le_div_iff₀ hb₁q hb₂q]; exact_mod_cast hlt.le
+      simp only [maxTriple, hb, cond_false]; exact (sup_eq_right.mpr hle).symm
+  · -- s₁ even, s₂ odd: `t₁ ≥ 0 ≥ t₂`, so `maxBool = true`.
+    have hb : maxBool (a₁, b₁, s₁) (a₂, b₂, s₂) = true := by
+      rw [hch_eq]; simp [hp1, hp2]
+    have hle : tripleToRat (a₂, b₂, s₂) ≤ tripleToRat (a₁, b₁, s₁) := by
+      rw [hv2, hv1, hp1, hp2]; simp only [pow_zero, pow_one, one_mul, neg_one_mul]; linarith
+    simp only [maxTriple, hb, cond_true]; exact (sup_eq_left.mpr hle).symm
+  · -- s₁ odd, s₂ even: `t₁ ≤ 0 ≤ t₂`, so `maxBool = false`.
+    have hb : maxBool (a₁, b₁, s₁) (a₂, b₂, s₂) = false := by
+      rw [hch_eq]; simp [hp1, hp2]
+    have hle : tripleToRat (a₁, b₁, s₁) ≤ tripleToRat (a₂, b₂, s₂) := by
+      rw [hv1, hv2, hp1, hp2]; simp only [pow_zero, pow_one, one_mul, neg_one_mul]; linarith
+    simp only [maxTriple, hb, cond_false]; exact (sup_eq_right.mpr hle).symm
+  · -- both odd: `maxBool ↔ a₁·b₂ ≤ a₂·b₁`.
+    by_cases hle_case : a₁ * b₂ ≤ a₂ * b₁
+    · have hb : maxBool (a₁, b₁, s₁) (a₂, b₂, s₂) = true := by
+        rw [hch_eq]; simp [hp1, hp2, hle_case]
+      have hle : tripleToRat (a₂, b₂, s₂) ≤ tripleToRat (a₁, b₁, s₁) := by
+        rw [hv2, hv1, hp1, hp2]; simp only [pow_one, neg_one_mul]
+        have h' : (a₁ : ℚ) / (b₁ : ℚ) ≤ (a₂ : ℚ) / (b₂ : ℚ) := by
+          rw [div_le_div_iff₀ hb₁q hb₂q]; exact_mod_cast hle_case
+        linarith
+      simp only [maxTriple, hb, cond_true]; exact (sup_eq_left.mpr hle).symm
+    · have hlt : a₂ * b₁ < a₁ * b₂ := lt_of_not_ge hle_case
+      have hb : maxBool (a₁, b₁, s₁) (a₂, b₂, s₂) = false := by
+        rw [hch_eq]; simp [hp1, hp2, hle_case]
+      have hle : tripleToRat (a₁, b₁, s₁) ≤ tripleToRat (a₂, b₂, s₂) := by
+        rw [hv1, hv2, hp1, hp2]; simp only [pow_one, neg_one_mul]
+        have h' : (a₂ : ℚ) / (b₂ : ℚ) ≤ (a₁ : ℚ) / (b₁ : ℚ) := by
+          rw [div_le_div_iff₀ hb₂q hb₁q]; exact_mod_cast hlt.le
+        linarith
+      simp only [maxTriple, hb, cond_false]; exact (sup_eq_right.mpr hle).symm
+
+/-- `maxTriple` is `Computable₂`: the wholesale-selection max is a `Computable.cond`
+on the sign-aware `maxBool` discriminator, selecting `Prod.fst`/`Prod.snd`. Mirrors
+`FinsetSumHelper.addTriple_computable`'s projection-and-`cond` recipe. -/
+theorem maxTriple_computable : Computable₂ maxTriple := by
+  show Computable (fun t : (ℕ × ℕ × ℕ) × (ℕ × ℕ × ℕ) => maxTriple t.1 t.2)
+  -- Projections.
+  have ha₁ : Computable (fun t : (ℕ × ℕ × ℕ) × (ℕ × ℕ × ℕ) => t.1.1) :=
+    Computable.fst.comp Computable.fst
+  have hb₁ : Computable (fun t : (ℕ × ℕ × ℕ) × (ℕ × ℕ × ℕ) => t.1.2.1) :=
+    (Computable.fst.comp Computable.snd).comp Computable.fst
+  have hs₁ : Computable (fun t : (ℕ × ℕ × ℕ) × (ℕ × ℕ × ℕ) => t.1.2.2) :=
+    (Computable.snd.comp Computable.snd).comp Computable.fst
+  have ha₂ : Computable (fun t : (ℕ × ℕ × ℕ) × (ℕ × ℕ × ℕ) => t.2.1) :=
+    Computable.fst.comp Computable.snd
+  have hb₂ : Computable (fun t : (ℕ × ℕ × ℕ) × (ℕ × ℕ × ℕ) => t.2.2.1) :=
+    (Computable.fst.comp Computable.snd).comp Computable.snd
+  have hs₂ : Computable (fun t : (ℕ × ℕ × ℕ) × (ℕ × ℕ × ℕ) => t.2.2.2) :=
+    (Computable.snd.comp Computable.snd).comp Computable.snd
+  -- Cross products `a₁·b₂` and `a₂·b₁`.
+  have hp₁ : Computable (fun t : (ℕ × ℕ × ℕ) × (ℕ × ℕ × ℕ) => t.1.1 * t.2.2.1) :=
+    Primrec.nat_mul.to_comp.comp ha₁ hb₂
+  have hp₂ : Computable (fun t : (ℕ × ℕ × ℕ) × (ℕ × ℕ × ℕ) => t.2.1 * t.1.2.1) :=
+    Primrec.nat_mul.to_comp.comp ha₂ hb₁
+  -- Parities and the two equality Bools.
+  have hpar₁ : Computable (fun t : (ℕ × ℕ × ℕ) × (ℕ × ℕ × ℕ) => t.1.2.2 % 2) :=
+    Primrec.nat_mod.to_comp.comp hs₁ (Computable.const 2)
+  have hpar₂ : Computable (fun t : (ℕ × ℕ × ℕ) × (ℕ × ℕ × ℕ) => t.2.2.2 % 2) :=
+    Primrec.nat_mod.to_comp.comp hs₂ (Computable.const 2)
+  have hbeq_par : Computable (fun t : (ℕ × ℕ × ℕ) × (ℕ × ℕ × ℕ) =>
+      decide (t.1.2.2 % 2 = t.2.2.2 % 2)) :=
+    Primrec.beq.to_comp.comp hpar₁ hpar₂
+  have hpar1_eq0 : Computable (fun t : (ℕ × ℕ × ℕ) × (ℕ × ℕ × ℕ) =>
+      decide (t.1.2.2 % 2 = 0)) :=
+    Primrec.beq.to_comp.comp hpar₁ (Computable.const 0)
+  -- Sign-aware comparison Bools.
+  have hge : Computable (fun t : (ℕ × ℕ × ℕ) × (ℕ × ℕ × ℕ) =>
+      decide (t.1.1 * t.2.2.1 ≥ t.2.1 * t.1.2.1)) := by
+    have : Primrec₂ (fun a b : ℕ => decide (a ≥ b)) := Primrec.nat_le.swap.decide
+    exact this.to_comp.comp hp₁ hp₂
+  have hle : Computable (fun t : (ℕ × ℕ × ℕ) × (ℕ × ℕ × ℕ) =>
+      decide (t.1.1 * t.2.2.1 ≤ t.2.1 * t.1.2.1)) := by
+    have : Primrec₂ (fun a b : ℕ => decide (a ≤ b)) := Primrec.nat_le.decide
+    exact this.to_comp.comp hp₁ hp₂
+  -- `maxBool` as a nested `cond`, then select fst/snd via `cond`.
+  have h_maxbool : Computable (fun t : (ℕ × ℕ × ℕ) × (ℕ × ℕ × ℕ) => maxBool t.1 t.2) :=
+    Computable.cond hbeq_par (Computable.cond hpar1_eq0 hge hle) hpar1_eq0
+  exact Computable.cond h_maxbool Computable.fst Computable.snd
+
+/-- Closure of `IsComputableSeqRat` under finite `Finset.sup'` (max) over a
+`Computable`-bounded range: for `r : ℕ × ℕ → ℚ` with `IsComputableDoubleSeqRat r`
+and `n : ℕ → ℕ` `Computable`, the sequence `fun k => max_{j ≤ n k} r (k, j)` (a
+`Finset.sup'` over `range (n k + 1)`) is in `IsComputableSeqRat`. Max-analogue of
+`FinsetSumHelper.finsetSum_rat`.
+
+The witness is a `Nat.rec` fold of the `Computable` wholesale-max `maxTriple` over
+`j`; correctness routes through `partialSups` (`partialSups_zero` / `partialSups_succ`),
+then `partialSups_eq_sup'_range` converts to the stated `sup'` form. -/
+theorem finsetMax_rat
+    {r : ℕ × ℕ → ℚ} (h : IsComputableDoubleSeqRat r)
+    {n : ℕ → ℕ} (hn : Computable n) :
+    IsComputableSeqRat (fun k => (Finset.range (n k + 1)).sup'
+      Finset.nonempty_range_add_one (fun j => r (k, j))) := by
+  obtain ⟨a_r, b_r, s_r, ha_r, hb_r, hs_r, hne_r, heq_r⟩ := h
+  -- `maxRec k` = max-accumulated witness triple of `r (k, 0), …, r (k, n k)`.
+  let maxRec : ℕ → ℕ × ℕ × ℕ := fun k =>
+    Nat.rec (motive := fun _ => ℕ × ℕ × ℕ)
+      (a_r (Nat.pair k 0), b_r (Nat.pair k 0), s_r (Nat.pair k 0))
+      (fun y IH => maxTriple IH
+        (a_r (Nat.pair k (y + 1)), b_r (Nat.pair k (y + 1)), s_r (Nat.pair k (y + 1))))
+      (n k)
+  have h_maxRec : Computable maxRec := by
+    have h_step : Computable₂ (fun (k : ℕ) (yih : ℕ × (ℕ × ℕ × ℕ)) =>
+        maxTriple yih.2
+          (a_r (Nat.pair k (yih.1 + 1)), b_r (Nat.pair k (yih.1 + 1)),
+           s_r (Nat.pair k (yih.1 + 1)))) := by
+      show Computable (fun p : ℕ × (ℕ × ℕ × ℕ × ℕ) =>
+        maxTriple p.2.2 (a_r (Nat.pair p.1 (p.2.1 + 1)),
+                         b_r (Nat.pair p.1 (p.2.1 + 1)),
+                         s_r (Nat.pair p.1 (p.2.1 + 1))))
+      have h_k : Computable (fun p : ℕ × (ℕ × ℕ × ℕ × ℕ) => p.1) := Computable.fst
+      have h_y1 : Computable (fun p : ℕ × (ℕ × ℕ × ℕ × ℕ) => p.2.1 + 1) :=
+        Computable.succ.comp (Computable.fst.comp Computable.snd)
+      have h_ih : Computable (fun p : ℕ × (ℕ × ℕ × ℕ × ℕ) => p.2.2) :=
+        Computable.snd.comp Computable.snd
+      have h_pair : Computable (fun p : ℕ × (ℕ × ℕ × ℕ × ℕ) => Nat.pair p.1 (p.2.1 + 1)) :=
+        Primrec₂.natPair.to_comp.comp h_k h_y1
+      have h_t2 : Computable (fun p : ℕ × (ℕ × ℕ × ℕ × ℕ) =>
+          (a_r (Nat.pair p.1 (p.2.1 + 1)),
+           b_r (Nat.pair p.1 (p.2.1 + 1)),
+           s_r (Nat.pair p.1 (p.2.1 + 1)))) :=
+        (ha_r.comp h_pair).pair ((hb_r.comp h_pair).pair (hs_r.comp h_pair))
+      exact maxTriple_computable.comp h_ih h_t2
+    have h_base : Computable (fun k : ℕ =>
+        (a_r (Nat.pair k 0), b_r (Nat.pair k 0), s_r (Nat.pair k 0))) := by
+      have h_pair0 : Computable (fun k : ℕ => Nat.pair k 0) :=
+        Primrec₂.natPair.to_comp.comp Computable.id (Computable.const 0)
+      exact (ha_r.comp h_pair0).pair ((hb_r.comp h_pair0).pair (hs_r.comp h_pair0))
+    exact Computable.nat_rec hn h_base h_step
+  have witness_val : ∀ k j,
+      tripleToRat (a_r (Nat.pair k j), b_r (Nat.pair k j), s_r (Nat.pair k j)) = r (k, j) := by
+    intro k j
+    have hh := heq_r (Nat.pair k j)
+    simp only [Nat.unpair_pair] at hh
+    simp only [tripleToRat]
+    exact hh.symm
+  have rec_aux : ∀ k m,
+      (Nat.rec (motive := fun _ => ℕ × ℕ × ℕ)
+        (a_r (Nat.pair k 0), b_r (Nat.pair k 0), s_r (Nat.pair k 0))
+        (fun y IH => maxTriple IH
+          (a_r (Nat.pair k (y + 1)), b_r (Nat.pair k (y + 1)), s_r (Nat.pair k (y + 1))))
+        m).2.1 ≠ 0 ∧
+      tripleToRat (Nat.rec (motive := fun _ => ℕ × ℕ × ℕ)
+        (a_r (Nat.pair k 0), b_r (Nat.pair k 0), s_r (Nat.pair k 0))
+        (fun y IH => maxTriple IH
+          (a_r (Nat.pair k (y + 1)), b_r (Nat.pair k (y + 1)), s_r (Nat.pair k (y + 1))))
+        m) = partialSups (fun j => r (k, j)) m := by
+    intro k m
+    induction m with
+    | zero =>
+      exact ⟨hne_r (Nat.pair k 0), by rw [partialSups_zero]; exact witness_val k 0⟩
+    | succ m IH =>
+      obtain ⟨ih_b, ih_val⟩ := IH
+      refine ⟨maxTriple_b_ne_zero ih_b (hne_r (Nat.pair k (m + 1))), ?_⟩
+      rw [maxTriple_correct ih_b (hne_r (Nat.pair k (m + 1))), ih_val, witness_val k (m + 1)]
+      exact (partialSups_succ (fun j => r (k, j)) m).symm
+  have key : IsComputableSeqRat (fun k => partialSups (fun j => r (k, j)) (n k)) := by
+    refine ⟨fun k => (maxRec k).1, fun k => (maxRec k).2.1, fun k => (maxRec k).2.2,
+      Computable.fst.comp h_maxRec,
+      (Computable.fst.comp Computable.snd).comp h_maxRec,
+      (Computable.snd.comp Computable.snd).comp h_maxRec,
+      ?_, ?_⟩
+    · intro k
+      exact (rec_aux k (n k)).1
+    · intro k
+      show partialSups (fun j => r (k, j)) (n k) = tripleToRat (maxRec k)
+      exact (rec_aux k (n k)).2.symm
+  have heq_form : (fun k => partialSups (fun j => r (k, j)) (n k))
+      = (fun k => (Finset.range (n k + 1)).sup' Finset.nonempty_range_add_one
+          (fun j => r (k, j))) := by
+    funext k
+    exact partialSups_eq_sup'_range (fun j => r (k, j)) (n k)
+  rwa [heq_form] at key
+
+end FinsetMaxHelper
+
+/-! ## §0c — Polynomial-evaluation closure helpers for A3 (TODO refactor → L1)
+
+Closure lemmas for evaluating a polynomial with `IsComputableSeqRat` coefficients
+at a `IsComputableSeqRat` rational point. The endpoint is
+`polyEvalRat_isComputableDoubleSeqRat`: combining `IsComputableSeqRat`-power,
+flat triple-indexed coefficients, and `finsetSum_rat`, the rational value
+`(p, k) ↦ Σⱼ a(p, j) · q(p)^j` (`j ∈ range(d(p)+1)`) is `IsComputableDoubleSeqRat`.
+
+Needed by A3 for the partial-max approximant `sNK`: each grid point produces a
+rational polynomial evaluation, and the partial max ② is taken over them. -/
+
+namespace PolyEvalHelper
+
+/-- Power closure of `IsComputableSeqRat` with varying exponent: given
+`IsComputableSeqRat q`, the doubly-indexed sequence `(k, j) ↦ q k ^ j` is
+`IsComputableDoubleSeqRat`. The witness lifts `q`'s triple `(a, b, s)` via
+`(a^j, b^j, s·j)` — the rational `(-1)^s · (a/b)` rule extends to powers because
+`mul_pow + div_pow + ← pow_mul` distributes the exponent. The `Nat`-level
+power `a^j` is `Computable` via `Primrec₂.unpaired'.1 Nat.Primrec.pow`
+(there is no top-level `Primrec.nat_pow`; cf. `docs/PITFALLS.md §1`). -/
+theorem pow_isComputableDoubleSeqRat
+    {q : ℕ → ℚ} (hq : IsComputableSeqRat q) :
+    IsComputableDoubleSeqRat (fun pj => q pj.1 ^ pj.2) := by
+  obtain ⟨a, b, s, ha, hb, hs, hne, heq⟩ := hq
+  change IsComputableSeqRat
+    (fun m => q (Nat.unpair m).1 ^ (Nat.unpair m).2)
+  have h_fst : Computable (fun m : ℕ => (Nat.unpair m).1) :=
+    Computable.fst.comp Computable.unpair
+  have h_snd : Computable (fun m : ℕ => (Nat.unpair m).2) :=
+    Computable.snd.comp Computable.unpair
+  have hpow : Primrec₂ ((· ^ ·) : ℕ → ℕ → ℕ) := Primrec₂.unpaired'.1 Nat.Primrec.pow
+  refine ⟨
+    fun m => a (Nat.unpair m).1 ^ (Nat.unpair m).2,
+    fun m => b (Nat.unpair m).1 ^ (Nat.unpair m).2,
+    fun m => s (Nat.unpair m).1 * (Nat.unpair m).2,
+    hpow.to_comp.comp (ha.comp h_fst) h_snd,
+    hpow.to_comp.comp (hb.comp h_fst) h_snd,
+    Primrec.nat_mul.to_comp.comp (hs.comp h_fst) h_snd,
+    fun _ => pow_ne_zero _ (hne _), fun m => ?_⟩
+  show q (Nat.unpair m).1 ^ (Nat.unpair m).2 =
+      (-1 : ℚ) ^ (s (Nat.unpair m).1 * (Nat.unpair m).2) *
+        ((a (Nat.unpair m).1 ^ (Nat.unpair m).2 : ℕ) /
+         (b (Nat.unpair m).1 ^ (Nat.unpair m).2 : ℕ) : ℚ)
+  rw [heq (Nat.unpair m).1, mul_pow, ← pow_mul, div_pow]
+  push_cast
+  ring
+
+/-- Closure of `IsComputableSeqRat` under "polynomial value at a varying point":
+given a triple-indexed coefficient family `a : ℕ × ℕ × ℕ → ℚ` (with flat
+`IsComputableSeqRat`), a `Computable` degree bound `d : ℕ × ℕ → ℕ`, `Computable`
+indexers `n_idx, K_idx : ℕ → ℕ`, and an `IsComputableSeqRat` evaluation point
+`q : ℕ → ℚ`, the sequence
+`p ↦ Σⱼ a(n_idx p, K_idx p, j) · (q p)^j`  (`j ∈ range(d(n_idx p, K_idx p) + 1)`)
+is `IsComputableSeqRat`. The core A3 step ③ helper: combining
+`pow_isComputableDoubleSeqRat`, a triple-reindex of the coefficient family,
+`IsComputableSeqRat.mul`, and `FinsetSumHelper.finsetSum_rat`. -/
+theorem polyVal_isComputableSeqRat
+    {a : ℕ × ℕ × ℕ → ℚ}
+    (ha : IsComputableSeqRat (fun m =>
+      a ((Nat.unpair m).1, (Nat.unpair (Nat.unpair m).2).1,
+         (Nat.unpair (Nat.unpair m).2).2)))
+    {d : ℕ × ℕ → ℕ} (hd : Computable d)
+    {n_idx K_idx : ℕ → ℕ} (hn : Computable n_idx) (hK : Computable K_idx)
+    {q : ℕ → ℚ} (hq : IsComputableSeqRat q) :
+    IsComputableSeqRat (fun p => ∑ j ∈ Finset.range (d (n_idx p, K_idx p) + 1),
+        a (n_idx p, K_idx p, j) * (q p) ^ j) := by
+  -- `r (p, j) := a (n_idx p, K_idx p, j) * (q p) ^ j`. Goal reduces via
+  -- `finsetSum_rat` to `IsComputableDoubleSeqRat r` + `Computable bound`.
+  set r : ℕ × ℕ → ℚ := fun pj =>
+    a (n_idx pj.1, K_idx pj.1, pj.2) * (q pj.1) ^ pj.2 with hr_def
+  set bound : ℕ → ℕ := fun p => d (n_idx p, K_idx p) with hbnd_def
+  have hbnd : Computable bound := hd.comp (hn.pair hK)
+  -- `IsComputableDoubleSeqRat r`: factor `r = r₁ · r₂` (componentwise on flat),
+  -- where `r₁ (p, j) := a (n_idx p, K_idx p, j)` and `r₂ (p, j) := (q p)^j`.
+  have hr : IsComputableDoubleSeqRat r := by
+    have hr2 : IsComputableDoubleSeqRat (fun pj : ℕ × ℕ => q pj.1 ^ pj.2) :=
+      pow_isComputableDoubleSeqRat hq
+    -- `r₁` via reindex of `a`-flat.
+    have hr1 : IsComputableDoubleSeqRat
+        (fun pj : ℕ × ℕ => a (n_idx pj.1, K_idx pj.1, pj.2)) := by
+      change IsComputableSeqRat
+        (fun m => a (n_idx (Nat.unpair m).1, K_idx (Nat.unpair m).1, (Nat.unpair m).2))
+      have h_fst : Computable (fun m : ℕ => (Nat.unpair m).1) :=
+        Computable.fst.comp Computable.unpair
+      have h_snd : Computable (fun m : ℕ => (Nat.unpair m).2) :=
+        Computable.snd.comp Computable.unpair
+      have h_n : Computable (fun m : ℕ => n_idx (Nat.unpair m).1) := hn.comp h_fst
+      have h_K : Computable (fun m : ℕ => K_idx (Nat.unpair m).1) := hK.comp h_fst
+      have h_Kj : Computable (fun m : ℕ =>
+          Nat.pair (K_idx (Nat.unpair m).1) (Nat.unpair m).2) :=
+        Primrec₂.natPair.to_comp.comp h_K h_snd
+      have hσ : Computable (fun m : ℕ =>
+          Nat.pair (n_idx (Nat.unpair m).1)
+            (Nat.pair (K_idx (Nat.unpair m).1) (Nat.unpair m).2)) :=
+        Primrec₂.natPair.to_comp.comp h_n h_Kj
+      have key : IsComputableSeqRat (fun m =>
+          a ((Nat.unpair (Nat.pair (n_idx (Nat.unpair m).1)
+                          (Nat.pair (K_idx (Nat.unpair m).1) (Nat.unpair m).2))).1,
+             (Nat.unpair (Nat.unpair (Nat.pair (n_idx (Nat.unpair m).1)
+                          (Nat.pair (K_idx (Nat.unpair m).1) (Nat.unpair m).2))).2).1,
+             (Nat.unpair (Nat.unpair (Nat.pair (n_idx (Nat.unpair m).1)
+                          (Nat.pair (K_idx (Nat.unpair m).1) (Nat.unpair m).2))).2).2)) :=
+        ha.comp hσ
+      convert key using 1
+      funext m
+      simp [Nat.unpair_pair]
+    -- Pointwise product on `ℕ × ℕ → ℚ` via flat `IsComputableSeqRat.mul`.
+    show IsComputableSeqRat (fun m => r (Nat.unpair m))
+    have hmul : IsComputableSeqRat
+        ((fun m => a (n_idx (Nat.unpair m).1, K_idx (Nat.unpair m).1, (Nat.unpair m).2))
+         * (fun m => q (Nat.unpair m).1 ^ (Nat.unpair m).2)) :=
+      IsComputableSeqRat.mul hr1 hr2
+    convert hmul using 1
+  -- Apply finsetSum_rat with `r` and `bound`.
+  have key := FinsetSumHelper.finsetSum_rat (r := r) hr hbnd
+  -- Match the target: pointwise-equal by `r`'s definition (`rfl` after `convert`).
+  convert key using 1
+
+/-- Grid-points sequence: given `IsComputableDoubleSeqRat` rational approximants
+`αR, βR` of `α, β`, a `Computable` precision selector `m : ℕ × ℕ → ℕ`, and a
+`Computable` nonzero grid count `k : ℕ × ℕ → ℕ`, the rational grid
+`αR(0, m(n,N)) + (J/k(n,N)) · (βR(0, m(n,N)) − αR(0, m(n,N)))`
+viewed as a function of the flat index `p ↔ (n, N, J)` via
+`Nat.pair n (Nat.pair N J)` is `IsComputableSeqRat`.
+
+Built stepwise via the L1 closure API: `comp` to reindex `αR, βR`, `sub` for
+`βR − αR`, direct witness `(J, k, 0)` for `(J : ℚ)/(k : ℚ)`, `mul` to combine,
+`add` for the final sum. A3 step ① helper. -/
+theorem gridQ_isComputableSeqRat
+    {αR βR : ℕ × ℕ → ℚ}
+    (hαR : IsComputableDoubleSeqRat αR) (hβR : IsComputableDoubleSeqRat βR)
+    {m k : ℕ × ℕ → ℕ} (hm : Computable m) (hk : Computable k)
+    (hk_pos : ∀ p, k p ≠ 0) :
+    IsComputableSeqRat (fun p : ℕ =>
+      αR (0, m ((Nat.unpair p).1, (Nat.unpair (Nat.unpair p).2).1)) +
+      (((Nat.unpair (Nat.unpair p).2).2 : ℚ) /
+        (k ((Nat.unpair p).1, (Nat.unpair (Nat.unpair p).2).1) : ℚ)) *
+      (βR (0, m ((Nat.unpair p).1, (Nat.unpair (Nat.unpair p).2).1)) -
+       αR (0, m ((Nat.unpair p).1, (Nat.unpair (Nat.unpair p).2).1)))) := by
+  -- Computable projectors out of the flat index `p ↔ (n, N, J)`.
+  have h_n : Computable (fun p : ℕ => (Nat.unpair p).1) :=
+    Computable.fst.comp Computable.unpair
+  have h_NJ : Computable (fun p : ℕ => (Nat.unpair p).2) :=
+    Computable.snd.comp Computable.unpair
+  have h_N : Computable (fun p : ℕ => (Nat.unpair (Nat.unpair p).2).1) :=
+    Computable.fst.comp (Computable.unpair.comp h_NJ)
+  have h_J : Computable (fun p : ℕ => (Nat.unpair (Nat.unpair p).2).2) :=
+    Computable.snd.comp (Computable.unpair.comp h_NJ)
+  have h_nN : Computable (fun p : ℕ => ((Nat.unpair p).1,
+      (Nat.unpair (Nat.unpair p).2).1)) := h_n.pair h_N
+  have h_k_nN : Computable (fun p : ℕ =>
+      k ((Nat.unpair p).1, (Nat.unpair (Nat.unpair p).2).1)) := hk.comp h_nN
+  have h_m_nN : Computable (fun p : ℕ =>
+      m ((Nat.unpair p).1, (Nat.unpair (Nat.unpair p).2).1)) := hm.comp h_nN
+  -- σ : reindex onto αR-flat to extract `αR(0, m(n_p, N_p))`.
+  have h_σ : Computable (fun p : ℕ => Nat.pair 0 (m ((Nat.unpair p).1,
+      (Nat.unpair (Nat.unpair p).2).1))) :=
+    Primrec₂.natPair.to_comp.comp (Computable.const 0) h_m_nN
+  -- αR_seq, βR_seq via comp on the flat forms.
+  have hαR_seq : IsComputableSeqRat (fun p : ℕ =>
+      αR (0, m ((Nat.unpair p).1, (Nat.unpair (Nat.unpair p).2).1))) := by
+    have hflat : IsComputableSeqRat (fun q : ℕ => αR (Nat.unpair q)) := hαR
+    have key : IsComputableSeqRat
+      ((fun q : ℕ => αR (Nat.unpair q)) ∘
+        (fun p : ℕ => Nat.pair 0
+          (m ((Nat.unpair p).1, (Nat.unpair (Nat.unpair p).2).1)))) :=
+      IsComputableSeqRat.comp hflat h_σ
+    convert key using 1
+    funext p
+    simp [Function.comp, Nat.unpair_pair]
+  have hβR_seq : IsComputableSeqRat (fun p : ℕ =>
+      βR (0, m ((Nat.unpair p).1, (Nat.unpair (Nat.unpair p).2).1))) := by
+    have hflat : IsComputableSeqRat (fun q : ℕ => βR (Nat.unpair q)) := hβR
+    have key : IsComputableSeqRat
+      ((fun q : ℕ => βR (Nat.unpair q)) ∘
+        (fun p : ℕ => Nat.pair 0
+          (m ((Nat.unpair p).1, (Nat.unpair (Nat.unpair p).2).1)))) :=
+      IsComputableSeqRat.comp hflat h_σ
+    convert key using 1
+    funext p
+    simp [Function.comp, Nat.unpair_pair]
+  -- Difference βR − αR (uses L1 `sub`).
+  have hdiff_seq : IsComputableSeqRat (fun p : ℕ =>
+      βR (0, m ((Nat.unpair p).1, (Nat.unpair (Nat.unpair p).2).1)) -
+      αR (0, m ((Nat.unpair p).1, (Nat.unpair (Nat.unpair p).2).1))) :=
+    IsComputableSeqRat.sub hβR_seq hαR_seq
+  -- (J : ℚ) / (k(n, N) : ℚ) via direct witness.
+  have hfrac_seq : IsComputableSeqRat (fun p : ℕ =>
+      ((Nat.unpair (Nat.unpair p).2).2 : ℚ) /
+      (k ((Nat.unpair p).1, (Nat.unpair (Nat.unpair p).2).1) : ℚ)) := by
+    refine ⟨fun p => (Nat.unpair (Nat.unpair p).2).2,
+      fun p => k ((Nat.unpair p).1, (Nat.unpair (Nat.unpair p).2).1),
+      fun _ => 0,
+      h_J, h_k_nN, Computable.const 0,
+      fun p => hk_pos _, fun p => ?_⟩
+    show ((Nat.unpair (Nat.unpair p).2).2 : ℚ) /
+        (k ((Nat.unpair p).1, (Nat.unpair (Nat.unpair p).2).1) : ℚ)
+      = (-1 : ℚ)^0 * (((Nat.unpair (Nat.unpair p).2).2 : ℕ) /
+          (k ((Nat.unpair p).1, (Nat.unpair (Nat.unpair p).2).1) : ℕ) : ℚ)
+    ring
+  -- (J/k) · (βR − αR).
+  have hscaled_seq : IsComputableSeqRat (fun p : ℕ =>
+      (((Nat.unpair (Nat.unpair p).2).2 : ℚ) /
+        (k ((Nat.unpair p).1, (Nat.unpair (Nat.unpair p).2).1) : ℚ)) *
+      (βR (0, m ((Nat.unpair p).1, (Nat.unpair (Nat.unpair p).2).1)) -
+       αR (0, m ((Nat.unpair p).1, (Nat.unpair (Nat.unpair p).2).1)))) :=
+    IsComputableSeqRat.mul hfrac_seq hdiff_seq
+  -- αR + (J/k)·(βR − αR).
+  exact IsComputableSeqRat.add hαR_seq hscaled_seq
+
+end PolyEvalHelper
+
 /-! ## §0b — Pure arithmetic helpers for the A1 norm bound
 
 These lemmas are recursion, Finset, and cast arithmetic facts used by the
@@ -597,6 +1082,125 @@ theorem polyApproxCMap_norm_le_sum
         exact mul_le_mul (hC j)
           (by rw [abs_pow]; exact pow_le_pow_left₀ (abs_nonneg _) hvB j)
           (abs_nonneg _) (hCnn j)
+
+/-- **Pointwise Lipschitz bound for `polyApproxCMap`.** For any two points
+`x, y ∈ [α, β]` with `max(|α|, |β|) ≤ B`,
+`|pₙₖ(x) − pₙₖ(y)| ≤ (Σⱼ j · |a(n,k,j)| · B^(j−1)) · |x − y|`.
+
+This is A3 outline step ③ (effective uniform continuity of `pₙₖ`). The bound
+factors via `Mathlib.Algebra.Order.Ring.Abs.abs_pow_sub_pow_le`:
+`|xʲ − yʲ| ≤ |x − y| · j · max(|x|, |y|)^(j−1)`, then dominates
+`max(|x|, |y|)^(j−1) ≤ B^(j−1)` and sums by the triangle inequality.
+
+P-R `chapt0:1003-1009` uses the same closed-form Lipschitz bound to derive
+the effective-uniform-continuity modulus needed for Theorem 7's grid argument. -/
+theorem polyApproxCMap_lipschitz
+    (a : ℕ × ℕ × ℕ → ℚ) (d : ℕ × ℕ → ℕ) (n k B : ℕ)
+    (hαB : |α| ≤ (B : ℝ)) (hβB : |β| ≤ (B : ℝ)) (x y : Set.Icc α β) :
+    |(polyApproxCMap (α := α) (β := β) a d n k) x
+        - (polyApproxCMap (α := α) (β := β) a d n k) y|
+      ≤ (∑ j ∈ Finset.range (d (n, k) + 1),
+          (j : ℝ) * |(a (n, k, j) : ℝ)| * (B : ℝ) ^ (j - 1))
+        * |x.val - y.val| := by
+  have hxB : |x.val| ≤ (B : ℝ) := by
+    have hx := x.2
+    rw [Set.mem_Icc] at hx
+    rw [abs_le]
+    exact ⟨by linarith [(abs_le.mp hαB).1, hx.1], by linarith [(abs_le.mp hβB).2, hx.2]⟩
+  have hyB : |y.val| ≤ (B : ℝ) := by
+    have hy := y.2
+    rw [Set.mem_Icc] at hy
+    rw [abs_le]
+    exact ⟨by linarith [(abs_le.mp hαB).1, hy.1], by linarith [(abs_le.mp hβB).2, hy.2]⟩
+  have hmaxB : max |x.val| |y.val| ≤ (B : ℝ) := max_le hxB hyB
+  have hmaxNN : (0 : ℝ) ≤ max |x.val| |y.val| := le_max_of_le_left (abs_nonneg _)
+  rw [polyApproxCMap_eval, polyApproxCMap_eval, ← Finset.sum_sub_distrib]
+  calc |∑ j ∈ Finset.range (d (n, k) + 1),
+          ((a (n, k, j) : ℝ) * x.val ^ j - (a (n, k, j) : ℝ) * y.val ^ j)|
+      = |∑ j ∈ Finset.range (d (n, k) + 1),
+          (a (n, k, j) : ℝ) * (x.val ^ j - y.val ^ j)| := by
+        congr 1
+        apply Finset.sum_congr rfl
+        intro j _
+        ring
+    _ ≤ ∑ j ∈ Finset.range (d (n, k) + 1),
+          |(a (n, k, j) : ℝ) * (x.val ^ j - y.val ^ j)| :=
+        Finset.abs_sum_le_sum_abs _ _
+    _ ≤ ∑ j ∈ Finset.range (d (n, k) + 1),
+          (j : ℝ) * |(a (n, k, j) : ℝ)| * (B : ℝ) ^ (j - 1) * |x.val - y.val| := by
+        apply Finset.sum_le_sum
+        intro j _
+        rw [abs_mul]
+        have hpow : |x.val ^ j - y.val ^ j|
+            ≤ |x.val - y.val| * j * max |x.val| |y.val| ^ (j - 1) :=
+          abs_pow_sub_pow_le x.val y.val j
+        have hpowB : max |x.val| |y.val| ^ (j - 1) ≤ (B : ℝ) ^ (j - 1) :=
+          pow_le_pow_left₀ hmaxNN hmaxB (j - 1)
+        have hjnn : (0 : ℝ) ≤ |x.val - y.val| * j :=
+          mul_nonneg (abs_nonneg _) (Nat.cast_nonneg _)
+        have h1 : |x.val ^ j - y.val ^ j| ≤ |x.val - y.val| * j * (B : ℝ) ^ (j - 1) :=
+          hpow.trans (mul_le_mul_of_nonneg_left hpowB hjnn)
+        calc |(a (n, k, j) : ℝ)| * |x.val ^ j - y.val ^ j|
+            ≤ |(a (n, k, j) : ℝ)| * (|x.val - y.val| * j * (B : ℝ) ^ (j - 1)) :=
+              mul_le_mul_of_nonneg_left h1 (abs_nonneg _)
+          _ = (j : ℝ) * |(a (n, k, j) : ℝ)| * (B : ℝ) ^ (j - 1) * |x.val - y.val| := by ring
+    _ = (∑ j ∈ Finset.range (d (n, k) + 1),
+          (j : ℝ) * |(a (n, k, j) : ℝ)| * (B : ℝ) ^ (j - 1)) * |x.val - y.val| := by
+        rw [Finset.sum_mul]
+
+/-- **Real-line Lipschitz bound for polynomial expressions.** Variant of
+`polyApproxCMap_lipschitz` that takes raw real points `x, y : ℝ` with explicit
+absolute-value bound `C` (rather than `Set.Icc α β`-typed points). Used in A3
+(see iter-09's three-error bound) at grid points `xQ_J : ℝ` that may lie
+slightly outside `[α, β]` — there we take `C := B + 1` to cover both the
+interval `[α, β]` (where `|·| ≤ B`) and grid points in
+`[α − 2⁻ᵐ, β + 2⁻ᵐ] ⊆ [-(B+1), B+1]`.
+
+The proof is structurally identical to `polyApproxCMap_lipschitz` minus the
+`Set.Icc α β` unpacking — both factor via `Algebra.Order.Ring.Abs.abs_pow_sub_pow_le`. -/
+theorem polyEval_lipschitz_real
+    (a : ℕ × ℕ × ℕ → ℚ) (d : ℕ × ℕ → ℕ) (n k C : ℕ)
+    (x y : ℝ) (hxC : |x| ≤ (C : ℝ)) (hyC : |y| ≤ (C : ℝ)) :
+    |(∑ j ∈ Finset.range (d (n, k) + 1), (a (n, k, j) : ℝ) * x ^ j)
+        - (∑ j ∈ Finset.range (d (n, k) + 1), (a (n, k, j) : ℝ) * y ^ j)|
+      ≤ (∑ j ∈ Finset.range (d (n, k) + 1),
+          (j : ℝ) * |(a (n, k, j) : ℝ)| * (C : ℝ) ^ (j - 1))
+        * |x - y| := by
+  have hmaxC : max |x| |y| ≤ (C : ℝ) := max_le hxC hyC
+  have hmaxNN : (0 : ℝ) ≤ max |x| |y| := le_max_of_le_left (abs_nonneg _)
+  rw [← Finset.sum_sub_distrib]
+  calc |∑ j ∈ Finset.range (d (n, k) + 1),
+          ((a (n, k, j) : ℝ) * x ^ j - (a (n, k, j) : ℝ) * y ^ j)|
+      = |∑ j ∈ Finset.range (d (n, k) + 1),
+          (a (n, k, j) : ℝ) * (x ^ j - y ^ j)| := by
+        congr 1
+        apply Finset.sum_congr rfl
+        intro j _
+        ring
+    _ ≤ ∑ j ∈ Finset.range (d (n, k) + 1),
+          |(a (n, k, j) : ℝ) * (x ^ j - y ^ j)| :=
+        Finset.abs_sum_le_sum_abs _ _
+    _ ≤ ∑ j ∈ Finset.range (d (n, k) + 1),
+          (j : ℝ) * |(a (n, k, j) : ℝ)| * (C : ℝ) ^ (j - 1) * |x - y| := by
+        apply Finset.sum_le_sum
+        intro j _
+        rw [abs_mul]
+        have hpow : |x ^ j - y ^ j|
+            ≤ |x - y| * j * max |x| |y| ^ (j - 1) :=
+          abs_pow_sub_pow_le x y j
+        have hpowC : max |x| |y| ^ (j - 1) ≤ (C : ℝ) ^ (j - 1) :=
+          pow_le_pow_left₀ hmaxNN hmaxC (j - 1)
+        have hjnn : (0 : ℝ) ≤ |x - y| * j :=
+          mul_nonneg (abs_nonneg _) (Nat.cast_nonneg _)
+        have h1 : |x ^ j - y ^ j| ≤ |x - y| * j * (C : ℝ) ^ (j - 1) :=
+          hpow.trans (mul_le_mul_of_nonneg_left hpowC hjnn)
+        calc |(a (n, k, j) : ℝ)| * |x ^ j - y ^ j|
+            ≤ |(a (n, k, j) : ℝ)| * (|x - y| * j * (C : ℝ) ^ (j - 1)) :=
+              mul_le_mul_of_nonneg_left h1 (abs_nonneg _)
+          _ = (j : ℝ) * |(a (n, k, j) : ℝ)| * (C : ℝ) ^ (j - 1) * |x - y| := by ring
+    _ = (∑ j ∈ Finset.range (d (n, k) + 1),
+          (j : ℝ) * |(a (n, k, j) : ℝ)| * (C : ℝ) ^ (j - 1)) * |x - y| := by
+        rw [Finset.sum_mul]
 
 /-- **P-R Ch. 2:141** characterization, used here as definition: a sequence
 `f : ℕ → C(Set.Icc α β, ℝ)` of continuous functions on the closed interval
@@ -1437,6 +2041,7 @@ theorem isComputableSeqCMap_of_effectiveLimit :
           field_simp
           ring
 
+set_option maxHeartbeats 1600000 in
 /-- **C[a,b] computability — Axiom 3 (Norm).** P-R Ch. 0 Theorem 7 (Maximum
 Values), quoted from `literature/papers/PourEl-Richards-chapt0.md:977-983`:
 
@@ -1452,171 +2057,981 @@ P-R's proof (`chapt0.md:984-1012`) takes the 1-D case `[a, b]` and reads off
 > "Since `a`, `b` are computable reals, and since `{fₙ}` is sequentially
 > computable, the double sequence `{s_{n,k}}` is computable." (P-R `chapt0:992`)
 
-The explicit hypothesis "`a`, `b` are computable reals" in P-R's proof is what
-the *current signature of `isComputableSeqCMap_norm` fails to encode*. See the
-"Why this signature is inadequate" section below for a formal counterexample
-and the "Recommended fix" section for the minimal signature change.
+The explicit hypothesis "`a`, `b` are computable reals" in P-R's proof is
+encoded here as `(hα_c : IsComputableReal α) (hβ_c : IsComputableReal β)`,
+matching P-R Ch. 2:128's phrasing "for recursive reals `a`, `b`". The
+rational bound `B` controls the magnitude of `α, β` but not their
+approximant data; `hα_c, hβ_c` supply that approximant data (via
+`IsComputableReal`'s constant-sequence form, which unfolds to a rational
+double-sequence converging effectively to `α` resp. `β`).
 
-## Status: **blocked on signature change required**
+## Signature evolution
 
-The body carries `sorry`. The lemma cannot be closed under the current
-signature — see below.
+A prior round (`l4-cmap-surface-axiom1`) surfaced this lemma with the
+weaker signature `(B) (hα_le) (hβ_le)` only. That signature is provably
+inadequate: take `P` undecidable Σ⁰₁, `ε := if P then 1 else 0`, `α := 0`,
+`β := -ε`; then `|α|, |β| ≤ 1` but `‖f n‖ ∈ {0, 1}` depending on `P`
+(via empty vs. singleton `Set.Icc α β`), so `(‖f n‖)` is not
+`IsComputableSeqReal`. The added `hα_c, hβ_c` hypotheses rule this out.
+Full obstruction analysis in git history at commit `a022a88`.
 
-## Why this signature is inadequate
+## Proof outline (P-R chapt0:984-1012, six moves)
 
-The signature gives only an integer bound `B` with `|α|, |β| ≤ B`; α, β
-themselves may be arbitrary noncomputable reals. The witness data of
-`IsComputableSeqCMap f` (polynomial coefficients `a : ℕ × ℕ × ℕ → ℚ`, degree
-bound `d : ℕ × ℕ → ℕ`, and the per-step approximation
-`‖f n − polyApproxCMap a d n k‖ ≤ 1/2^k`) determines `f` *modulo* the
-interval `[α, β]`, but **the sup-norm `‖f n‖` depends on `[α, β]` in a way
-that no rational data about α, β can pin down**.
+Given a polynomial-approximant witness `(a, d) : (ℕ × ℕ × ℕ → ℚ) × (ℕ × ℕ → ℕ)`
+for `f` (from `IsComputableSeqCMap.hf`) and rational approximant witnesses
+`αApprox, βApprox : ℕ × ℕ → ℚ` for `α, β` (from `hα_c, hβ_c`):
 
-**Counterexample**. Let `P` be any undecidable Σ⁰₁ predicate of ℕ and set
-`ε := if P then 1 else 0`. Take `α := 0`, `β := -ε`. Then `|α|, |β| ≤ 1`,
-so the signature's hypothesis is satisfied with `B = 1`.
+① **Grid.** For `n, k`, pick approximant precision `m(n, k)` and form
+  rational grid `x_{n, k, j} := αApprox(0, m) + (j/k) · (βApprox(0, m) − αApprox(0, m))`
+  for `j = 0, …, k`.
 
-Consider the constant-one sequence `f n := 1 : C(Set.Icc α β, ℝ)`. The
-polynomial approximant `p_{n,k}(x) := 1` (`a(n, k, 0) := 1`, `d(n, k) := 0`,
-all higher coefficients 0) satisfies `f n - p_{n,k} = 0`, so
-`‖f n - p_{n,k}‖ = 0 ≤ 1/2^k`. The witness is computable. Hence
-`IsComputableSeqCMap f` holds.
+② **Partial max.** Evaluate the polynomial approximant `pₙₖ` at each grid
+  point and take the rational max:
+  `sₙₖ := max_{j ≤ k} |pₙₖ(x_{n, k, j})|`.
+  Closure via `IsComputableSeqRat.{max, abs}` (L1).
 
-But:
-- If `P` holds: `β = -1 < 0 = α`, so `Set.Icc α β = ∅` and `‖f n‖ = 0` for
-  all `n` (Mathlib's `BoundedContinuousFunction.norm_eq_zero_of_empty`).
-- If `P` fails: `β = 0 = α`, so `Set.Icc α β = {0}` is nonempty and
-  `‖f n‖ = |1| = 1`.
+③ **Effective uniform continuity of `pₙₖ`.** From the polynomial
+  coefficients and the bound `B`, the Lipschitz constant
+  `Lip(pₙₖ) ≤ Σ_{j=1}^{d(n,k)} j |a(n,k,j)| Bʲ⁻¹` is Computable.
 
-Hence the constant sequence `(‖f n‖)` is `0` or `1` depending on whether
-`P` holds — *not* `IsComputableSeqReal`, since membership in `[α, β]`
-(equivalently `α ≤ β`) reduces to deciding `P`. The hypothesis
-`|α|, |β| ≤ B` is *insufficient* to make `(‖f n‖)` computable. ∎
+④ **Combined modulus.** `e(n, N) := M · L(n, N)` matching P-R's
+  `chapt0:1003`, with `M ≥ ⌈β − α⌉` and `L(n, N)` the Lipschitz-derived
+  per-precision modulus.
 
-## Where P-R's proof breaks down
+⑤ **Three-error decomposition.** `|sₙₖ − ‖f n‖| ≤ 1/2^k_poly +
+  endpoint_slack + Lip(pₙₖ)/k`. Choose `k_poly, m` as Computable functions
+  of `N` so total error `≤ 2⁻ᴺ` when `k ≥ e(n, N)`.
 
-Re-reading P-R `chapt0:984-1012` line by line and identifying the first step
-that cannot proceed with only a rational bound `B`:
-
-- `chapt0:986-989`. Partial maxima `s_{n,k} := max{fₙ(a + (j/k)(b−a)) : 1 ≤
-  j ≤ k}`. The grid points `x_j := a + (j/k)(b−a)` are *required to be
-  computable reals* so that `{fₙ(x_j)}` is a computable double sequence.
-  Under our signature `a`, `b` are arbitrary reals; the grid points are not
-  computable, and the *value* `fₙ(x_j)` is not approximable in general.
-- `chapt0:992`. "Since `a`, `b` are computable reals, [...] the double
-  sequence `{s_{n,k}}` is computable." — **direct invocation of the
-  computable-endpoints hypothesis**. No equivalent is available from
-  `|α|, |β| ≤ B`.
-- `chapt0:1000`. "Let `M` be an integer `> (b − a)`." Here `M` plays the
-  role of our `B` — but P-R needs both `M` *and* the computability of `a`,
-  `b` themselves.
-
-The remaining steps (`chapt0:993-1011`: the effective modulus `d(n, N)`, the
-choice `e(n, N) := M · d(n, N)`, and the conclusion via Proposition 1 of
-§2) all *depend on* the grid double sequence being computable, which fails
-at step `chapt0:986-989` without the computable-endpoints hypothesis.
-
-The L1 closures `IsComputableSeqRat.max`, `.min`, `.abs` (landed in this
-working tree) would directly close P-R's `max` over the finite grid *if*
-the grid existed as a computable rational/real double sequence. They do not
-help bridge the gap when the grid itself is non-constructible from `B`
-alone.
-
-## Recommended fix — minimal signature change
-
-Add the two computable-endpoint hypotheses, matching P-R's `chapt2:128`
-phrasing "for recursive reals `a`, `b`":
-
-```lean
-theorem isComputableSeqCMap_norm
-    (B : ℕ) (hα_le : |α| ≤ (B : ℝ)) (hβ_le : |β| ≤ (B : ℝ))
-    (hα_c : IsComputableReal α) (hβ_c : IsComputableReal β)
-    (f : ℕ → C(Set.Icc α β, ℝ)) (hf : IsComputableSeqCMap (α := α) (β := β) f) :
-    IsComputableSeqReal (fun n => ‖f n‖)
-```
-
-(`IsComputableReal` lives at
-`ComputableAnalysis/L1/ComputableSeqReal.lean:696` — it unfolds to
-`IsComputableSeqReal (fun _ => α)`, so the witness data is exactly a
-rational double sequence approximating `α` to `1/2^k` precision, same for
-`β`.)
-
-This change propagates by one line in `computabilityStructureCMap_of`'s
-`isComputableSeqReal_norm` field: pass the new hypotheses through. The A1
-and A2 fields are unchanged (their proofs do not depend on `α`, `β` being
-computable beyond the rational bound `B`).
-
-## Alternative resolution paths (deferred)
-
-1. **Reparameterize `computabilityStructureCMap_of`** to take *explicit*
-   rational approximant data for α, β (analogous to how `B` is passed
-   explicitly rather than as `[Fact (|α| ≤ B)]`). Cleaner from a Mathlib-PR
-   perspective: no new typeclass instances needed at the use site, just two
-   extra ℕ × ℕ → ℚ arguments.
-2. **Restrict to integer / rational endpoints**. Adding
-   `(hαq : α = (αq : ℝ)) (hβq : β = (βq : ℝ))` for some `αq, βq : ℚ`
-   trivially gives `IsComputableReal α` and `β`. This loses generality but
-   suffices for the most common Mathlib use case (closed-form rational
-   endpoints like `Set.Icc (0 : ℝ) 1`).
-3. **Switch to the Grzegorczyk-Lacombe (G-L) raw-evaluator predicate**
-   (P-R Ch. 0 §3) instead of the polynomial-approximation predicate. The
-   G-L predicate's "evaluator at computable reals" formulation already
-   bakes in the requirement on α, β. This is a larger refactor — it
-   changes the L4 predicate definition, not just one lemma's signature —
-   and is tracked separately.
+⑥ **Apply Prop 1.** `(sₙₖ)` is `IsComputableDoubleSeqRat`, `e` is
+  `Computable`, the bound holds — apply
+  `isComputableSeqReal_of_effectiveConvergence` from L1 §2.5 to conclude.
 
 ref: `literature/papers/PourEl-Richards-chapt0.md:977-1012` (Theorem 7
-statement and proof),
+statement and proof);
+`literature/papers/PourEl-Richards-chapt0.md:246-272` (Proposition 1, applied
+in step ⑥);
 `literature/papers/PourEl-Richards-chapt2.md:128-129` ("axiom 3 = Ch. 0 Thm
 7" plus "for recursive reals `a`, `b`"). -/
 theorem isComputableSeqCMap_norm
     (B : ℕ) (hα_le : |α| ≤ (B : ℝ)) (hβ_le : |β| ≤ (B : ℝ))
-    (f : ℕ → C(Set.Icc α β, ℝ)) (_hf : IsComputableSeqCMap (α := α) (β := β) f) :
+    (hα_c : IsComputableReal α) (hβ_c : IsComputableReal β)
+    (hαβ : α ≤ β)
+    (f : ℕ → C(Set.Icc α β, ℝ)) (hf : IsComputableSeqCMap (α := α) (β := β) f) :
     IsComputableSeqReal (fun n => ‖f n‖) := by
-  -- Mark B, hα_le, hβ_le as referenced so the signature stays stable across
-  -- the future fill-in.
-  let _B := B
-  let _hα := hα_le
-  let _hβ := hβ_le
-  -- BLOCKED ON SIGNATURE CHANGE REQUIRED — see this lemma's docstring for the
-  -- rigorous obstruction analysis (formal counterexample + line-by-line
-  -- breakdown of where P-R's `chapt0:984-1012` argument fails under the
-  -- current signature) and the minimal-fix recommendation (add
-  -- `IsComputableReal α`, `IsComputableReal β` hypotheses).
-  sorry
+  -- ① Destructure hypotheses to expose witnesses.
+  obtain ⟨a, d, ha_seq, hd, herr⟩ := hf
+  obtain ⟨αR, hαR_seq, hαR_err⟩ := hα_c
+  obtain ⟨βR, hβR_seq, hβR_err⟩ := hβ_c
+  obtain ⟨a_num, a_den, a_sgn, ha_num_c, ha_den_c, ha_sgn_c, ha_den_ne, ha_eq⟩ := ha_seq
+  -- ② Modulus engineering. With `K_poly nN := N + 2` (polynomial precision
+  -- 2⁻ᴺ⁻²), `Lip_nat nN` an ℕ-valued upper bound on the polynomial Lipschitz
+  -- constant `Lip(p_{n, K_poly nN})`, `m_mod nN := Lip_nat + N + 3` controlling
+  -- the endpoint-approximant precision (so `Lip · 2⁻ᵐ ≤ 2⁻ᴺ⁻²` with slack for
+  -- the degenerate `α' > β'` case), and `k_grid nN := 8 · Lip_nat · (B+1) · 2^N
+  -- + 1` controlling the grid spacing (so `Lip · 2(B+1) / k_grid ≤ 2⁻ᴺ⁻²`),
+  -- the three errors sum to ≤ 2⁻ᴺ.
+  set K_poly : ℕ × ℕ → ℕ := fun p => p.2 + 2 with hK_poly_def
+  set Lip_nat : ℕ × ℕ → ℕ := fun p =>
+    Nat.rec (motive := fun _ => ℕ) 0
+      (fun j acc => acc + j * a_num (Nat.pair p.1 (Nat.pair (K_poly p) j))
+                        * (B + 1) ^ (j - 1))
+      (d (p.1, K_poly p) + 1)
+    with hLip_nat_def
+  set m_mod : ℕ × ℕ → ℕ := fun p => Lip_nat p + p.2 + 3 with hm_mod_def
+  set k_grid : ℕ × ℕ → ℕ := fun p => 8 * Lip_nat p * (B + 1) * 2 ^ p.2 + 1
+    with hk_grid_def
+  -- ③ Computability of moduli.
+  have hK_poly_c : Computable K_poly :=
+    Computable.succ.comp (Computable.succ.comp Computable.snd)
+  have hd_Kpoly : Computable (fun p : ℕ × ℕ => d (p.1, K_poly p)) :=
+    hd.comp (Computable.fst.pair hK_poly_c)
+  have hLip_nat_c : Computable Lip_nat := by
+    -- `Lip_nat p` is `Nat.rec 0 step (d (p.1, K_poly p) + 1)`.
+    have h_iter : Computable (fun p : ℕ × ℕ => d (p.1, K_poly p) + 1) :=
+      Computable.succ.comp hd_Kpoly
+    have h_base : Computable (fun _ : ℕ × ℕ => (0 : ℕ)) := Computable.const 0
+    have h_pow_prim : Primrec₂ ((· ^ ·) : ℕ → ℕ → ℕ) :=
+      Primrec₂.unpaired'.1 Nat.Primrec.pow
+    have h_step : Computable₂ (fun (p : ℕ × ℕ) (jacc : ℕ × ℕ) =>
+        jacc.2 + jacc.1 * a_num (Nat.pair p.1 (Nat.pair (K_poly p) jacc.1))
+                       * (B + 1) ^ (jacc.1 - 1)) := by
+      have h_p1 : Computable (fun t : (ℕ × ℕ) × ℕ × ℕ => t.1.1) :=
+        Computable.fst.comp Computable.fst
+      have h_Kpoly_p : Computable (fun t : (ℕ × ℕ) × ℕ × ℕ => K_poly t.1) :=
+        hK_poly_c.comp Computable.fst
+      have h_j : Computable (fun t : (ℕ × ℕ) × ℕ × ℕ => t.2.1) :=
+        Computable.fst.comp Computable.snd
+      have h_acc : Computable (fun t : (ℕ × ℕ) × ℕ × ℕ => t.2.2) :=
+        Computable.snd.comp Computable.snd
+      have h_pair_Kj : Computable (fun t : (ℕ × ℕ) × ℕ × ℕ =>
+          Nat.pair (K_poly t.1) t.2.1) :=
+        Primrec₂.natPair.to_comp.comp h_Kpoly_p h_j
+      have h_outer_idx : Computable (fun t : (ℕ × ℕ) × ℕ × ℕ =>
+          Nat.pair t.1.1 (Nat.pair (K_poly t.1) t.2.1)) :=
+        Primrec₂.natPair.to_comp.comp h_p1 h_pair_Kj
+      have h_anum_call : Computable (fun t : (ℕ × ℕ) × ℕ × ℕ =>
+          a_num (Nat.pair t.1.1 (Nat.pair (K_poly t.1) t.2.1))) :=
+        ha_num_c.comp h_outer_idx
+      have h_j_anum : Computable (fun t : (ℕ × ℕ) × ℕ × ℕ =>
+          t.2.1 * a_num (Nat.pair t.1.1 (Nat.pair (K_poly t.1) t.2.1))) :=
+        Primrec.nat_mul.to_comp.comp h_j h_anum_call
+      have h_jminus1 : Computable (fun t : (ℕ × ℕ) × ℕ × ℕ => t.2.1 - 1) :=
+        Primrec.nat_sub.to_comp.comp h_j (Computable.const 1)
+      have h_B_pow : Computable (fun t : (ℕ × ℕ) × ℕ × ℕ =>
+          (B + 1) ^ (t.2.1 - 1)) :=
+        h_pow_prim.to_comp.comp (Computable.const (B + 1)) h_jminus1
+      have h_summand : Computable (fun t : (ℕ × ℕ) × ℕ × ℕ =>
+          t.2.1 * a_num (Nat.pair t.1.1 (Nat.pair (K_poly t.1) t.2.1))
+                * (B + 1) ^ (t.2.1 - 1)) :=
+        Primrec.nat_mul.to_comp.comp h_j_anum h_B_pow
+      exact Primrec.nat_add.to_comp.comp h_acc h_summand
+    exact Computable.nat_rec h_iter h_base h_step
+  have hm_mod_c : Computable m_mod := by
+    show Computable (fun p : ℕ × ℕ => Lip_nat p + p.2 + 3)
+    have h_sum : Computable (fun p : ℕ × ℕ => Lip_nat p + p.2) :=
+      Primrec.nat_add.to_comp.comp hLip_nat_c Computable.snd
+    exact Computable.succ.comp (Computable.succ.comp (Computable.succ.comp h_sum))
+  have hk_grid_c : Computable k_grid := by
+    show Computable (fun p : ℕ × ℕ => 8 * Lip_nat p * (B + 1) * 2 ^ p.2 + 1)
+    have h_pow_prim : Primrec₂ ((· ^ ·) : ℕ → ℕ → ℕ) :=
+      Primrec₂.unpaired'.1 Nat.Primrec.pow
+    have h_2pow : Computable (fun p : ℕ × ℕ => 2 ^ p.2) :=
+      h_pow_prim.to_comp.comp (Computable.const 2) Computable.snd
+    have h_8Lip : Computable (fun p : ℕ × ℕ => 8 * Lip_nat p) :=
+      Primrec.nat_mul.to_comp.comp (Computable.const 8) hLip_nat_c
+    have h_8LipB : Computable (fun p : ℕ × ℕ => 8 * Lip_nat p * (B + 1)) :=
+      Primrec.nat_mul.to_comp.comp h_8Lip (Computable.const (B + 1))
+    have h_prod : Computable (fun p : ℕ × ℕ => 8 * Lip_nat p * (B + 1) * 2 ^ p.2) :=
+      Primrec.nat_mul.to_comp.comp h_8LipB h_2pow
+    exact Computable.succ.comp h_prod
+  have hk_grid_pos : ∀ p, k_grid p ≠ 0 := fun p => by
+    show 8 * Lip_nat p * (B + 1) * 2 ^ p.2 + 1 ≠ 0
+    omega
+  -- ④ Build `gridQ` (rational grid points) via PolyEvalHelper.
+  -- We keep the body abstracted behind a `set`-bound symbol so subsequent
+  -- equality proofs can match at the symbol level without unfolding the
+  -- (very large) lambda body — see the `convert`-timeout in iter-08.
+  set gridQ : ℕ → ℚ := fun p =>
+      αR (0, m_mod ((Nat.unpair p).1, (Nat.unpair (Nat.unpair p).2).1)) +
+      (((Nat.unpair (Nat.unpair p).2).2 : ℚ) /
+        (k_grid ((Nat.unpair p).1, (Nat.unpair (Nat.unpair p).2).1) : ℚ)) *
+      (βR (0, m_mod ((Nat.unpair p).1, (Nat.unpair (Nat.unpair p).2).1)) -
+       αR (0, m_mod ((Nat.unpair p).1, (Nat.unpair (Nat.unpair p).2).1)))
+    with hgridQ_def
+  have hgridQ_c : IsComputableSeqRat gridQ :=
+    PolyEvalHelper.gridQ_isComputableSeqRat hαR_seq hβR_seq hm_mod_c hk_grid_c
+      hk_grid_pos
+  -- ⑤ Build `polyVal` (polynomial values at grid points) via PolyEvalHelper.
+  set n_idx : ℕ → ℕ := fun p => (Nat.unpair p).1 with hn_idx_def
+  set N_idx : ℕ → ℕ := fun p => (Nat.unpair (Nat.unpair p).2).1 with hN_idx_def
+  set K_idx : ℕ → ℕ := fun p => K_poly (n_idx p, N_idx p) with hK_idx_def
+  have hn_idx_c : Computable n_idx :=
+    Computable.fst.comp Computable.unpair
+  have hN_idx_c : Computable N_idx :=
+    Computable.fst.comp (Computable.unpair.comp (Computable.snd.comp Computable.unpair))
+  have hK_idx_c : Computable K_idx :=
+    hK_poly_c.comp (hn_idx_c.pair hN_idx_c)
+  have ha_seq' : IsComputableSeqRat (fun m =>
+      a ((Nat.unpair m).1, (Nat.unpair (Nat.unpair m).2).1,
+         (Nat.unpair (Nat.unpair m).2).2)) :=
+    ⟨a_num, a_den, a_sgn, ha_num_c, ha_den_c, ha_sgn_c, ha_den_ne, ha_eq⟩
+  set polyVal : ℕ → ℚ := fun p =>
+      ∑ j ∈ Finset.range (d (n_idx p, K_idx p) + 1),
+        a (n_idx p, K_idx p, j) * (gridQ p) ^ j
+    with hpolyVal_def
+  have hpolyVal_c : IsComputableSeqRat polyVal :=
+    PolyEvalHelper.polyVal_isComputableSeqRat ha_seq' hd hn_idx_c hK_idx_c hgridQ_c
+  -- ⑥ Absolute value (the `sNK`-style raw entry is `|polyVal p|`).
+  set absPolyVal : ℕ → ℚ := fun p => |polyVal p| with habsPolyVal_def
+  have habsPolyVal_c : IsComputableSeqRat absPolyVal := hpolyVal_c.abs
+  -- ⑦ Reshape `absPolyVal` to a double sequence over `(M, J)` so we can apply
+  -- `finsetMax_rat`. The map `σ : ℕ → ℕ` packs `(M, J) ↦ M.1 ∷ (M.2, J)`.
+  set σ : ℕ → ℕ := fun N : ℕ =>
+    Nat.pair (Nat.unpair (Nat.unpair N).1).1
+      (Nat.pair (Nat.unpair (Nat.unpair N).1).2 (Nat.unpair N).2)
+    with hσ_def
+  have hσ_c : Computable σ := by
+    have h_M : Computable (fun N : ℕ => (Nat.unpair N).1) :=
+      Computable.fst.comp Computable.unpair
+    have h_J : Computable (fun N : ℕ => (Nat.unpair N).2) :=
+      Computable.snd.comp Computable.unpair
+    have h_M1 : Computable (fun N : ℕ => (Nat.unpair (Nat.unpair N).1).1) :=
+      Computable.fst.comp (Computable.unpair.comp h_M)
+    have h_M2 : Computable (fun N : ℕ => (Nat.unpair (Nat.unpair N).1).2) :=
+      Computable.snd.comp (Computable.unpair.comp h_M)
+    have h_M2_J : Computable (fun N : ℕ =>
+        Nat.pair (Nat.unpair (Nat.unpair N).1).2 (Nat.unpair N).2) :=
+      Primrec₂.natPair.to_comp.comp h_M2 h_J
+    exact Primrec₂.natPair.to_comp.comp h_M1 h_M2_J
+  have habsPolyVal_σ_c : IsComputableSeqRat (fun N : ℕ => absPolyVal (σ N)) :=
+    habsPolyVal_c.comp hσ_c
+  -- ⑧ Define `sNK : ℕ × ℕ → ℚ` and prove `IsComputableDoubleSeqRat sNK`.
+  -- Conceptually: `sNK (n, N) := max over J ∈ 0..k_grid(n, N) of
+  -- |polyEval(n, K_poly(n, N), gridQ(n, N, J))|`. Concretely:
+  -- `sNK (n, N) := sup' over J of absPolyVal (σ (Nat.pair (Nat.pair n N) J))`.
+  set rEntry : ℕ × ℕ → ℚ :=
+      fun MJ => absPolyVal (σ (Nat.pair MJ.1 MJ.2)) with hrEntry_def
+  have hrEntry_double : IsComputableDoubleSeqRat rEntry := by
+    -- `r (Nat.unpair N) = absPolyVal (σ (Nat.pair (Nat.unpair N).1 (Nat.unpair N).2))
+    -- = absPolyVal (σ N)` by `Nat.pair_unpair`. We prove the function-level
+    -- equality and rewrite, avoiding the term-explosion in `convert`.
+    change IsComputableSeqRat (fun N : ℕ => rEntry (Nat.unpair N))
+    have h_eq : (fun N : ℕ => rEntry (Nat.unpair N))
+                = (fun N : ℕ => absPolyVal (σ N)) := by
+      funext N
+      show absPolyVal (σ (Nat.pair (Nat.unpair N).1 (Nat.unpair N).2))
+           = absPolyVal (σ N)
+      rw [Nat.pair_unpair]
+    rw [h_eq]
+    exact habsPolyVal_σ_c
+  have hk_grid_unpair_c : Computable (fun M : ℕ => k_grid (Nat.unpair M)) :=
+    hk_grid_c.comp Computable.unpair
+  have hsNK_flat : IsComputableSeqRat (fun M : ℕ =>
+      (Finset.range (k_grid (Nat.unpair M) + 1)).sup'
+        Finset.nonempty_range_add_one (fun J => rEntry (M, J))) :=
+    FinsetMaxHelper.finsetMax_rat hrEntry_double hk_grid_unpair_c
+  set sNK : ℕ × ℕ → ℚ := fun nN =>
+      (Finset.range (k_grid nN + 1)).sup' Finset.nonempty_range_add_one
+        (fun J => rEntry (Nat.pair nN.1 nN.2, J))
+    with hsNK_def
+  have hsNK_double : IsComputableDoubleSeqRat sNK := by
+    change IsComputableSeqRat (fun M : ℕ => sNK (Nat.unpair M))
+    have h_eq : (fun M : ℕ => sNK (Nat.unpair M))
+                = (fun M : ℕ => (Finset.range (k_grid (Nat.unpair M) + 1)).sup'
+                    Finset.nonempty_range_add_one (fun J => rEntry (M, J))) := by
+      funext M
+      show (Finset.range (k_grid (Nat.unpair M) + 1)).sup'
+            Finset.nonempty_range_add_one
+              (fun J => rEntry (Nat.pair (Nat.unpair M).1 (Nat.unpair M).2, J))
+           = (Finset.range (k_grid (Nat.unpair M) + 1)).sup'
+            Finset.nonempty_range_add_one (fun J => rEntry (M, J))
+      rw [Nat.pair_unpair]
+    rw [h_eq]
+    exact hsNK_flat
+  -- ⑨ Apply Prop 1 with `e (n, N) := N` (`Computable.snd`).
+  refine isComputableSeqReal_of_effectiveConvergence (r := sNK) hsNK_double
+    (e := fun p => p.2) Computable.snd ?_
+  -- ⑩ Three-error bound (analytic core, Stage 3).
+  -- High-level structure: with `e (n, N) := N`, the conclusion
+  -- `k ≥ N → |sNK (n, k) - ‖f n‖| ≤ 1/2^N` factors via the cleaner
+  -- `|sNK (n, k) - ‖f n‖| ≤ 1/2^k`, then `1/2^k ≤ 1/2^N` by monotonicity.
+  -- The core inequality decomposes:
+  -- (a) polynomial approx: `|‖p‖ - ‖f n‖| ≤ 1/2^K` via `herr` (`K := k + 2`).
+  -- (b) sNK ≈ ‖p‖:         `|sNK - ‖p‖| ≤ 2/2^K` via Lipschitz + grid bounds.
+  -- Sum: 3/2^K = 3/2^(k+2) = 3/(4·2^k) ≤ 1/2^k. ✓
+  intro n N k hkN
+  -- Reduce to the `1/2^k`-bound, then use monotonicity.
+  suffices h_core : |((sNK (n, k) : ℝ)) - ‖f n‖| ≤ 1 / 2 ^ k by
+    apply h_core.trans
+    apply one_div_le_one_div_of_le
+    · positivity
+    · exact pow_le_pow_right₀ (by norm_num : (1:ℝ) ≤ 2) hkN
+  -- ⑩.a Set up local constants. `K := k + 2 = K_poly (n, k)`,
+  -- `p := polyApproxCMap a d n K` (the K-th polynomial approximant of f n).
+  set K : ℕ := k + 2 with hK_eq
+  set p : C(Set.Icc α β, ℝ) := polyApproxCMap (α := α) (β := β) a d n K
+    with hp_eq
+  -- ⑩.b Polynomial-approximation error: `|‖p‖ - ‖f n‖| ≤ 1/2^K`.
+  have h_a : |‖p‖ - ‖f n‖| ≤ 1 / 2 ^ K := by
+    calc |‖p‖ - ‖f n‖|
+        ≤ ‖p - f n‖ := abs_norm_sub_norm_le _ _
+      _ = ‖f n - p‖ := norm_sub_rev _ _
+      _ ≤ 1 / 2 ^ K := herr n K
+  -- ⑩.c sNK ≈ ‖p‖ (the analytic Lipschitz + grid argument).
+  -- Decomposition: (b1) `sNK ≤ ‖p‖ + Lip · 2⁻ᵐ ≤ ‖p‖ + 1/2^K`.
+  --                (b2) `‖p‖ ≤ sNK + Lip · ((B+1)/k_grid + 2⁻ᵐ) ≤ sNK + 2/2^K`.
+  -- Hence `|sNK - ‖p‖| ≤ 2/2^K`. The Lipschitz argument uses
+  -- `polyEval_lipschitz_real` at `C := B + 1` (so it covers grid points which
+  -- lie in `[α − 2⁻ᵐ, β + 2⁻ᵐ] ⊆ [-(B+1), B+1]`).
+  have h_b : |((sNK (n, k) : ℝ)) - ‖p‖| ≤ 2 / 2 ^ K := by
+    -- Local naming.
+    set kg : ℕ := k_grid (n, k) with hkg_eq
+    set mm : ℕ := m_mod (n, k) with hmm_eq
+    set Lip_nℕ : ℕ := Lip_nat (n, k) with hLip_n_eq
+    have hkg_form : kg = 8 * Lip_nℕ * (B + 1) * 2 ^ k + 1 := rfl
+    have hmm_form : mm = Lip_nℕ + k + 3 := rfl
+    -- Endpoint rational approximants as ℝ.
+    set α' : ℝ := ((αR (0, mm) : ℚ) : ℝ) with hα'_eq
+    set β' : ℝ := ((βR (0, mm) : ℚ) : ℝ) with hβ'_eq
+    -- Closeness of approximants.
+    have h_2m_pos : (0 : ℝ) < 2 ^ mm := by positivity
+    have h_2m_le_one : (1 : ℝ) / 2 ^ mm ≤ 1 := by
+      rw [div_le_one h_2m_pos]
+      exact one_le_pow₀ (by norm_num : (1:ℝ) ≤ 2)
+    have hα'_close : |α' - α| ≤ 1 / 2 ^ mm := by
+      simpa using hαR_err 0 mm
+    have hβ'_close : |β' - β| ≤ 1 / 2 ^ mm := by
+      simpa using hβR_err 0 mm
+    -- α', β' bounded by B + 1.
+    have h_α'_bound : |α'| ≤ (B : ℝ) + 1 := by
+      calc |α'|
+          = |α + (α' - α)| := by congr 1; ring
+        _ ≤ |α| + |α' - α| := abs_add_le _ _
+        _ ≤ (B : ℝ) + 1 := by linarith [hα_le, hα'_close, h_2m_le_one]
+    have h_β'_bound : |β'| ≤ (B : ℝ) + 1 := by
+      calc |β'|
+          = |β + (β' - β)| := by congr 1; ring
+        _ ≤ |β| + |β' - β| := abs_add_le _ _
+        _ ≤ (B : ℝ) + 1 := by linarith [hβ_le, hβ'_close, h_2m_le_one]
+    -- kg positivity.
+    have h_kg_pos : 0 < kg := by show 0 < 8 * Lip_nℕ * (B + 1) * 2 ^ k + 1; omega
+    have h_kg_real_pos : (0 : ℝ) < (kg : ℝ) := by exact_mod_cast h_kg_pos
+    -- Grid point as ℝ: `xQ J := α' + (J/kg)·(β' - α')`.
+    -- Stays in the convex hull of {α', β'}, hence has `|·| ≤ B + 1`.
+    have h_xQ_bound : ∀ J : ℕ, J ≤ kg →
+        |α' + (J : ℝ) / (kg : ℝ) * (β' - α')| ≤ (B : ℝ) + 1 := by
+      intro J hJ
+      have h_J_real_nn : (0 : ℝ) ≤ (J : ℝ) := Nat.cast_nonneg _
+      have h_J_le_kg : (J : ℝ) ≤ (kg : ℝ) := by exact_mod_cast hJ
+      have h_ratio_nn : (0 : ℝ) ≤ (J : ℝ) / (kg : ℝ) :=
+        div_nonneg h_J_real_nn h_kg_real_pos.le
+      have h_ratio_le_one : (J : ℝ) / (kg : ℝ) ≤ 1 := by
+        rw [div_le_one h_kg_real_pos]
+        exact h_J_le_kg
+      -- xQ J is a convex combination: `(1 − J/kg)·α' + (J/kg)·β'`.
+      have hxQ_eq : α' + (J : ℝ) / (kg : ℝ) * (β' - α')
+          = (1 - (J : ℝ) / (kg : ℝ)) * α' + ((J : ℝ) / (kg : ℝ)) * β' := by ring
+      rw [hxQ_eq]
+      calc |(1 - (J : ℝ) / (kg : ℝ)) * α' + ((J : ℝ) / (kg : ℝ)) * β'|
+          ≤ |(1 - (J : ℝ) / (kg : ℝ)) * α'| + |((J : ℝ) / (kg : ℝ)) * β'| :=
+            abs_add_le _ _
+        _ = (1 - (J : ℝ) / (kg : ℝ)) * |α'| + ((J : ℝ) / (kg : ℝ)) * |β'| := by
+            rw [abs_mul, abs_mul]
+            congr 1
+            · rw [abs_of_nonneg (by linarith)]
+            · rw [abs_of_nonneg h_ratio_nn]
+        _ ≤ (1 - (J : ℝ) / (kg : ℝ)) * ((B : ℝ) + 1)
+            + ((J : ℝ) / (kg : ℝ)) * ((B : ℝ) + 1) := by
+            apply add_le_add
+            · exact mul_le_mul_of_nonneg_left h_α'_bound (by linarith)
+            · exact mul_le_mul_of_nonneg_left h_β'_bound h_ratio_nn
+        _ = (B : ℝ) + 1 := by ring
+    -- ⑩.c.1 Symbol for the real-line grid points.
+    set xQ : ℕ → ℝ := fun J => α' + (J : ℝ) / (kg : ℝ) * (β' - α') with hxQ_def
+    have h_xQ_bnd : ∀ J : ℕ, J ≤ kg → |xQ J| ≤ (B : ℝ) + 1 := h_xQ_bound
+    -- ⑩.c.2 Padded-interval bounds. xQ J lives in [min α' β', max α' β'] ⊆
+    -- [α - 1/2^mm, β + 1/2^mm] using `hαβ`, `hα'_close`, `hβ'_close`.
+    have h_min_αβ' : α - 1 / 2 ^ mm ≤ min α' β' := by
+      rcases le_or_gt α' β' with h | h
+      · rw [min_eq_left h]; linarith [(abs_le.mp hα'_close).1]
+      · rw [min_eq_right h.le]; linarith [(abs_le.mp hβ'_close).1, hαβ]
+    have h_max_αβ' : max α' β' ≤ β + 1 / 2 ^ mm := by
+      rcases le_or_gt α' β' with h | h
+      · rw [max_eq_right h]; linarith [(abs_le.mp hβ'_close).2]
+      · rw [max_eq_left h.le]; linarith [(abs_le.mp hα'_close).2, hαβ]
+    have h_xQ_in_padded : ∀ J : ℕ, J ≤ kg →
+        α - 1 / 2 ^ mm ≤ xQ J ∧ xQ J ≤ β + 1 / 2 ^ mm := by
+      intro J hJ
+      have h_J_nn : (0 : ℝ) ≤ (J : ℝ) := Nat.cast_nonneg _
+      have h_J_le : (J : ℝ) ≤ (kg : ℝ) := by exact_mod_cast hJ
+      have h_t_nn : (0 : ℝ) ≤ (J : ℝ) / (kg : ℝ) := div_nonneg h_J_nn h_kg_real_pos.le
+      have h_t_le_one : (J : ℝ) / (kg : ℝ) ≤ 1 := by
+        rw [div_le_one h_kg_real_pos]; exact h_J_le
+      have hxQ_conv : xQ J
+          = (1 - (J : ℝ) / (kg : ℝ)) * α' + ((J : ℝ) / (kg : ℝ)) * β' := by
+        show α' + (J : ℝ) / (kg : ℝ) * (β' - α') = _
+        ring
+      have h_min_le : min α' β' ≤ xQ J := by
+        rw [hxQ_conv]
+        have eq1 : min α' β'
+            = (1 - (J : ℝ) / (kg : ℝ)) * (min α' β')
+              + ((J : ℝ) / (kg : ℝ)) * (min α' β') := by ring
+        rw [eq1]
+        apply add_le_add
+        · exact mul_le_mul_of_nonneg_left (min_le_left _ _) (by linarith)
+        · exact mul_le_mul_of_nonneg_left (min_le_right _ _) h_t_nn
+      have h_le_max : xQ J ≤ max α' β' := by
+        rw [hxQ_conv]
+        have eq2 : max α' β'
+            = (1 - (J : ℝ) / (kg : ℝ)) * (max α' β')
+              + ((J : ℝ) / (kg : ℝ)) * (max α' β') := by ring
+        rw [eq2]
+        apply add_le_add
+        · exact mul_le_mul_of_nonneg_left (le_max_left _ _) (by linarith)
+        · exact mul_le_mul_of_nonneg_left (le_max_right _ _) h_t_nn
+      exact ⟨by linarith [h_min_αβ'], by linarith [h_max_αβ']⟩
+    -- ⑩.c.3 Clamping bound via `Set.projIcc`. Three-case split on xQ J vs [α, β].
+    have h_clamp_close : ∀ J : ℕ, J ≤ kg →
+        |xQ J - (Set.projIcc α β hαβ (xQ J)).val| ≤ 1 / 2 ^ mm := by
+      intro J hJ
+      obtain ⟨h_xQ_lo, h_xQ_hi⟩ := h_xQ_in_padded J hJ
+      have h_2m_inv_nn : (0 : ℝ) ≤ 1 / 2 ^ mm := by positivity
+      by_cases h1 : xQ J < α
+      · have h_eq : (Set.projIcc α β hαβ (xQ J)).val = α := by
+          rw [Set.coe_projIcc, max_eq_left]
+          calc min β (xQ J) ≤ xQ J := min_le_right _ _
+            _ ≤ α := h1.le
+        rw [h_eq, abs_of_neg (by linarith)]; linarith
+      · push_neg at h1
+        by_cases h2 : β < xQ J
+        · have h_eq : (Set.projIcc α β hαβ (xQ J)).val = β := by
+            rw [Set.coe_projIcc, min_eq_left h2.le, max_eq_right hαβ]
+          rw [h_eq, abs_of_pos (by linarith)]; linarith
+        · push_neg at h2
+          have h_eq : (Set.projIcc α β hαβ (xQ J)).val = xQ J := by
+            rw [Set.coe_projIcc, min_eq_right h2, max_eq_right h1]
+          rw [h_eq, sub_self, abs_zero]; exact h_2m_inv_nn
+    -- ⑩.c.4 Cast/unfold of `rEntry` to the polynomial expression at `xQ J`.
+    -- (rEntry (Nat.pair n k, J) : ℝ) = |∑ j (a (n, K, j) : ℝ) · (xQ J)^j|.
+    have h_rEntry_eq : ∀ J : ℕ,
+        ((rEntry (Nat.pair n k, J) : ℚ) : ℝ)
+          = |∑ j ∈ Finset.range (d (n, K) + 1),
+              (a (n, K, j) : ℝ) * (xQ J) ^ j| := by
+      intro J
+      have hσ_app : σ (Nat.pair (Nat.pair n k) J)
+          = Nat.pair n (Nat.pair k J) := by
+        show Nat.pair (Nat.unpair (Nat.unpair (Nat.pair (Nat.pair n k) J)).1).1
+                      (Nat.pair (Nat.unpair (Nat.unpair (Nat.pair (Nat.pair n k) J)).1).2
+                                (Nat.unpair (Nat.pair (Nat.pair n k) J)).2)
+            = _
+        simp only [Nat.unpair_pair]
+      have hn_eq : n_idx (Nat.pair n (Nat.pair k J)) = n := by
+        show (Nat.unpair (Nat.pair n (Nat.pair k J))).1 = n
+        simp [Nat.unpair_pair]
+      have hN_eq : N_idx (Nat.pair n (Nat.pair k J)) = k := by
+        show (Nat.unpair (Nat.unpair (Nat.pair n (Nat.pair k J))).2).1 = k
+        simp [Nat.unpair_pair]
+      have hKidx_eq : K_idx (Nat.pair n (Nat.pair k J)) = K := by
+        show K_poly (n_idx (Nat.pair n (Nat.pair k J)),
+                     N_idx (Nat.pair n (Nat.pair k J))) = K
+        rw [hn_eq, hN_eq]
+      have h_J_extract : (Nat.unpair (Nat.unpair
+            (Nat.pair n (Nat.pair k J))).2).2 = J := by simp [Nat.unpair_pair]
+      have h_mmod_eq : m_mod (n_idx (Nat.pair n (Nat.pair k J)),
+                              N_idx (Nat.pair n (Nat.pair k J))) = mm := by
+        rw [hn_eq, hN_eq]
+      have h_kgrid_eq : k_grid (n_idx (Nat.pair n (Nat.pair k J)),
+                                N_idx (Nat.pair n (Nat.pair k J))) = kg := by
+        rw [hn_eq, hN_eq]
+      have h_gridQ_eq : ((gridQ (Nat.pair n (Nat.pair k J)) : ℚ) : ℝ) = xQ J := by
+        show ((αR (0, m_mod (n_idx _, N_idx _))
+              + ((Nat.unpair (Nat.unpair (Nat.pair n (Nat.pair k J))).2).2 : ℚ)
+                / (k_grid (n_idx _, N_idx _) : ℚ)
+              * (βR (0, m_mod (n_idx _, N_idx _)) - αR (0, m_mod (n_idx _, N_idx _)))
+              : ℚ) : ℝ) = _
+        rw [h_mmod_eq, h_kgrid_eq, h_J_extract]
+        push_cast
+        show ((αR (0, mm) : ℚ) : ℝ) + (J : ℝ) / (kg : ℝ)
+              * (((βR (0, mm) : ℚ) : ℝ) - ((αR (0, mm) : ℚ) : ℝ)) = xQ J
+        rw [← hα'_eq, ← hβ'_eq]
+      show ((absPolyVal (σ (Nat.pair (Nat.pair n k) J)) : ℚ) : ℝ) = _
+      rw [hσ_app]
+      show ((|polyVal (Nat.pair n (Nat.pair k J))| : ℚ) : ℝ) = _
+      rw [Rat.cast_abs]
+      congr 1
+      show ((∑ j ∈ Finset.range (d (n_idx _, K_idx _) + 1),
+              a (n_idx _, K_idx _, j) * gridQ _ ^ j : ℚ) : ℝ) = _
+      rw [hn_eq, hKidx_eq]
+      push_cast
+      refine Finset.sum_congr rfl ?_
+      intro j _
+      rw [← h_gridQ_eq]
+    -- ⑩.c.5 Cast distribution over `Finset.sup'` via `Rat.cast_max`.
+    have h_sNK_cast :
+        ((sNK (n, k) : ℚ) : ℝ)
+          = (Finset.range (kg + 1)).sup' Finset.nonempty_range_add_one
+              (fun J => ((rEntry (Nat.pair n k, J) : ℚ) : ℝ)) := by
+      show ((((Finset.range (kg + 1)).sup' Finset.nonempty_range_add_one
+              (fun J => rEntry (Nat.pair n k, J)) : ℚ) : ℝ)) = _
+      exact Finset.apply_sup'_eq_sup'_comp Finset.nonempty_range_add_one
+        (fun q : ℚ => (q : ℝ)) (fun x y => Rat.cast_max x y)
+    -- ⑩.c.6 Lip_nℕ as a `Finset.range` sum (closed form of the Nat.rec).
+    have h_Lip_natrec : ∀ N : ℕ,
+        Nat.rec (motive := fun _ => ℕ) 0
+          (fun j acc => acc + j * a_num (Nat.pair n (Nat.pair K j))
+                            * (B + 1) ^ (j - 1))
+          N
+        = ∑ j ∈ Finset.range N,
+            j * a_num (Nat.pair n (Nat.pair K j)) * (B + 1) ^ (j - 1) := by
+      intro N
+      induction N with
+      | zero => simp
+      | succ m IH =>
+        show (Nat.rec (motive := fun _ => ℕ) 0 _ m
+              + m * a_num (Nat.pair n (Nat.pair K m)) * (B + 1) ^ (m - 1) : ℕ) = _
+        rw [IH, Finset.sum_range_succ]
+    have h_Lip_nℕ_eq : (Lip_nℕ : ℕ)
+        = ∑ j ∈ Finset.range (d (n, K) + 1),
+            j * a_num (Nat.pair n (Nat.pair K j)) * (B + 1) ^ (j - 1) :=
+      h_Lip_natrec (d (n, K) + 1)
+    -- ⑩.c.7 Per-coefficient bound from `ha_eq`.
+    have h_a_bnd : ∀ j : ℕ,
+        |((a (n, K, j)) : ℝ)|
+          ≤ ((a_num (Nat.pair n (Nat.pair K j)) : ℕ) : ℝ) := by
+      intro j
+      have h_a_q_eq : a (n, K, j)
+          = (-1 : ℚ) ^ (a_sgn (Nat.pair n (Nat.pair K j)))
+            * ((a_num (Nat.pair n (Nat.pair K j)) : ℚ)
+               / (a_den (Nat.pair n (Nat.pair K j)) : ℚ)) := by
+        have h := ha_eq (Nat.pair n (Nat.pair K j))
+        simpa [Nat.unpair_pair] using h
+      have h_den_ne : a_den (Nat.pair n (Nat.pair K j)) ≠ 0 :=
+        ha_den_ne (Nat.pair n (Nat.pair K j))
+      have h_den_pos_R : (0 : ℝ) < (a_den (Nat.pair n (Nat.pair K j)) : ℝ) := by
+        have : (0 : ℕ) < a_den (Nat.pair n (Nat.pair K j)) :=
+          Nat.pos_of_ne_zero h_den_ne
+        exact_mod_cast this
+      have h_den_ge_one_R : (1 : ℝ) ≤ (a_den (Nat.pair n (Nat.pair K j)) : ℝ) := by
+        exact_mod_cast Nat.one_le_iff_ne_zero.mpr h_den_ne
+      have h_anum_nn_R : (0 : ℝ) ≤ ((a_num (Nat.pair n (Nat.pair K j)) : ℕ) : ℝ) :=
+        Nat.cast_nonneg _
+      show |((a (n, K, j) : ℚ) : ℝ)| ≤ _
+      rw [h_a_q_eq]
+      push_cast
+      rw [abs_mul, abs_pow]
+      have h_neg1 : |(-1 : ℝ)| = 1 := by norm_num
+      rw [h_neg1, one_pow, one_mul, abs_div]
+      rw [abs_of_nonneg h_anum_nn_R, abs_of_pos h_den_pos_R]
+      exact div_le_self h_anum_nn_R h_den_ge_one_R
+    -- ⑩.c.8 Polynomial-Lipschitz constant ≤ Lip_nℕ (as ℝ).
+    have h_Lip_real_le_nat :
+        (∑ j ∈ Finset.range (d (n, K) + 1),
+            (j : ℝ) * |((a (n, K, j)) : ℝ)| * ((B : ℝ) + 1) ^ (j - 1))
+          ≤ ((Lip_nℕ : ℕ) : ℝ) := by
+      rw [h_Lip_nℕ_eq]
+      push_cast
+      apply Finset.sum_le_sum
+      intro j _
+      have h_pow_nn : (0 : ℝ) ≤ ((B : ℝ) + 1) ^ (j - 1) := by positivity
+      have h_j_nn : (0 : ℝ) ≤ (j : ℝ) := Nat.cast_nonneg _
+      apply mul_le_mul_of_nonneg_right _ h_pow_nn
+      exact mul_le_mul_of_nonneg_left (h_a_bnd j) h_j_nn
+    -- ⑩.c.9 Arithmetic: Lip_nℕ · 1/2^mm ≤ 1/2^K.
+    have h_Lip_2m_le_K : ((Lip_nℕ : ℕ) : ℝ) * (1 / 2 ^ mm) ≤ 1 / 2 ^ K := by
+      have h_2mm_pos : (0 : ℝ) < (2 : ℝ) ^ mm := by positivity
+      have h_2K_pos : (0 : ℝ) < (2 : ℝ) ^ K := by positivity
+      have h_Lip_lt : (Lip_nℕ : ℕ) < 2 ^ Lip_nℕ := Nat.lt_two_pow_self
+      have h_Lip_le_2pow : ((Lip_nℕ : ℕ) : ℝ) ≤ (2 : ℝ) ^ Lip_nℕ := by
+        have h1 : ((Lip_nℕ : ℕ) : ℝ) ≤ ((2 ^ Lip_nℕ : ℕ) : ℝ) := by
+          exact_mod_cast h_Lip_lt.le
+        have h2 : ((2 ^ Lip_nℕ : ℕ) : ℝ) = (2 : ℝ) ^ Lip_nℕ := by push_cast; ring
+        linarith
+      rw [mul_one_div, div_le_div_iff₀ h_2mm_pos h_2K_pos]
+      -- Goal: Lip_nℕ · 2^K ≤ 1 · 2^mm = 2^mm.
+      rw [one_mul]
+      have h_pow_eq : (2 : ℝ) ^ mm = (2 : ℝ) ^ Lip_nℕ * (2 : ℝ) ^ k * 8 := by
+        rw [hmm_form]; ring
+      have h_2K_form : (2 : ℝ) ^ K = (2 : ℝ) ^ k * 4 := by rw [hK_eq]; ring
+      rw [h_pow_eq, h_2K_form]
+      have h_2k_pos : (0 : ℝ) < (2 : ℝ) ^ k := by positivity
+      have h_2Lip_pos : (0 : ℝ) < (2 : ℝ) ^ Lip_nℕ := by positivity
+      nlinarith [h_Lip_le_2pow, h_2k_pos, h_2Lip_pos]
+    -- ⑩.c.10 Arithmetic: Lip_nℕ · 2(B+1)/kg ≤ 1/2^K.
+    have h_Lip_BpKg_bound :
+        ((Lip_nℕ : ℕ) : ℝ) * (2 * ((B : ℝ) + 1) / (kg : ℝ)) ≤ 1 / 2 ^ K := by
+      have h_2K_pos : (0 : ℝ) < (2 : ℝ) ^ K := by positivity
+      have h_kg_pos := h_kg_real_pos
+      have h_kg_lower : 8 * ((Lip_nℕ : ℕ) : ℝ) * ((B : ℝ) + 1) * 2 ^ k ≤ (kg : ℝ) := by
+        have h_eq : (kg : ℝ) = 8 * ((Lip_nℕ : ℕ) : ℝ) * ((B : ℝ) + 1) * 2 ^ k + 1 := by
+          have h := hkg_form
+          push_cast [h]; ring
+        linarith
+      rw [show ((Lip_nℕ : ℕ) : ℝ) * (2 * ((B : ℝ) + 1) / (kg : ℝ))
+            = (((Lip_nℕ : ℕ) : ℝ) * 2 * ((B : ℝ) + 1)) / (kg : ℝ) from by ring]
+      rw [div_le_div_iff₀ h_kg_pos h_2K_pos, one_mul]
+      have h_2K_form : (2 : ℝ) ^ K = 4 * 2 ^ k := by rw [hK_eq]; ring
+      rw [h_2K_form]
+      have h_2k_pos : (0 : ℝ) < (2 : ℝ) ^ k := by positivity
+      have h_Lip_nn : (0 : ℝ) ≤ ((Lip_nℕ : ℕ) : ℝ) := Nat.cast_nonneg _
+      have h_B_nn : (0 : ℝ) ≤ (B : ℝ) := Nat.cast_nonneg _
+      nlinarith [h_kg_lower, h_2k_pos, h_Lip_nn, h_B_nn]
+    -- ⑩.c.11 Combined-error bound: Lip_nℕ · (1/2^mm) + Lip_nℕ · 2(B+1)/kg ≤ 2/2^K.
+    have h_combined_bound :
+        ((Lip_nℕ : ℕ) : ℝ) * (1 / 2 ^ mm)
+          + ((Lip_nℕ : ℕ) : ℝ) * (2 * ((B : ℝ) + 1) / (kg : ℝ))
+          ≤ 2 / 2 ^ K := by
+      have h1 := h_Lip_2m_le_K
+      have h2 := h_Lip_BpKg_bound
+      have h_2K_pos : (0 : ℝ) < (2 : ℝ) ^ K := by positivity
+      have : (1 : ℝ) / 2 ^ K + 1 / 2 ^ K = 2 / 2 ^ K := by ring
+      linarith
+    -- ⑩.c.12 Direction (b1): `(sNK : ℝ) ≤ ‖p‖ + 1/2^K` via clamping.
+    -- For each grid index J ≤ kg, the polynomial value at xQ_J differs from the
+    -- value at the clamped point `projIcc α β (xQ_J)` by ≤ Lip · 1/2^mm ≤ 1/2^K;
+    -- the latter is bounded by ‖p‖ via `ContinuousMap.norm_coe_le_norm`.
+    have h_b1 : ((sNK (n, k) : ℚ) : ℝ) ≤ ‖p‖ + 1 / 2 ^ K := by
+      rw [h_sNK_cast]
+      apply Finset.sup'_le
+      intro J hJ_mem
+      have hJ : J ≤ kg := Nat.le_of_lt_succ (Finset.mem_range.mp hJ_mem)
+      rw [h_rEntry_eq J]
+      set xcJ : Set.Icc α β := Set.projIcc α β hαβ (xQ J) with hxcJ_def
+      have h_xcJ_abs : |xcJ.val| ≤ (B : ℝ) := by
+        have hx := xcJ.2; rw [Set.mem_Icc] at hx
+        rw [abs_le]; refine ⟨?_, ?_⟩
+        · linarith [(abs_le.mp hα_le).1, hx.1]
+        · linarith [(abs_le.mp hβ_le).2, hx.2]
+      have h_xcJ_abs_BP1 : |xcJ.val| ≤ (B : ℝ) + 1 := by linarith
+      have h_xQJ_abs_BP1 : |xQ J| ≤ (B : ℝ) + 1 := h_xQ_bnd J hJ
+      have h_clamp : |xQ J - xcJ.val| ≤ 1 / 2 ^ mm := h_clamp_close J hJ
+      have h_p_at_xcJ :
+          (polyApproxCMap (α := α) (β := β) a d n K) xcJ
+            = ∑ j ∈ Finset.range (d (n, K) + 1), (a (n, K, j) : ℝ) * xcJ.val ^ j :=
+        polyApproxCMap_eval a d n K xcJ
+      have h_norm_at_xcJ :
+          |(polyApproxCMap (α := α) (β := β) a d n K) xcJ| ≤ ‖p‖ := by
+        rw [hp_eq]
+        have := ContinuousMap.norm_coe_le_norm
+          (polyApproxCMap (α := α) (β := β) a d n K) xcJ
+        rwa [Real.norm_eq_abs] at this
+      have h_lip := polyEval_lipschitz_real a d n K (B + 1)
+        (xQ J) xcJ.val
+        (show |xQ J| ≤ ((B + 1 : ℕ) : ℝ) by push_cast; exact h_xQJ_abs_BP1)
+        (show |xcJ.val| ≤ ((B + 1 : ℕ) : ℝ) by push_cast; exact h_xcJ_abs_BP1)
+      push_cast at h_lip
+      have h_xQ_dist_nn : 0 ≤ |xQ J - xcJ.val| := abs_nonneg _
+      have h_lip_bnd :
+          |∑ j ∈ Finset.range (d (n, K) + 1), (a (n, K, j) : ℝ) * (xQ J) ^ j
+            - ∑ j ∈ Finset.range (d (n, K) + 1), (a (n, K, j) : ℝ) * xcJ.val ^ j|
+            ≤ 1 / 2 ^ K := by
+        calc |∑ j ∈ Finset.range (d (n, K) + 1), (a (n, K, j) : ℝ) * (xQ J) ^ j
+                - ∑ j ∈ Finset.range (d (n, K) + 1), (a (n, K, j) : ℝ) * xcJ.val ^ j|
+            ≤ (∑ j ∈ Finset.range (d (n, K) + 1),
+                (j : ℝ) * |((a (n, K, j)) : ℝ)| * ((B : ℝ) + 1) ^ (j - 1))
+              * |xQ J - xcJ.val| := h_lip
+          _ ≤ ((Lip_nℕ : ℕ) : ℝ) * |xQ J - xcJ.val| := by
+              exact mul_le_mul_of_nonneg_right h_Lip_real_le_nat h_xQ_dist_nn
+          _ ≤ ((Lip_nℕ : ℕ) : ℝ) * (1 / 2 ^ mm) := by
+              apply mul_le_mul_of_nonneg_left h_clamp
+              exact Nat.cast_nonneg _
+          _ ≤ 1 / 2 ^ K := h_Lip_2m_le_K
+      have h_sum_at_xcJ_le_p :
+          |∑ j ∈ Finset.range (d (n, K) + 1), (a (n, K, j) : ℝ) * xcJ.val ^ j|
+            ≤ ‖p‖ := by
+        rw [← h_p_at_xcJ]; exact h_norm_at_xcJ
+      calc |∑ j ∈ Finset.range (d (n, K) + 1), (a (n, K, j) : ℝ) * (xQ J) ^ j|
+          = |(∑ j ∈ Finset.range (d (n, K) + 1), (a (n, K, j) : ℝ) * xcJ.val ^ j)
+              + ((∑ j ∈ Finset.range (d (n, K) + 1), (a (n, K, j) : ℝ) * (xQ J) ^ j)
+                 - (∑ j ∈ Finset.range (d (n, K) + 1),
+                       (a (n, K, j) : ℝ) * xcJ.val ^ j))| := by congr 1; ring
+        _ ≤ |∑ j ∈ Finset.range (d (n, K) + 1), (a (n, K, j) : ℝ) * xcJ.val ^ j|
+              + |(∑ j ∈ Finset.range (d (n, K) + 1), (a (n, K, j) : ℝ) * (xQ J) ^ j)
+                 - (∑ j ∈ Finset.range (d (n, K) + 1),
+                       (a (n, K, j) : ℝ) * xcJ.val ^ j)| := abs_add_le _ _
+        _ ≤ ‖p‖ + 1 / 2 ^ K := add_le_add h_sum_at_xcJ_le_p h_lip_bnd
+    -- ⑩.c.13 Direction (b2): `‖p‖ ≤ (sNK : ℝ) + 2/2^K` via covering.
+    -- Apply `ContinuousMap.norm_le` to reduce to a per-point bound on `|p x|`.
+    -- For each `x : Set.Icc α β`, construct `Jstar ≤ kg` such that
+    -- `|x.val - xQ Jstar|` is small enough that `polyEval_lipschitz_real` gives
+    -- a 2/2^K bound. Two subcases: `α' < β'` (floor-cover) and `α' ≥ β'`
+    -- (degenerate, with midpoint case-split on x.val).
+    have h_b2 : ‖p‖ ≤ ((sNK (n, k) : ℚ) : ℝ) + 2 / 2 ^ K := by
+      have h_sNK_nn : (0 : ℝ) ≤ ((sNK (n, k) : ℚ) : ℝ) := by
+        rw [h_sNK_cast]
+        have h_0_mem : 0 ∈ Finset.range (kg + 1) := Finset.mem_range.mpr (by omega)
+        have h_rEntry_0_nn : (0 : ℝ) ≤ ((rEntry (Nat.pair n k, 0) : ℚ) : ℝ) := by
+          rw [h_rEntry_eq 0]; exact abs_nonneg _
+        rw [Finset.le_sup'_iff]
+        exact ⟨0, h_0_mem, h_rEntry_0_nn⟩
+      have h_rhs_nn : (0 : ℝ) ≤ ((sNK (n, k) : ℚ) : ℝ) + 2 / 2 ^ K := by
+        have h_2_2K_nn : (0 : ℝ) ≤ 2 / 2 ^ K := by positivity
+        linarith
+      rw [hp_eq, ContinuousMap.norm_le _ h_rhs_nn]
+      intro x
+      rw [Real.norm_eq_abs]
+      have h_p_eval : (polyApproxCMap (α := α) (β := β) a d n K) x
+          = ∑ j ∈ Finset.range (d (n, K) + 1), (a (n, K, j) : ℝ) * x.val ^ j :=
+        polyApproxCMap_eval a d n K x
+      rw [h_p_eval]
+      have h_x_abs_BP1 : |x.val| ≤ (B : ℝ) + 1 := by
+        have hx_mem := x.2; rw [Set.mem_Icc] at hx_mem
+        rw [abs_le]; refine ⟨?_, ?_⟩
+        · linarith [(abs_le.mp hα_le).1]
+        · linarith [(abs_le.mp hβ_le).2]
+      -- The proof closes once we exhibit `Jstar ≤ kg` with a Lipschitz-bounded
+      -- distance, after which the triangle-inequality + sup' chain finishes.
+      suffices h_cover : ∃ Jstar : ℕ, Jstar ≤ kg ∧
+          |(∑ j ∈ Finset.range (d (n, K) + 1), (a (n, K, j) : ℝ) * x.val ^ j)
+            - (∑ j ∈ Finset.range (d (n, K) + 1),
+                  (a (n, K, j) : ℝ) * (xQ Jstar) ^ j)|
+            ≤ 2 / 2 ^ K by
+        obtain ⟨Jstar, h_Jstar_le_kg, h_lip_bnd⟩ := h_cover
+        have h_Jstar_mem : Jstar ∈ Finset.range (kg + 1) :=
+          Finset.mem_range.mpr (Nat.lt_succ_of_le h_Jstar_le_kg)
+        have h_rEntry_Jstar_le_sup :
+            ((rEntry (Nat.pair n k, Jstar) : ℚ) : ℝ)
+              ≤ (Finset.range (kg + 1)).sup' Finset.nonempty_range_add_one
+                  (fun J => ((rEntry (Nat.pair n k, J) : ℚ) : ℝ)) := by
+          rw [Finset.le_sup'_iff]
+          exact ⟨Jstar, h_Jstar_mem, le_refl _⟩
+        have h_rEntry_Jstar : ((rEntry (Nat.pair n k, Jstar) : ℚ) : ℝ)
+            = |∑ j ∈ Finset.range (d (n, K) + 1),
+                (a (n, K, j) : ℝ) * (xQ Jstar) ^ j| :=
+          h_rEntry_eq Jstar
+        calc |∑ j ∈ Finset.range (d (n, K) + 1), (a (n, K, j) : ℝ) * x.val ^ j|
+            = |(∑ j ∈ Finset.range (d (n, K) + 1),
+                  (a (n, K, j) : ℝ) * (xQ Jstar) ^ j)
+                + ((∑ j ∈ Finset.range (d (n, K) + 1),
+                      (a (n, K, j) : ℝ) * x.val ^ j)
+                   - (∑ j ∈ Finset.range (d (n, K) + 1),
+                         (a (n, K, j) : ℝ) * (xQ Jstar) ^ j))| := by
+              congr 1; ring
+          _ ≤ |∑ j ∈ Finset.range (d (n, K) + 1),
+                  (a (n, K, j) : ℝ) * (xQ Jstar) ^ j|
+                + |(∑ j ∈ Finset.range (d (n, K) + 1),
+                      (a (n, K, j) : ℝ) * x.val ^ j)
+                   - (∑ j ∈ Finset.range (d (n, K) + 1),
+                         (a (n, K, j) : ℝ) * (xQ Jstar) ^ j)| := abs_add_le _ _
+          _ ≤ ((sNK (n, k) : ℚ) : ℝ) + 2 / 2 ^ K := by
+              rw [h_sNK_cast, ← h_rEntry_Jstar]
+              exact add_le_add h_rEntry_Jstar_le_sup h_lip_bnd
+      by_cases hαβ' : α' < β'
+      · -- Non-degenerate case: clamp x.val to [α', β'] then floor-round.
+        set y : ℝ := max α' (min β' x.val) with hy_def
+        have h_y_ge_α' : α' ≤ y := le_max_left _ _
+        have h_y_le_β' : y ≤ β' := max_le hαβ'.le (min_le_left _ _)
+        have h_x_y_close : |x.val - y| ≤ 1 / 2 ^ mm := by
+          have hx_lo : α ≤ x.val := (Set.mem_Icc.mp x.2).1
+          have hx_hi : x.val ≤ β := (Set.mem_Icc.mp x.2).2
+          by_cases h1 : x.val < α'
+          · have h_min_x_le_xval : min β' x.val ≤ x.val := min_le_right _ _
+            have h_min_lt_α' : min β' x.val < α' := h_min_x_le_xval.trans_lt h1
+            have h_y_eq : y = α' := by rw [hy_def, max_eq_left h_min_lt_α'.le]
+            rw [h_y_eq, abs_of_neg (by linarith)]
+            linarith [(abs_le.mp hα'_close).2]
+          · push_neg at h1
+            by_cases h2 : β' < x.val
+            · have h_min_x : min β' x.val = β' := min_eq_left h2.le
+              have h_y_eq : y = β' := by rw [hy_def, h_min_x, max_eq_right hαβ'.le]
+              rw [h_y_eq, abs_of_pos (by linarith)]
+              linarith [(abs_le.mp hβ'_close).1]
+            · push_neg at h2
+              have h_min_eq : min β' x.val = x.val := min_eq_right h2
+              have h_y_eq : y = x.val := by rw [hy_def, h_min_eq, max_eq_right h1]
+              rw [h_y_eq, sub_self, abs_zero]; positivity
+        set t : ℝ := (y - α') / (β' - α') with ht_def
+        have h_β'_minus_α'_pos : 0 < β' - α' := by linarith
+        have h_t_nn : 0 ≤ t := div_nonneg (by linarith) h_β'_minus_α'_pos.le
+        have h_t_le_one : t ≤ 1 := by
+          rw [ht_def, div_le_one h_β'_minus_α'_pos]
+          linarith
+        have h_y_eq_α'_plus_t : y = α' + t * (β' - α') := by
+          rw [ht_def]; field_simp; ring
+        have h_kg_t_nn : 0 ≤ (kg : ℝ) * t := mul_nonneg h_kg_real_pos.le h_t_nn
+        set Jstar : ℕ := Nat.floor ((kg : ℝ) * t) with hJstar_def
+        have h_Jstar_R_le : (Jstar : ℝ) ≤ (kg : ℝ) * t := Nat.floor_le h_kg_t_nn
+        have h_Jstar_lt : (kg : ℝ) * t < (Jstar : ℝ) + 1 := Nat.lt_floor_add_one _
+        have h_Jstar_le_kg : Jstar ≤ kg := by
+          have h_kgt_le_kg : (kg : ℝ) * t ≤ (kg : ℝ) := by
+            have := mul_le_mul_of_nonneg_left h_t_le_one h_kg_real_pos.le
+            linarith
+          exact_mod_cast h_Jstar_R_le.trans h_kgt_le_kg
+        have h_xQ_Jstar_def : xQ Jstar = α' + (Jstar : ℝ) / (kg : ℝ) * (β' - α') :=
+          rfl
+        have h_t_ge_Jstar_kg : (Jstar : ℝ) / (kg : ℝ) ≤ t := by
+          rw [div_le_iff₀ h_kg_real_pos]; linarith
+        have h_diff_le : t - (Jstar : ℝ) / (kg : ℝ) ≤ 1 / (kg : ℝ) := by
+          rw [sub_le_iff_le_add,
+              show (1 : ℝ) / (kg : ℝ) + (Jstar : ℝ) / (kg : ℝ)
+                = ((Jstar : ℝ) + 1) / (kg : ℝ) from by ring,
+              le_div_iff₀ h_kg_real_pos]
+          linarith
+        have h_y_minus_xQJstar_nn : 0 ≤ y - xQ Jstar := by
+          rw [h_xQ_Jstar_def, h_y_eq_α'_plus_t]
+          have : 0 ≤ (t - (Jstar : ℝ) / (kg : ℝ)) * (β' - α') :=
+            mul_nonneg (by linarith) (by linarith)
+          linarith
+        have h_y_minus_xQJstar_le : y - xQ Jstar ≤ (β' - α') / (kg : ℝ) := by
+          rw [h_xQ_Jstar_def, h_y_eq_α'_plus_t]
+          have h_eq : α' + t * (β' - α') - (α' + (Jstar : ℝ) / (kg : ℝ) * (β' - α'))
+                    = (t - (Jstar : ℝ) / (kg : ℝ)) * (β' - α') := by ring
+          rw [h_eq]
+          calc (t - (Jstar : ℝ) / (kg : ℝ)) * (β' - α')
+              ≤ 1 / (kg : ℝ) * (β' - α') :=
+                mul_le_mul_of_nonneg_right h_diff_le (by linarith)
+            _ = (β' - α') / (kg : ℝ) := by ring
+        have h_β'_minus_α'_le : β' - α' ≤ 2 * ((B : ℝ) + 1) := by
+          have h1 := (abs_le.mp h_α'_bound).1
+          have h2 := (abs_le.mp h_β'_bound).2
+          linarith
+        have h_β'mα'_kg_le :
+            (β' - α') / (kg : ℝ) ≤ 2 * ((B : ℝ) + 1) / (kg : ℝ) := by
+          rw [div_le_div_iff₀ h_kg_real_pos h_kg_real_pos]
+          exact mul_le_mul_of_nonneg_right h_β'_minus_α'_le h_kg_real_pos.le
+        have h_x_xQJstar_close : |x.val - xQ Jstar|
+            ≤ 1 / 2 ^ mm + 2 * ((B : ℝ) + 1) / (kg : ℝ) := by
+          calc |x.val - xQ Jstar|
+              = |(x.val - y) + (y - xQ Jstar)| := by congr 1; ring
+            _ ≤ |x.val - y| + |y - xQ Jstar| := abs_add_le _ _
+            _ ≤ 1 / 2 ^ mm + (β' - α') / (kg : ℝ) := by
+                apply add_le_add h_x_y_close
+                rw [abs_of_nonneg h_y_minus_xQJstar_nn]; exact h_y_minus_xQJstar_le
+            _ ≤ 1 / 2 ^ mm + 2 * ((B : ℝ) + 1) / (kg : ℝ) := by
+                linarith [h_β'mα'_kg_le]
+        have h_xQJstar_BP1 : |xQ Jstar| ≤ (B : ℝ) + 1 := h_xQ_bnd Jstar h_Jstar_le_kg
+        have h_lip := polyEval_lipschitz_real a d n K (B + 1) x.val (xQ Jstar)
+          (show |x.val| ≤ ((B + 1 : ℕ) : ℝ) by push_cast; exact h_x_abs_BP1)
+          (show |xQ Jstar| ≤ ((B + 1 : ℕ) : ℝ) by push_cast; exact h_xQJstar_BP1)
+        push_cast at h_lip
+        have h_dist_nn : 0 ≤ |x.val - xQ Jstar| := abs_nonneg _
+        refine ⟨Jstar, h_Jstar_le_kg, ?_⟩
+        calc |(∑ j ∈ Finset.range (d (n, K) + 1), (a (n, K, j) : ℝ) * x.val ^ j)
+              - (∑ j ∈ Finset.range (d (n, K) + 1),
+                    (a (n, K, j) : ℝ) * (xQ Jstar) ^ j)|
+            ≤ (∑ j ∈ Finset.range (d (n, K) + 1),
+                (j : ℝ) * |((a (n, K, j)) : ℝ)| * ((B : ℝ) + 1) ^ (j - 1))
+              * |x.val - xQ Jstar| := h_lip
+          _ ≤ ((Lip_nℕ : ℕ) : ℝ) * |x.val - xQ Jstar| := by
+              exact mul_le_mul_of_nonneg_right h_Lip_real_le_nat h_dist_nn
+          _ ≤ ((Lip_nℕ : ℕ) : ℝ) * (1 / 2 ^ mm + 2 * ((B : ℝ) + 1) / (kg : ℝ)) := by
+              exact mul_le_mul_of_nonneg_left h_x_xQJstar_close (Nat.cast_nonneg _)
+          _ = ((Lip_nℕ : ℕ) : ℝ) * (1 / 2 ^ mm)
+              + ((Lip_nℕ : ℕ) : ℝ) * (2 * ((B : ℝ) + 1) / (kg : ℝ)) := by ring
+          _ ≤ 2 / 2 ^ K := h_combined_bound
+      · -- Degenerate case: α' ≥ β', forcing β - α ≤ 2/2^mm. Midpoint case-split.
+        push_neg at hαβ'
+        have h_β_minus_α : β - α ≤ 2 / 2 ^ mm := by
+          have h1 := abs_le.mp hα'_close
+          have h2 := abs_le.mp hβ'_close
+          have h_eq : (2 : ℝ) / 2 ^ mm = 2 * (1 / 2 ^ mm) := by ring
+          linarith [h1.1, h1.2, h2.1, h2.2, hαβ', h_eq]
+        have h_xQ_0_eq : xQ 0 = α' := by
+          show α' + ((0 : ℕ) : ℝ) / (kg : ℝ) * (β' - α') = α'
+          rw [Nat.cast_zero]; ring
+        have h_xQ_kg_eq : xQ kg = β' := by
+          show α' + ((kg : ℕ) : ℝ) / (kg : ℝ) * (β' - α') = β'
+          rw [div_self h_kg_real_pos.ne']; ring
+        by_cases h_x_mid : x.val ≤ (α + β) / 2
+        · -- Pick J* := 0. xQ 0 = α'. |x.val - α'| ≤ 2/2^mm.
+          have hx_lo : α ≤ x.val := (Set.mem_Icc.mp x.2).1
+          have h_x_α_le : x.val - α ≤ (β - α) / 2 := by linarith
+          have h_xα_abs : |x.val - α| ≤ (β - α) / 2 := by
+            rw [abs_of_nonneg (by linarith)]; exact h_x_α_le
+          have h_x_xQ0 : |x.val - xQ 0| ≤ 2 / 2 ^ mm := by
+            rw [h_xQ_0_eq]
+            calc |x.val - α'|
+                = |(x.val - α) + (α - α')| := by congr 1; ring
+              _ ≤ |x.val - α| + |α - α'| := abs_add_le _ _
+              _ ≤ (β - α) / 2 + 1 / 2 ^ mm := by
+                  apply add_le_add h_xα_abs
+                  rw [show α - α' = -(α' - α) from by ring, abs_neg]
+                  exact hα'_close
+              _ ≤ 1 / 2 ^ mm + 1 / 2 ^ mm := by
+                  have h_eq : (2 : ℝ) / 2 ^ mm = 2 * (1 / 2 ^ mm) := by ring
+                  linarith [h_β_minus_α, h_eq]
+              _ = 2 / 2 ^ mm := by ring
+          have h_xQ_0_BP1 : |xQ 0| ≤ (B : ℝ) + 1 := h_xQ_bnd 0 (by omega)
+          have h_lip := polyEval_lipschitz_real a d n K (B + 1) x.val (xQ 0)
+            (show |x.val| ≤ ((B + 1 : ℕ) : ℝ) by push_cast; exact h_x_abs_BP1)
+            (show |xQ 0| ≤ ((B + 1 : ℕ) : ℝ) by push_cast; exact h_xQ_0_BP1)
+          push_cast at h_lip
+          have h_dist_nn : 0 ≤ |x.val - xQ 0| := abs_nonneg _
+          refine ⟨0, by omega, ?_⟩
+          calc |(∑ j ∈ Finset.range (d (n, K) + 1), (a (n, K, j) : ℝ) * x.val ^ j)
+                - (∑ j ∈ Finset.range (d (n, K) + 1),
+                      (a (n, K, j) : ℝ) * (xQ 0) ^ j)|
+              ≤ (∑ j ∈ Finset.range (d (n, K) + 1),
+                  (j : ℝ) * |((a (n, K, j)) : ℝ)| * ((B : ℝ) + 1) ^ (j - 1))
+                * |x.val - xQ 0| := h_lip
+            _ ≤ ((Lip_nℕ : ℕ) : ℝ) * |x.val - xQ 0| :=
+                mul_le_mul_of_nonneg_right h_Lip_real_le_nat h_dist_nn
+            _ ≤ ((Lip_nℕ : ℕ) : ℝ) * (2 / 2 ^ mm) :=
+                mul_le_mul_of_nonneg_left h_x_xQ0 (Nat.cast_nonneg _)
+            _ = 2 * (((Lip_nℕ : ℕ) : ℝ) * (1 / 2 ^ mm)) := by ring
+            _ ≤ 2 * (1 / 2 ^ K) :=
+                mul_le_mul_of_nonneg_left h_Lip_2m_le_K (by norm_num)
+            _ = 2 / 2 ^ K := by ring
+        · push_neg at h_x_mid
+          -- Pick J* := kg. xQ kg = β'. |x.val - β'| ≤ 2/2^mm.
+          have hx_hi : x.val ≤ β := (Set.mem_Icc.mp x.2).2
+          have h_βx_le : β - x.val ≤ (β - α) / 2 := by linarith
+          have h_βx_abs : |β - x.val| ≤ (β - α) / 2 := by
+            rw [abs_of_nonneg (by linarith)]; exact h_βx_le
+          have h_x_xQ_kg : |x.val - xQ kg| ≤ 2 / 2 ^ mm := by
+            rw [h_xQ_kg_eq]
+            calc |x.val - β'|
+                = |-(β - x.val) + (β - β')| := by congr 1; ring
+              _ ≤ |-(β - x.val)| + |β - β'| := abs_add_le _ _
+              _ = |β - x.val| + |β - β'| := by rw [abs_neg]
+              _ ≤ (β - α) / 2 + 1 / 2 ^ mm := by
+                  apply add_le_add h_βx_abs
+                  rw [show β - β' = -(β' - β) from by ring, abs_neg]
+                  exact hβ'_close
+              _ ≤ 1 / 2 ^ mm + 1 / 2 ^ mm := by
+                  have h_eq : (2 : ℝ) / 2 ^ mm = 2 * (1 / 2 ^ mm) := by ring
+                  linarith [h_β_minus_α, h_eq]
+              _ = 2 / 2 ^ mm := by ring
+          have h_xQ_kg_BP1 : |xQ kg| ≤ (B : ℝ) + 1 := h_xQ_bnd kg (le_refl _)
+          have h_lip := polyEval_lipschitz_real a d n K (B + 1) x.val (xQ kg)
+            (show |x.val| ≤ ((B + 1 : ℕ) : ℝ) by push_cast; exact h_x_abs_BP1)
+            (show |xQ kg| ≤ ((B + 1 : ℕ) : ℝ) by push_cast; exact h_xQ_kg_BP1)
+          push_cast at h_lip
+          have h_dist_nn : 0 ≤ |x.val - xQ kg| := abs_nonneg _
+          refine ⟨kg, le_refl _, ?_⟩
+          calc |(∑ j ∈ Finset.range (d (n, K) + 1), (a (n, K, j) : ℝ) * x.val ^ j)
+                - (∑ j ∈ Finset.range (d (n, K) + 1),
+                      (a (n, K, j) : ℝ) * (xQ kg) ^ j)|
+              ≤ (∑ j ∈ Finset.range (d (n, K) + 1),
+                  (j : ℝ) * |((a (n, K, j)) : ℝ)| * ((B : ℝ) + 1) ^ (j - 1))
+                * |x.val - xQ kg| := h_lip
+            _ ≤ ((Lip_nℕ : ℕ) : ℝ) * |x.val - xQ kg| :=
+                mul_le_mul_of_nonneg_right h_Lip_real_le_nat h_dist_nn
+            _ ≤ ((Lip_nℕ : ℕ) : ℝ) * (2 / 2 ^ mm) :=
+                mul_le_mul_of_nonneg_left h_x_xQ_kg (Nat.cast_nonneg _)
+            _ = 2 * (((Lip_nℕ : ℕ) : ℝ) * (1 / 2 ^ mm)) := by ring
+            _ ≤ 2 * (1 / 2 ^ K) :=
+                mul_le_mul_of_nonneg_left h_Lip_2m_le_K (by norm_num)
+            _ = 2 / 2 ^ K := by ring
+    -- ⑩.c.14 Combine `h_b1` and `h_b2` via `abs_le`.
+    rw [abs_le]
+    have h_2K_pos : (0 : ℝ) < (2 : ℝ) ^ K := by positivity
+    refine ⟨?_, ?_⟩
+    · linarith [h_b2]
+    · have h_1_le_2 : (1 : ℝ) / 2 ^ K ≤ 2 / 2 ^ K := by
+        rw [div_le_div_iff₀ h_2K_pos h_2K_pos]; linarith
+      linarith [h_b1, h_1_le_2]
+  -- ⑩.d Combine (a) and (b) via triangle inequality.
+  have h_K_eq : (2 : ℝ) ^ K = 4 * 2 ^ k := by
+    rw [hK_eq]
+    ring
+  calc |((sNK (n, k) : ℝ)) - ‖f n‖|
+      ≤ |((sNK (n, k) : ℝ)) - ‖p‖| + |‖p‖ - ‖f n‖| :=
+        abs_sub_le _ _ _
+    _ ≤ 2 / 2 ^ K + 1 / 2 ^ K := add_le_add h_b h_a
+    _ = 3 / 2 ^ K := by ring
+    _ ≤ 1 / 2 ^ k := by
+        rw [h_K_eq]
+        have h_pos : (0 : ℝ) < 2 ^ k := by positivity
+        rw [div_le_div_iff₀ (by positivity) h_pos]
+        linarith
 
-/-- The `ComputabilityStructure ℝ (C(Set.Icc α β, ℝ))` structure, parameterized over an
-explicit rational bound `(B : ℕ)` on `max(|α|, |β|)`.
+/-- The `ComputabilityStructure ℝ (C(Set.Icc α β, ℝ))` structure, parameterized over
+an explicit rational bound `(B : ℕ)` on `max(|α|, |β|)` **and** computable-real
+witnesses for `α, β` (needed by A3 — see `isComputableSeqCMap_norm`).
 
-**Why a `def` taking explicit bounds and not an `instance`** (iter-05 of round
-`l4-cmap-axiom-linearity-cont`): the polynomial-form A1 proof's norm-bound
-argument needs a Computable upper bound on `max(|α|, |β|)`. For arbitrary
-`α, β : ℝ` no such bound exists; given a rational bound `B`, the precision-pad
-argument goes through. This matches P-R Ch. 2:128 ("for recursive reals a, b").
-The previous `noncomputable instance instComputabilityStructureCMap` (without
-hypothesis) was provably unrealizable for arbitrary `α, β` — see
-`.goals/l4-cmap-axiom-linearity-cont/iter-04.md` for the obstruction analysis.
+**Why a `def` taking explicit hypotheses and not an `instance`** (iter-05 of
+round `l4-cmap-axiom-linearity-cont`): the polynomial-form A1 proof's
+norm-bound argument needs a Computable upper bound on `max(|α|, |β|)`. For
+arbitrary `α, β : ℝ` no such bound exists; given a rational bound `B`, the
+precision-pad argument goes through. Separately, A3's grid-based maximum
+argument needs `α, β` to be *computable reals*, not just bounded — see the
+counterexample in `isComputableSeqCMap_norm`'s docstring and P-R Ch. 2:128
+("for recursive reals `a, b`"). The previous `noncomputable instance`
+(without any hypothesis) was provably unrealizable for arbitrary `α, β` —
+see `.goals/l4-cmap-axiom-linearity-cont/iter-04.md`.
 
 The predicate is `IsComputableSeqCMap`; `zero_seq`,
-`isComputableSeq_linearCombination` (A1), and
-`isComputableSeq_of_effectiveLimit` (A2) are proved.
-`isComputableSeqReal_norm` (A3) delegates to the named lemma
-`isComputableSeqCMap_norm`, which is itself a partial-close
-(`sorry`-carrying) until `α, β` are restricted to computable reals — see
-that lemma's docstring for the three resolution paths.
+`isComputableSeq_linearCombination` (A1), `isComputableSeq_of_effectiveLimit`
+(A2), and `isComputableSeqReal_norm` (A3, via the named
+`isComputableSeqCMap_norm`) are all packaged. A3 was closed in round
+`l4-cmap-axiom3-norm-resig` via the three-error decomposition (clamping +
+floor-cover + midpoint case-split for the degenerate `α' ≥ β'` regime).
 
 ref for axioms 1-3: `literature/papers/PourEl-Richards-chapt2.md:66-77`.
 ref for "axiom 1 trivial / axiom 2 = Ch. 0 Thm 4 / axiom 3 = Ch. 0 Thm 7":
 `literature/papers/PourEl-Richards-chapt2.md:128-129`. -/
 @[reducible] noncomputable def computabilityStructureCMap_of
-    (B : ℕ) (hα_le : |α| ≤ (B : ℝ)) (hβ_le : |β| ≤ (B : ℝ)) :
+    (B : ℕ) (hα_le : |α| ≤ (B : ℝ)) (hβ_le : |β| ≤ (B : ℝ))
+    (hα_c : IsComputableReal α) (hβ_c : IsComputableReal β)
+    (hαβ : α ≤ β) :
     ComputabilityStructure ℝ (C(Set.Icc α β, ℝ)) where
   IsComputableSeq := IsComputableSeqCMap
   isComputableSeq_linearCombination :=
     isComputableSeqCMap_linearCombination B hα_le hβ_le
   isComputableSeq_of_effectiveLimit :=
     isComputableSeqCMap_of_effectiveLimit (α := α) (β := β)
-  isComputableSeqReal_norm := fun f hf => isComputableSeqCMap_norm B hα_le hβ_le f hf
+  isComputableSeqReal_norm := fun f hf =>
+    isComputableSeqCMap_norm B hα_le hβ_le hα_c hβ_c hαβ f hf
   zero_seq := by
     -- The all-zero polynomial approximant exactly equals the zero continuous map.
     refine ⟨fun _ => 0, fun _ => 0, ?_, Computable.const _, ?_⟩

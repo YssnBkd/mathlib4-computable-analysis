@@ -147,3 +147,16 @@
   \uses{lem:l1_isComputableReal_ofRat}
   Instantiate \Cref{lem:l1_isComputableReal_ofRat} at $q = 0$, using $((0 : \mathbb{Q}) : \mathbb{R}) = 0$.
 \end{proof}
+
+\begin{lemma}
+  \label{lem:l1_isComputableSeqReal_of_effectiveConvergence}
+  \lean{ComputableAnalysis.L1.isComputableSeqReal_of_effectiveConvergence}
+  \leanok
+  \uses{def:l1_isComputableSeqReal, def:l1_isComputableSeqRat}
+  \textbf{Closure under effective convergence} (P-R Ch.\,0 Proposition~1, \texttt{literature/papers/PourEl-Richards-chapt0.md:246}). Given a doubly-computable rational sequence $(r_{n,k}) : \mathbb{N} \times \mathbb{N} \to \mathbb{Q}$, a real sequence $x : \mathbb{N} \to \mathbb{R}$, and a Computable effective modulus $e : \mathbb{N} \times \mathbb{N} \to \mathbb{N}$ with the convergence bound
+  $$k \ge e(n, N) \;\Longrightarrow\; |r_{n,k} - x_n| \le 2^{-N},$$
+  the sequence $x$ is \texttt{IsComputableSeqReal}.
+\end{lemma}
+\begin{proof}\leanok
+  Diagonalised witness $r'(n, k) := r(n,\, e(n,k))$. Computability of $r'$ via $\texttt{IsComputableDoubleSeqRat}$-closure under \texttt{comp} with the $\texttt{Computable}$ reindex $\sigma(m) := \texttt{Nat.pair}\,((\texttt{Nat.unpair}\,m).1)\,(e(\texttt{Nat.unpair}\,m))$. The convergence bound $|r'(n, N) - x_n| = |r(n, e(n, N)) - x_n| \le 2^{-N}$ follows by instantiating \texttt{hconv} at $k := e(n, N)$ (which satisfies $k \ge e(n, N)$).
+\end{proof}

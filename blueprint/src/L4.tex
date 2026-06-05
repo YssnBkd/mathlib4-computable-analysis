@@ -28,15 +28,16 @@
 \begin{theorem}
   \label{thm:l4_cmap_instance}
   \lean{ComputableAnalysis.L4.computabilityStructureCMap_of}
+  \leanok
   \uses{def:l3_computabilityStructure}
-  $C([a,b], \mathbb{R})$ with the sup-norm carries a \texttt{ComputabilityStructure}~$\mathbb{R}$, where a sequence $(s_n)$ in $C[a,b]$ is computable iff there is a computable double array of rational-coefficient polynomials $p_{n,m}$ with $\|s_n - p_{n,m}\|_\infty \le 2^{-m}$ for all $n,m$. The construction is parameterized by an explicit rational bound $B \ge \max(|a|,|b|)$, matching P-R Ch.\,2:128's restriction to recursive endpoints. P-R Ch.\,2:141--153.
+  $C([a,b], \mathbb{R})$ with the sup-norm carries a \texttt{ComputabilityStructure}~$\mathbb{R}$, where a sequence $(s_n)$ in $C[a,b]$ is computable iff there is a computable double array of rational-coefficient polynomials $p_{n,m}$ with $\|s_n - p_{n,m}\|_\infty \le 2^{-m}$ for all $n,m$. The construction is parameterized by an explicit rational bound $B \ge \max(|a|,|b|)$, computable-real witnesses for $\alpha, \beta$, and $\alpha \le \beta$, matching P-R Ch.\,2:128's restriction to recursive endpoints. P-R Ch.\,2:141--153.
 \end{theorem}
-\begin{proof}
+\begin{proof}\leanok
   \uses{lem:l4_cmap_axiom1, lem:l4_cmap_axiom2, lem:l4_cmap_axiom3, def:l1_isComputableSeqReal}
   The three structure fields are verified separately.
   \emph{Linearity} (P-R Axiom~1, Linear Forms): by \Cref{lem:l4_cmap_axiom1}.
   \emph{Effective limit} (P-R Axiom~2): by \Cref{lem:l4_cmap_axiom2}.
-  \emph{Computable norm} (P-R Axiom~3): delegates to \Cref{lem:l4_cmap_axiom3}, which is a partial close (sorry-carrying) until the signature is strengthened — see that lemma's docstring + the obstruction analysis.
+  \emph{Computable norm} (P-R Axiom~3): delegates to \Cref{lem:l4_cmap_axiom3}, instantiated with the parameters $B, h_{\alpha\le B}, h_{\beta\le B}, h_{\alpha\text{-c}}, h_{\beta\text{-c}}, h_{\alpha\beta}$ supplied to the structure.
 \end{proof}
 
 \begin{lemma}
@@ -54,11 +55,26 @@
 \begin{lemma}
   \label{lem:l4_cmap_axiom3}
   \lean{ComputableAnalysis.L4.isComputableSeqCMap_norm}
-  \uses{def:l3_computabilityStructure, def:l1_isComputableSeqReal, lem:l1_isComputableSeqRat_max, lem:l1_isComputableSeqRat_abs}
-  Sup-norm of a \texttt{IsComputableSeqCMap} family is a \texttt{IsComputableSeqReal} (P-R Ch.\,0 Theorem~7, Maximum Values, \texttt{literature/papers/PourEl-Richards-chapt0.md:977}). \textbf{Partial close} (sorry-carrying): the current signature takes only a rational bound $B$ with $|\alpha|, |\beta| \le B$, which is provably insufficient — the rational grid points $\alpha + (j/k)(\beta - \alpha)$ that P-R's proof samples on are not computable from $B$ alone. Counterexample in the Lean docstring. The L1 closures $\texttt{IsComputableSeqRat.max}, \texttt{IsComputableSeqRat.abs}$ are listed in \texttt{uses} above because they will be used once the signature is strengthened to take $\texttt{IsComputableReal}~\alpha, \beta$ hypotheses.
+  \leanok
+  \uses{def:l3_computabilityStructure, def:l1_isComputableSeqReal, lem:l1_isComputableSeqReal_of_effectiveConvergence, lem:l1_isComputableSeqRat_max, lem:l1_isComputableSeqRat_abs}
+  Sup-norm of a \texttt{IsComputableSeqCMap} family is a \texttt{IsComputableSeqReal} (P-R Ch.\,0 Theorem~7, Maximum Values, \texttt{literature/papers/PourEl-Richards-chapt0.md:977}). The signature takes a rational bound $B$ with $|\alpha|, |\beta| \le B$, computable-real witnesses $\texttt{IsComputableReal}~\alpha, \beta$ (for the grid construction), and the well-orderedness assumption $\alpha \le \beta$ (required to rule out a degenerate empty-interval adversary).
 \end{lemma}
-% No \leanok on lem:l4_cmap_axiom3 — its body carries `sorry` (partial close). See the
-% lemma's docstring in CMap.lean for the obstruction analysis + three resolution paths.
+\begin{proof}
+  \leanok
+  \uses{lem:l1_isComputableSeqReal_of_effectiveConvergence}
+  Three-error decomposition for $|s_{n,k} - \|f_n\||_\infty \le 2^{-N}$ when $k \ge N$, following P-R chapt0:984--1012.
+  \begin{itemize}
+    \item Set $K := k + 2$ and let $p := \texttt{polyApproxCMap}~a~d~n~K$ be the $K$-th polynomial approximant of $f_n$.
+    \item (a) \emph{Polynomial-approximation error}: $|\|p\| - \|f_n\|| \le \|p - f_n\| \le 2^{-K}$, by the input \texttt{herr} bound at precision $K$.
+    \item (b) \emph{Sample/norm gap} $|s_{n,k} - \|p\|| \le 2 \cdot 2^{-K}$, decomposed:
+      \begin{itemize}
+        \item \emph{$h_{b1}$ (clamp)}: each grid sample $|p_\mathbb{R}(xQ_J)|$ is bounded by $\|p\| + 2^{-K}$ via the clamp $xc_J := \mathtt{projIcc}~\alpha~\beta~h_{\alpha\beta}(xQ_J) \in [\alpha,\beta]$, Lipschitz bound $|p_\mathbb{R}(xQ_J) - p(xc_J)| \le \mathrm{Lip} \cdot 2^{-mm} \le 2^{-K}$, and $|p(xc_J)| \le \|p\|$.
+        \item \emph{$h_{b2}$ (cover)}: for each $x \in [\alpha,\beta]$, find $J^* \le kg$ with $|x - xQ_{J^*}|$ controlled. Non-degenerate $\alpha' < \beta'$: clamp $x$ into $[\alpha',\beta']$, parameterize $t \in [0,1]$, set $J^* := \lfloor kg \cdot t \rfloor$, giving $|x - xQ_{J^*}| \le 2^{-mm} + 2(B+1)/kg$. Degenerate $\alpha' \ge \beta'$ (forces $\beta - \alpha \le 2 \cdot 2^{-mm}$): midpoint case-split on $x \le (\alpha+\beta)/2$, pick $J^* := 0$ or $J^* := kg$, giving $|x - xQ_{J^*}| \le 2 \cdot 2^{-mm}$.
+      \end{itemize}
+    \item Summed errors: $|s_{n,k} - \|f_n\|| \le 2^{-K} + 2 \cdot 2^{-K} = 3 \cdot 2^{-(k+2)} \le 2^{-k} \le 2^{-N}$ when $k \ge N$.
+  \end{itemize}
+  Effective convergence then yields $\|f_n\|$ as \texttt{IsComputableSeqReal} via \Cref{lem:l1_isComputableSeqReal_of_effectiveConvergence}.
+\end{proof}
 
 \begin{theorem}
   \label{thm:l4_lp_instance}

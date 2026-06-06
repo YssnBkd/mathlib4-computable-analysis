@@ -72,6 +72,17 @@
 \end{proof}
 
 \begin{lemma}
+  \label{lem:l1_isComputableSeqRat_neg}
+  \lean{ComputableAnalysis.L1.IsComputableSeqRat.neg}
+  \leanok
+  \uses{def:l1_isComputableSeqRat}
+  \texttt{IsComputableSeqRat} is closed under pointwise negation: if $h : \texttt{IsComputableSeqRat}\,r$, then $\lambda k.\,-r_k$ is computable.
+\end{lemma}
+\begin{proof}\leanok
+  Witness $(a, b, s+1)$: keep the magnitude pair $(a, b)$ unchanged and increment the sign sequence by $1$ (\texttt{Computable.succ.comp}). The defining identity $-r_k = (-1)^{s_k+1} \cdot (a_k / b_k)$ reduces via \texttt{pow\_succ} and \texttt{ring}.
+\end{proof}
+
+\begin{lemma}
   \label{lem:l1_isComputableSeqRat_comp}
   \lean{ComputableAnalysis.L1.IsComputableSeqRat.comp}
   \leanok
@@ -159,4 +170,51 @@
 \end{lemma}
 \begin{proof}\leanok
   Diagonalised witness $r'(n, k) := r(n,\, e(n,k))$. Computability of $r'$ via $\texttt{IsComputableDoubleSeqRat}$-closure under \texttt{comp} with the $\texttt{Computable}$ reindex $\sigma(m) := \texttt{Nat.pair}\,((\texttt{Nat.unpair}\,m).1)\,(e(\texttt{Nat.unpair}\,m))$. The convergence bound $|r'(n, N) - x_n| = |r(n, e(n, N)) - x_n| \le 2^{-N}$ follows by instantiating \texttt{hconv} at $k := e(n, N)$ (which satisfies $k \ge e(n, N)$).
+\end{proof}
+
+\begin{lemma}
+  \label{lem:l1_isComputableSeqReal_add}
+  \lean{ComputableAnalysis.L1.IsComputableSeqReal.add}
+  \leanok
+  \uses{def:l1_isComputableSeqReal, lem:l1_isComputableSeqReal_of_effectiveConvergence, lem:l1_isComputableSeqRat_add}
+  \texttt{IsComputableSeqReal} is closed under pointwise addition: if $h_i : \texttt{IsComputableSeqReal}\,a_i$ for $i \in \{1,2\}$, then the Pi-pointwise sum $a_1 + a_2$ is computable.
+\end{lemma}
+\begin{proof}\leanok
+  \uses{lem:l1_isComputableSeqReal_of_effectiveConvergence, lem:l1_isComputableSeqRat_add}
+  Witness construction: from $h_i$ extract rational double-sequences $r_{a_i}$ with precision $1/2^k$. Take $r(n,k) := r_{a_1}(n,k) + r_{a_2}(n,k)$ via \Cref{lem:l1_isComputableSeqRat_add} on the \texttt{Nat.unpair}-flattened forms, with effective modulus $e(n,N) := N + 1$. The bound $|r(n,k) - (a_1 + a_2)_n| \le 1/2^k + 1/2^k = 2/2^k \le 1/2^N$ for $k \ge N+1$ follows by triangle inequality and $2 \cdot 2^N \le 2^k$. Apply \Cref{lem:l1_isComputableSeqReal_of_effectiveConvergence}. Hoisted from a private L2 helper during round \texttt{l2-mul-smul-sub}. P-R Ch.\,0:246.
+\end{proof}
+
+\begin{lemma}
+  \label{lem:l1_isComputableSeqReal_neg}
+  \lean{ComputableAnalysis.L1.IsComputableSeqReal.neg}
+  \leanok
+  \uses{def:l1_isComputableSeqReal, lem:l1_isComputableSeqReal_of_effectiveConvergence, lem:l1_isComputableSeqRat_neg}
+  \texttt{IsComputableSeqReal} is closed under pointwise negation: if $h : \texttt{IsComputableSeqReal}\,a$, then $\lambda n.\,-a_n$ is computable.
+\end{lemma}
+\begin{proof}\leanok
+  \uses{lem:l1_isComputableSeqReal_of_effectiveConvergence, lem:l1_isComputableSeqRat_neg}
+  Witness $r(n,k) := -r_a(n,k)$ via \Cref{lem:l1_isComputableSeqRat_neg} on the flattened form; effective modulus $e(n,N) := N$ (unshifted, since \texttt{abs\_neg} is magnitude-exact, unlike the triangle-doubling in $\texttt{add}$). Bound: $|-r_a(n,k) - (-a_n)| = |r_a(n,k) - a_n| \le 1/2^k \le 1/2^N$ for $k \ge N$. Hoisted from a private L2 helper during round \texttt{l2-mul-smul-sub}. P-R Ch.\,0:246.
+\end{proof}
+
+\begin{lemma}
+  \label{lem:l1_isComputableSeqReal_bound}
+  \lean{ComputableAnalysis.L1.IsComputableSeqReal.bound}
+  \leanok
+  \uses{def:l1_isComputableSeqReal}
+  Every computable real sequence has a \texttt{Computable} natural-number upper bound: if $h : \texttt{IsComputableSeqReal}\,y$, there exist $M : \mathbb{N} \to \mathbb{N}$ \texttt{Computable} with $\forall n.\,|y_n| \le M_n$.
+\end{lemma}
+\begin{proof}\leanok
+  From the witness $(a_w, b_w, s_w)$ of $h$'s flattened \texttt{IsComputableSeqRat} form, evaluate at $\texttt{Nat.pair}\,n\,0$ to extract the numerator/denominator of $r_y(n,0)$, the rational approximant to $y_n$ with error $\le 1$. Then $|y_n| \le |r_y(n,0)| + 1 = a_w(\texttt{Nat.pair}\,n\,0) / b_w(\texttt{Nat.pair}\,n\,0) + 1 \le a_w(\texttt{Nat.pair}\,n\,0) + 1 \le M_n := a_w(\texttt{Nat.pair}\,n\,0) + b_w(\texttt{Nat.pair}\,n\,0) + 1$, using $a/b \le a$ for $b \ge 1$. Computability of $M$ is a chain of \texttt{Primrec.nat\_add.to\_comp.comp} on $a_w$, $b_w$, and the pairing $\lambda n.\,\texttt{Nat.pair}\,n\,0$. Round \texttt{l2-mul-smul-sub}.
+\end{proof}
+
+\begin{lemma}
+  \label{lem:l1_isComputableSeqReal_mul}
+  \lean{ComputableAnalysis.L1.IsComputableSeqReal.mul}
+  \leanok
+  \uses{def:l1_isComputableSeqReal, lem:l1_isComputableSeqReal_of_effectiveConvergence, lem:l1_isComputableSeqRat_mul, lem:l1_isComputableSeqReal_bound}
+  \texttt{IsComputableSeqReal} is closed under pointwise multiplication: $a_1 \cdot a_2$ is computable when both factors are.
+\end{lemma}
+\begin{proof}\leanok
+  \uses{lem:l1_isComputableSeqReal_of_effectiveConvergence, lem:l1_isComputableSeqRat_mul, lem:l1_isComputableSeqReal_bound}
+  Extract \texttt{Computable} natural-valued bounds $M_a, M_b$ on $|a|, |b|$ via \Cref{lem:l1_isComputableSeqReal_bound}. Witness $r(n,k) := r_a(n,k) \cdot r_b(n,k)$ via \Cref{lem:l1_isComputableSeqRat_mul} on the flattened forms; effective modulus $e(n,N) := N + M_a(n) + M_b(n) + 1$. The error decomposition $|R \cdot S - a_n b_n| \le |R| \cdot |S - b_n| + |b_n| \cdot |R - a_n|$ combined with $|R| \le |a_n| + 1/2^k \le M_a(n) + 1$ and $|b_n| \le M_b(n)$ gives $|R \cdot S - a_n b_n| \le (M_a + M_b + 1)/2^k$. For $k \ge N + M_a + M_b + 1$, $2^k \ge 2^N \cdot 2^{M_a + M_b + 1} \ge 2^N \cdot (M_a + M_b + 1)$ via \texttt{Nat.lt\_two\_pow\_self}, so the bound lands at $\le 1/2^N$. Round \texttt{l2-mul-smul-sub}. P-R Ch.\,0:246.
 \end{proof}

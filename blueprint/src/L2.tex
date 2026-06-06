@@ -1,9 +1,101 @@
 \chapter{L2 — Grzegorczyk--Lacombe computable continuous functions}
 
 % P-R reference: Chapter 0 (G-L definition) + Chapter 1 (closure properties).
+% Verbatim Definition A at literature/papers/PourEl-Richards-chapt0.md:427-435.
 
 \begin{definition}
   \label{def:l2_isGLComputable}
-  \notready
-  Predicate \texttt{IsGLComputable}\,$: C(\textnormal{Icc } a\, b, \mathbb{R}) \to \texttt{Prop}$ capturing Grzegorczyk--Lacombe effective uniform continuity plus computable rational-approximation modulus. P-R Ch.\,0:139.
+  \lean{ComputableAnalysis.L2.IsGLComputable}
+  \leanok
+  \uses{def:l1_isComputableSeqReal}
+  Predicate \texttt{IsGLComputable}\,$: C(\textnormal{Icc } \alpha\, \beta, \mathbb{R}) \to \texttt{Prop}$ encoding Pour-El \& Richards \emph{Definition A} (Grzegorczyk--Lacombe). A continuous map $f : C(\textnormal{Icc}\,\alpha\,\beta, \mathbb{R})$ is \texttt{IsGLComputable} iff
+  \begin{itemize}
+    \item \textbf{(i) Sequential computability}: for every input sequence $x : \mathbb{N} \to \textnormal{Icc}\,\alpha\,\beta$ whose underlying real sequence $\lambda n.\,(x_n : \mathbb{R})$ satisfies \texttt{IsComputableSeqReal}, the output sequence $\lambda n.\,f(x_n)$ also satisfies \texttt{IsComputableSeqReal}.
+    \item \textbf{(ii) Effective uniform continuity}: there exists a \texttt{Computable} function $d : \mathbb{N} \to \mathbb{N}$ with $\forall N.\,0 < d(N)$ such that for all $N$ and all $x, y \in \textnormal{Icc}\,\alpha\,\beta$, $|(x : \mathbb{R}) - (y : \mathbb{R})| \le 1/d(N) \implies |f(x) - f(y)| \le 1/2^N$.
+  \end{itemize}
+  The positivity conjunct $\forall N.\,0 < d(N)$ is an explicit encoding of P-R's implicit ``$1/d(N)$ is a well-defined positive real'' classical reading; without it, Mathlib's $1/0 = 0$ convention collapses the predicate to mere sequential computability (Banach--Mazur, chapt0:520). P-R Ch.\,0:427--435 (verbatim in file header).
 \end{definition}
+
+\begin{lemma}
+  \label{lem:l2_const_gl}
+  \lean{ComputableAnalysis.L2.l2_const_gl}
+  \leanok
+  \uses{def:l2_isGLComputable, def:l1_isComputableReal}
+  For any $c : \mathbb{R}$ with \texttt{IsComputableReal}\,$c$, the constant continuous map $\texttt{ContinuousMap.const}\,(\textnormal{Icc}\,\alpha\,\beta)\,c$ satisfies \texttt{IsGLComputable}.
+\end{lemma}
+\begin{proof}\leanok
+  \uses{def:l2_isGLComputable, def:l1_isComputableReal}
+  Clause (i): the output sequence $\lambda n.\,(\texttt{const}\,c)(x_n)$ reduces definitionally to $\lambda n.\,c$, which unfolds to \texttt{IsComputableReal}\,$c = $ hypothesis. Clause (ii): pick the trivial modulus witness $d := \lambda \_.\,1$; \texttt{Computable.const 1} certifies recursiveness, $0 < 1$ certifies positivity, and the modulus implication is vacuously satisfied since $|c - c| = 0 \le 1/2^N$. P-R Ch.\,0:504.
+\end{proof}
+
+\begin{lemma}
+  \label{lem:l2_id_gl}
+  \lean{ComputableAnalysis.L2.l2_id_gl}
+  \leanok
+  \uses{def:l2_isGLComputable}
+  The coordinate inclusion $(\lambda x : \textnormal{Icc}\,\alpha\,\beta.\,(x : \mathbb{R}))$ viewed as a \texttt{ContinuousMap} (continuity via \texttt{continuous\_subtype\_val}) satisfies \texttt{IsGLComputable}.
+\end{lemma}
+\begin{proof}\leanok
+  \uses{def:l2_isGLComputable}
+  Clause (i): the output sequence at $n$ reduces definitionally to $(x_n : \mathbb{R})$, which is the input hypothesis on $x$'s computability. Clause (ii): pick $d N := 2^N$. The antecedent $|x - y| \le 1/2^N$ in $\mathbb{R}$ matches the conclusion exactly (the identity preserves distances). Computability of $\lambda N.\,2^N$ is built inline via \texttt{Computable.nat\_rec}; positivity via \texttt{Nat.two\_pow\_pos}. P-R Ch.\,0:504.
+\end{proof}
+
+\begin{lemma}
+  \label{lem:l2_sum_gl}
+  \lean{ComputableAnalysis.L2.l2_sum_gl}
+  \leanok
+  \uses{def:l2_isGLComputable, lem:l1_isComputableSeqReal_add}
+  If $f, g : C(\textnormal{Icc}\,\alpha\,\beta, \mathbb{R})$ both satisfy \texttt{IsGLComputable}, then so does $f + g$.
+\end{lemma}
+\begin{proof}\leanok
+  \uses{def:l2_isGLComputable, lem:l1_isComputableSeqReal_add}
+  Clause (i): the output sequence $\lambda n.\,(f+g)(x_n) = \lambda n.\,f(x_n) + g(x_n)$ is L1-computable via \Cref{lem:l1_isComputableSeqReal_add} applied to $\lambda n.\,f(x_n)$ and $\lambda n.\,g(x_n)$. Clause (ii): with $d_f, d_g$ the moduli of $f, g$, pick $d_{\textnormal{sum}}(N) := d_f(N+1) \cdot d_g(N+1)$ — positive by \texttt{Nat.mul\_pos} from the iter-06 positivity conjunct, computable by composition. The hypothesis $|x-y| \le 1/d_{\textnormal{sum}}(N)$ bounds $|x-y|$ by both $1/d_f(N+1)$ and $1/d_g(N+1)$ (via \texttt{one\_div\_le\_one\_div\_of\_le} and \texttt{Nat.le\_mul\_of\_pos\_*}), yielding $|f(x) - f(y)| \le 1/2^{N+1}$ and $|g(x) - g(y)| \le 1/2^{N+1}$ from $d_f, d_g$ at level $N+1$. The triangle inequality and $1/2^{N+1} + 1/2^{N+1} = 1/2^N$ close. P-R Ch.\,0:504.
+\end{proof}
+
+\begin{lemma}
+  \label{lem:l2_neg_gl}
+  \lean{ComputableAnalysis.L2.l2_neg_gl}
+  \leanok
+  \uses{def:l2_isGLComputable, lem:l1_isComputableSeqReal_neg}
+  If $f : C(\textnormal{Icc}\,\alpha\,\beta, \mathbb{R})$ satisfies \texttt{IsGLComputable}, then so does $-f$.
+\end{lemma}
+\begin{proof}\leanok
+  \uses{def:l2_isGLComputable, lem:l1_isComputableSeqReal_neg}
+  Clause (i): the output sequence $\lambda n.\,(-f)(x_n) = \lambda n.\,-f(x_n)$ is L1-computable via \Cref{lem:l1_isComputableSeqReal_neg} applied to $\lambda n.\,f(x_n)$. Clause (ii): the modulus of $f$ is \emph{preserved unchanged} for $-f$. Indeed $|(-f)(x) - (-f)(y)| = |-(f(x) - f(y))| = |f(x) - f(y)|$ by \texttt{abs\_neg}, so the hypothesis closes via $f$'s own modulus implication. Computability and positivity of $d_f$ are reused verbatim. P-R Ch.\,0:504.
+\end{proof}
+
+\begin{lemma}
+  \label{lem:l2_sub_gl}
+  \lean{ComputableAnalysis.L2.l2_sub_gl}
+  \leanok
+  \uses{def:l2_isGLComputable, lem:l2_sum_gl, lem:l2_neg_gl}
+  If $f, g : C(\textnormal{Icc}\,\alpha\,\beta, \mathbb{R})$ both satisfy \texttt{IsGLComputable}, then so does $f - g$.
+\end{lemma}
+\begin{proof}\leanok
+  \uses{lem:l2_sum_gl, lem:l2_neg_gl}
+  Rewrite $f - g = f + (-g)$ via \texttt{sub\_eq\_add\_neg} (the \texttt{AddGroup} axiom lifted to $C(X, \mathbb{R})$ via \texttt{Mathlib.Topology.ContinuousMap.Algebra}), then apply \Cref{lem:l2_sum_gl} to $h_f$ and \Cref{lem:l2_neg_gl}\,$h_g$. Two-line corollary.
+\end{proof}
+
+\begin{lemma}
+  \label{lem:l2_smul_gl}
+  \lean{ComputableAnalysis.L2.l2_smul_gl}
+  \leanok
+  \uses{def:l2_isGLComputable, def:l1_isComputableReal, lem:l1_isComputableSeqReal_mul, lem:l1_isComputableSeqReal_bound}
+  If $c : \mathbb{R}$ satisfies \texttt{IsComputableReal} and $f : C(\textnormal{Icc}\,\alpha\,\beta, \mathbb{R})$ satisfies \texttt{IsGLComputable}, then so does $c \bullet f$.
+\end{lemma}
+\begin{proof}\leanok
+  \uses{lem:l1_isComputableSeqReal_mul, lem:l1_isComputableSeqReal_bound}
+  Extract a natural-valued bound $M := M_c(0)$ on $|c|$ via \Cref{lem:l1_isComputableSeqReal_bound} applied to the constant sequence $\lambda \_.\,c$. Clause (i): $(c \bullet f)(x_n) = c \cdot f(x_n)$ by \texttt{ContinuousMap.smul\_apply} composed with \texttt{smul\_eq\_mul}; sequential closure via \Cref{lem:l1_isComputableSeqReal_mul} applied to the constant sequence (which is $h_c$ directly via the \texttt{IsComputableReal} definition) and the L1-computable $\lambda n.\,f(x_n)$. Clause (ii): pick modulus $d_{\textnormal{smul}}(N) := d_f(N + M)$. Then $|(c \bullet f)(x) - (c \bullet f)(y)| = |c| \cdot |f(x) - f(y)| \le M \cdot 1/2^{N+M} = M / (2^N \cdot 2^M) \le 1/2^N$ using $M \le 2^M$ from \texttt{Nat.lt\_two\_pow\_self}. P-R Ch.\,0:504.
+\end{proof}
+
+\begin{lemma}
+  \label{lem:l2_mul_gl}
+  \lean{ComputableAnalysis.L2.l2_mul_gl}
+  \leanok
+  \uses{def:l2_isGLComputable, lem:l1_isComputableSeqReal_mul}
+  If $f, g : C(\textnormal{Icc}\,\alpha\,\beta, \mathbb{R})$ both satisfy \texttt{IsGLComputable}, then so does $f \cdot g$.
+\end{lemma}
+\begin{proof}\leanok
+  \uses{lem:l1_isComputableSeqReal_mul}
+  Extract natural-valued upper bounds $M_f := \lceil \|f\| \rceil_+ + 1$ and $M_g := \lceil \|g\| \rceil_+ + 1$ on $|f|, |g|$ via \texttt{ContinuousMap.norm\_coe\_le\_norm} on the compact $\textnormal{Icc}\,\alpha\,\beta$ (\texttt{CompactSpace} from \texttt{compactSpace\_Icc} via the \texttt{CompactIccSpace}\,$\mathbb{R}$ instance). Clause (i): sequential closure via \Cref{lem:l1_isComputableSeqReal_mul} applied to $\lambda n.\,f(x_n)$ and $\lambda n.\,g(x_n)$. Clause (ii): modulus $d_{\textnormal{mul}}(N) := d_f(N + 1 + M_g) \cdot d_g(N + 1 + M_f)$, positive by \texttt{Nat.mul\_pos}. The hypothesis $|x-y| \le 1/d_{\textnormal{mul}}(N)$ bounds $|x-y|$ by both factor-divided forms via \texttt{Nat.le\_mul\_of\_pos\_*}, yielding $|f(x)-f(y)| \le 1/2^{N+1+M_g}$ and $|g(x)-g(y)| \le 1/2^{N+1+M_f}$. The decomposition $f(x)g(x) - f(y)g(y) = f(x) \cdot (g(x) - g(y)) + g(y) \cdot (f(x) - f(y))$ combined with the triangle inequality and the pointwise bounds gives $|(f \cdot g)(x) - (f \cdot g)(y)| \le M_f/2^{N+1+M_f} + M_g/2^{N+1+M_g} \le 1/2^{N+1} + 1/2^{N+1} = 1/2^N$, each term collapsing via $M_\bullet \le 2^{M_\bullet}$ from \texttt{Nat.lt\_two\_pow\_self}. The headline result of round \texttt{l2-mul-smul-sub}. P-R Ch.\,0:504.
+\end{proof}

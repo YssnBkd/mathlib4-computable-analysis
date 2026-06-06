@@ -15,3 +15,6 @@ Registry of all `/goal` rounds. Status is `active`, `success`, `partial`, `aband
 | l4-cmap-surface-axiom1 | success | 2026-06-04 | 2026-06-04 | 5/30 | proof-attempt |
 | l1-max-abs-closure | success | 2026-06-04 | 2026-06-04 | 8/50 | proof-attempt |
 | l4-cmap-axiom3-norm-resig | success | 2026-06-04 | 2026-06-05 | 10/100 | proof-attempt |
+| l2-grzegorczyk-lacombe | success | 2026-06-05 | 2026-06-05 | 10/50 | proof-attempt |
+| l2-mul-smul-sub | success | 2026-06-05 | 2026-06-06 | 10/50 | proof-attempt |
+| pr-coverage-assessment | abandoned | 2026-06-06 | 2026-06-06 | 18/50 | explore |

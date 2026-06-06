@@ -13,42 +13,56 @@ UP 1989), targeting upstream contribution to `Mathlib.Computability.Analysis.*`.
 first** — it is the project constitution. The deliverable is **Lean code**; the
 type-checker is the final arbiter.
 
-## What just happened (2026-06-05 — round `l4-cmap-axiom3-norm-resig` wraps)
+## What just happened (2026-06-06 — round `l2-mul-smul-sub` wraps)
 
-The active `/goal` round `l4-cmap-axiom3-norm-resig` closed **A3** (sup-norm
-computability for `C[α, β]`) **fully sorry-free**. With A1 and A2 already
-closed in earlier rounds, the entire `computabilityStructureCMap_of` instance
-is now sorry-free.
+The active `/goal` round `l2-mul-smul-sub` extended **L2** with the
+remaining arithmetic closures (sub, smul, mul) and lifted four L1 helpers
+(`IsComputableSeqReal.add`, `.neg`, `.bound`, `.mul`) from previously-private
+status into the L1 namespace. **All sorry-free, all DA-passed.**
 
-Concretely, this conversation drove iter-10:
+Concretely, the round drove iter-02 through iter-10 (8 effective iters):
 
-1. **A3 body (`isComputableSeqCMap_norm`)** filled via the three-error
-   decomposition (P-R chapt0:984-1012):
-   - **(a) Polynomial-approximation**: `|‖p‖ − ‖f_n‖| ≤ 1/2^K` via `herr`.
-   - **(b1) Clamp**: `(sNK : ℝ) ≤ ‖p‖ + 1/2^K` via `Set.projIcc` clamping +
-     `polyEval_lipschitz_real` + `ContinuousMap.norm_coe_le_norm`.
-   - **(b2) Cover**: `‖p‖ ≤ (sNK : ℝ) + 2/2^K` via
-     `ContinuousMap.norm_le` reduction + per-point Lipschitz to the grid.
-     Case-splits on `α' < β'` (floor-cover) vs `α' ≥ β'` (degenerate,
-     midpoint case-split).
-   - **Combine** via `abs_le` → `|sNK − ‖f_n‖| ≤ 3/2^K ≤ 1/2^k ≤ 1/2^N`.
-2. **Moduli tightened**: `m_mod := Lip + N + 3`, `k_grid := 8·Lip·(B+1)·2^N + 1`
-   (small adjustment from iter-09; DA review notes `+3` is overkill but harmless).
-3. **`computabilityStructureCMap_of`** takes six hypotheses
-   `(B) (hα_le) (hβ_le) (hα_c) (hβ_c) (hαβ)` (matching A3); fully sorry-free.
-4. **Blueprint**: `lem:l4_cmap_axiom3` and `thm:l4_cmap_instance` promoted to
-   `\leanok` on both statement and proof; `lem:l1_isComputableSeqReal_of_effectiveConvergence`
-   added; both `leanblueprint checkdecls` and `leanblueprint web` exit 0.
-5. **DA review** on three-error decomposition: `verdict: passes` (see
-   `.goals/l4-cmap-axiom3-norm-resig/reviews/C5.md`).
+1. **C1, C2 — L1 helper lifts.** `IsComputableSeqReal.add` (modulus
+   `e(n,N) := N+1`, triangle inequality) and `.neg` (modulus unshifted via
+   `abs_neg`) hoisted from `private` L2 helpers to named L1 §4.5 theorems.
+   `l2_sum_gl` and `l2_neg_gl` callsites updated to `h_f.add h_g` /
+   `h_f.neg` dot-notation. Two-line proof for each at the L2 site.
+2. **C3 — `l2_sub_gl`.** Two-line corollary:
+   `rw [sub_eq_add_neg]; exact l2_sum_gl hf (l2_neg_gl hg)`.
+3. **C4 — `l2_smul_gl`** (closure under `c • f` for `IsComputableReal c`).
+   Required two new L1 helpers: `IsComputableSeqReal.bound` (Nat-valued
+   `Computable` upper bound on `|y n|` extracted from the
+   `IsComputableSeqRat` witness ingredients at `Nat.pair n 0`) and
+   `IsComputableSeqReal.mul` (modulus `e(n,N) := N + Ma + Mb + 1`,
+   amplification via `Nat.lt_two_pow_self`). The L2 lemma uses modulus
+   `df (N + M)` with `M := Mc 0` an additive shift by the Nat bound on `|c|`.
+4. **C5 — `l2_mul_gl`** (the headline closure under `*`). Boundedness via
+   `ContinuousMap.norm` on the compact `Set.Icc α β`
+   (`CompactSpace` automatic from `compactSpace_Icc`). Modulus
+   `d_mul N := df (N + 1 + M_g) * dg (N + 1 + M_f)` where
+   `M_f, M_g := ⌈‖·‖⌉₊ + 1` are Nat upper bounds. Cross-term bound chain
+   `M / 2^(N+1+M) ≤ 1/2^(N+1)` via `Nat.lt_two_pow_self`'s `M ≤ 2^M`;
+   total ≤ `1/2^N`. Required adding
+   `import Mathlib.Topology.ContinuousMap.Compact` (for the `Norm` instance).
+5. **C6 — Blueprint.** Added 5 new L1 nodes (including previously-missing
+   `lem:l1_isComputableSeqRat_neg`) and 3 new L2 nodes
+   (`lem:l2_{sub,smul,mul}_gl`); refreshed `\uses` on `lem:l2_sum_gl` /
+   `lem:l2_neg_gl` to point at the lifted L1 helpers.
+   `leanblueprint checkdecls` and `web` exit 0.
+6. **C7 — Build + axiom audit.** Full `lake build` clean (2533 jobs); all 7
+   new declarations (`IsComputableSeqReal.{add,neg,bound,mul}`,
+   `l2_{sub,smul,mul}_gl`) return
+   `[propext, Classical.choice, Quot.sound]` only.
+7. **DA reviews**: `verdict: passes` on C1, C2, C3, C4, C5. All five reviews
+   under `.goals/l2-mul-smul-sub/reviews/`.
 
-## Current state (post-session, as of 2026-06-05)
+## Current state (post-session, as of 2026-06-06)
 
 | Layer | Lean state | Blueprint |
 |---|---|---|
 | L0 | done, 0 sorry | `L0.tex` — 12 nodes `\leanok` |
-| L1 | rational closures + real-point predicate + Prop 1 sorry-free | `L1.tex` — 14+ `\leanok` |
-| L2 | not started | `L2.tex` — 1 `\notready` stub |
+| L1 | rational + **real** closures (add/neg/mul/bound) + real-point predicate + Prop 1 sorry-free | `L1.tex` — 19+ `\leanok` |
+| L2 | **`IsGLComputable` + 7 closures (const, id, sum, neg, sub, smul, mul) sorry-free** — composition (`l2_comp_gl`) and L2→L4 bridge still open | `L2.tex` — def + 7 lemmas all `\leanok` |
 | L3 | `ComputabilityStructure` typeclass sorry-free | `L3.tex` — 1 `\leanok` def |
 | L4 | **C[a,b] FULLY sorry-free** — A1, A2, A3 + structure all closed; Lᵖ / Hilbert not started | `L4.tex` — `lem:l4_cmap_axiom{1,2,3}` all `\leanok`; `thm:l4_cmap_instance` `\leanok`; Lᵖ/Hilbert `\notready` |
 | L5 | not started | `L5.tex` — 4 `\notready` stubs |
@@ -56,60 +70,67 @@ Concretely, this conversation drove iter-10:
 - **HEAD** unchanged this conversation (no commit was made; user's preference).
   All work is in working tree.
 - Repo-wide `sorry` count: **0** (modulo docstring-quoted occurrences).
-- `lake build` green; no errors; no sorry-warnings; 6 push_neg deprecation warnings.
-- Round criteria C1-C8 met; C9 (docs) in progress (this file is the C9 update).
+- `lake build` green; no errors; no sorry-warnings; only pre-existing
+  `push_neg` deprecation warnings on `L4/Instances/CMap.lean`.
+- Round criteria C1-C8 all green; awaiting `/goal-end`.
 
 ## Recommended next action — `/goal-end` then choose next round
 
-The active round has all proof-mathematical criteria met (C1-C8). To formally
-close, first run `/goal-end` to archive the round to `.goals/<slug>/`. Then
-choose one of three high-value next directions:
+The active round has all 8 criteria met. To formally close, first run
+`/goal-end` to archive the round to `.goals/l2-mul-smul-sub/`. Then choose
+one of four high-value next directions:
 
 ### Option A — Zulip outreach (recommended; ~30 min)
 
-The project has reached a credible inflection point: L0, L1, L3, and the full
-L4 C[a,b] instance are sorry-free under the kernel axioms only. This is the
-right moment to engage Mathlib4 reviewers on Zulip's `#new contributors` or
-`#Mathlib4` streams. **The user posts** — not Claude. The asker would draft
-the 3-paragraph note:
+The project now has L0, L1 (with full real-arithmetic closure), L3, L4
+C[a,b], and **L2 Grzegorczyk-Lacombe Def-A + 7 closures (const, id, sum,
+neg, sub, smul, mul) all sorry-free**. This is a stronger inflection point
+than the prior round's. **The user posts** — not Claude. The asker would
+draft:
 - ¶1: project pitch (P-R formalization, predicate-first, substrate =
   Mathlib `Computable`/`Partrec`).
-- ¶2: progress (L0-L4 sup-norm done; reference blueprint URL).
+- ¶2: progress (L0-L4 sup-norm done; L2 Def-A anchor with full algebra
+  closure; reference blueprint URL).
 - ¶3: ask for feedback on the predicate-first architecture vs
   represented-spaces (Pauly/Brattka).
 
 Record the thread under `docs/zulip-threads.md`.
 
-### Option B — `/goal` round on **L2** (Grzegorczyk-Lacombe; ~10-20 iters)
+### Option B — `/goal l2-comp-closure` (composition; ~10-15 iters)
 
-Open a new `/goal` round `l2-grzegorczyk-lacombe` targeting P-R Ch. 0 §3 + Ch. 1.
-L2 is the computable-continuous-function layer:
-- Definition: `IsGLComputable : C(ℝ, ℝ) → Prop` matching P-R Ch. 0:1042
-  (rational sequence with effective uniform continuity modulus).
-- Closure: composition, sum, product, scalar multiplication.
-- **Hook to L4**: `IsGLComputable f → IsComputableSeqCMap (fun _ => f)` for any
-  `Set.Icc α β` (constant sequence ↦ singleton-precision approximation).
+Open `l2-comp-closure` to add the final L2 arithmetic-surface piece:
+- `l2_comp_gl` — closure under precomposition with a GL-computable map
+  `g : C(Set.Icc γ δ, Set.Icc α β)`. Tricky because of the range-as-subtype
+  encoding (codomain of `g` is the subtype `↥(Set.Icc α β)`, not a free
+  type — defining what GL-computability means for `g` itself requires
+  thought). This is the genuinely-deferred piece from the prior round; once
+  it lands, the L2 arithmetic surface is closed.
 
-L2 unlocks integration / differentiation theorems in P-R Ch. 1.
+### Option C — `/goal l2-l4-bridge` (Equivalence Theorem; ~15-25 iters)
 
-### Option C — `/goal` round on **L4 Lᵖ** (~15-25 iters)
+Open `l2-l4-bridge` targeting P-R Ch. 0 §7 **Equivalence Theorem** (Def-A ⇔
+Def-B): construct `IsGLComputable f ↔ IsComputableSeqCMap (fun _ => f)`.
+This is the conceptual capstone of L2 — it bridges the
+sequential-computability-plus-modulus shape (Def A) to the
+polynomial-approximation shape (Def B, used by L4 `CMap`). Likely requires
+the L4-side Stone-Weierstrass machinery already built in `l4-cmap-axiom*`
+rounds. **Highest research-quality payoff** of the four options.
+
+### Option D — `/goal l4-lp-instance` (~15-25 iters)
 
 Open `l4-lp-instance` targeting `ComputabilityStructure ℝ (L^p[a,b])` for
 `1 ≤ p < ∞`. P-R Ch. 2:146. Construction: rational-step-function
 approximants with effective Lᵖ-convergence modulus. Requires L1 + measure
-theory bridge (Mathlib's `MeasureTheory.LpSpace`).
-
-Significantly harder than the C[a,b] instance — the polynomial-approximation
-machinery doesn't carry over (Weierstrass approximation in Lᵖ is different).
-Recommend Option B (L2) first.
+theory bridge (Mathlib's `MeasureTheory.LpSpace`). Significantly harder than
+C[a,b] — Weierstrass approximation doesn't carry over.
 
 ## Round parameters (for the closed round)
 
-- slug: `l4-cmap-axiom3-norm-resig` (CLOSED — all C1-C8 met; C9 in progress)
+- slug: `l2-mul-smul-sub` (CLOSED — all C1-C8 met)
 - mode: `proof-attempt`
-- max_iterations: 100 (10 used; 90 remaining if reopened)
-- time_budget_minutes: 3600 (within budget)
-- DA scope: C5 verdict `passes`.
+- max_iterations: 50 (10 used; 40 remaining if reopened)
+- time_budget_minutes: 360 (within budget)
+- DA scope: C1, C2, C3, C4, C5 — all `verdict: passes`.
 
 ## Quick handoff checklist (run in order at session start)
 
@@ -117,8 +138,10 @@ Recommend Option B (L2) first.
    `push_neg` deprecation warnings.
 2. `grep -rn "sorry" ComputableAnalysis/ --include="*.lean" | grep -v "^\s*--"` —
    expect 0 hits.
-3. `#print axioms ComputableAnalysis.L4.computabilityStructureCMap_of` —
-   expect `[propext, Classical.choice, Quot.sound]`.
+3. `#print axioms ComputableAnalysis.L4.computabilityStructureCMap_of` and
+   `#print axioms ComputableAnalysis.L2.{IsGLComputable, l2_const_gl, l2_id_gl, l2_sum_gl, l2_neg_gl, l2_sub_gl, l2_smul_gl, l2_mul_gl}` and
+   `#print axioms ComputableAnalysis.L1.IsComputableSeqReal.{add, neg, bound, mul}` —
+   expect `[propext, Classical.choice, Quot.sound]` on each.
 4. `cat current-goal.md` to confirm round status; if all criteria green, run
    `/goal-end` to archive.
 

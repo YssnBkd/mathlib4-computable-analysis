@@ -783,6 +783,283 @@ theorem comp
 
 end IsComputableSeqRat
 
+/-! ## §4.5 — Arithmetic closure of `IsComputableSeqReal`
+
+Closure lemmas for the real-valued sequence predicate, built by lifting the §4
+rational-level closures through `isComputableSeqReal_of_effectiveConvergence`
+(§2.5). Naming follows Mathlib's dot-notation convention (`Continuous.add`):
+the theorems live in `namespace IsComputableSeqReal` so callers write
+`h₁.add h₂`. -/
+
+namespace IsComputableSeqReal
+
+/-- Closure of `IsComputableSeqReal` under pointwise addition.
+
+Witness: take `(ra)` from `ha` and `(rb)` from `hb`, combine as
+`r(n,k) := ra(n,k) + rb(n,k)` (via `IsComputableSeqRat.add` on the flattened
+forms), with effective modulus `e(n,N) := N + 1`. The bound
+`|(ra + rb)(n,k) − (a + b) n| ≤ 1/2^k + 1/2^k = 2/2^k ≤ 1/2^N` for
+`k ≥ N + 1` follows from `abs_add_le` and `2 · 2^N ≤ 2^k`.
+
+ref: P-R Ch. 0 Proposition 1 (chapt0:246) — closure under effective limits;
+the additive closure is implicit. -/
+theorem add
+    {a b : ℕ → ℝ}
+    (ha : IsComputableSeqReal a) (hb : IsComputableSeqReal b) :
+    IsComputableSeqReal (a + b) := by
+  obtain ⟨ra, hra, hra_bnd⟩ := ha
+  obtain ⟨rb, hrb, hrb_bnd⟩ := hb
+  refine isComputableSeqReal_of_effectiveConvergence
+    (r := fun p => ra p + rb p) ?_ (e := fun p => p.2 + 1) ?_ ?_
+  · -- `IsComputableDoubleSeqRat (fun p => ra p + rb p)` via `.add` on flattened forms.
+    have hra_flat : IsComputableSeqRat (fun n => ra (Nat.unpair n)) := hra
+    have hrb_flat : IsComputableSeqRat (fun n => rb (Nat.unpair n)) := hrb
+    exact hra_flat.add hrb_flat
+  · -- `Computable (fun p : ℕ × ℕ => p.2 + 1)`.
+    exact Computable.succ.comp Computable.snd
+  · -- Convergence bound.
+    intro n N k hk
+    have h_eq :
+        (((ra (n, k) + rb (n, k) : ℚ) : ℝ)) - (a + b) n =
+          (((ra (n, k) : ℝ)) - a n) + (((rb (n, k) : ℝ)) - b n) := by
+      push_cast
+      simp [Pi.add_apply]
+      ring
+    have h_tri :
+        |(((ra (n, k) + rb (n, k) : ℚ) : ℝ)) - (a + b) n| ≤
+          |((ra (n, k) : ℝ)) - a n| + |((rb (n, k) : ℝ)) - b n| := by
+      rw [h_eq]; exact abs_add_le _ _
+    have h_a : |((ra (n, k) : ℝ)) - a n| ≤ (1 : ℝ) / 2 ^ k := hra_bnd n k
+    have h_b : |((rb (n, k) : ℝ)) - b n| ≤ (1 : ℝ) / 2 ^ k := hrb_bnd n k
+    have h_inv_le : (1 : ℝ) / 2 ^ k + (1 : ℝ) / 2 ^ k ≤ (1 : ℝ) / 2 ^ N := by
+      have hk_pos : (0 : ℝ) < 2 ^ k := by positivity
+      have hN_pos : (0 : ℝ) < 2 ^ N := by positivity
+      have h_pow_le : (2 : ℝ) ^ (N + 1) ≤ 2 ^ k :=
+        pow_le_pow_right₀ (by norm_num : (1 : ℝ) ≤ 2) hk
+      rw [pow_succ] at h_pow_le
+      rw [show (1 : ℝ) / 2 ^ k + (1 : ℝ) / 2 ^ k = 2 / 2 ^ k from by ring]
+      rw [div_le_div_iff₀ hk_pos hN_pos]
+      linarith
+    linarith
+
+/-- Closure of `IsComputableSeqReal` under pointwise negation.
+
+Witness `r(n,k) := - ra(n,k)` (via `IsComputableSeqRat.neg` on the flattened
+form), with the modulus reused unchanged: `|(- ra(n,k) : ℝ) − (- a n)| =
+|ra(n,k) − a n| ≤ 1/2^k ≤ 1/2^N` for `k ≥ N`, via `abs_neg`.
+
+ref: P-R Ch. 0 Proposition 1 (chapt0:246) — negation closure implicit. -/
+theorem neg
+    {a : ℕ → ℝ} (ha : IsComputableSeqReal a) :
+    IsComputableSeqReal (fun n => - a n) := by
+  obtain ⟨ra, hra, hra_bnd⟩ := ha
+  refine isComputableSeqReal_of_effectiveConvergence
+    (r := fun p => - ra p) ?_ (e := fun p => p.2) ?_ ?_
+  · -- `IsComputableDoubleSeqRat (fun p => - ra p)` via `.neg` on flattened form.
+    have hra_flat : IsComputableSeqRat (fun n => ra (Nat.unpair n)) := hra
+    exact hra_flat.neg
+  · -- `Computable (fun p : ℕ × ℕ => p.2)`.
+    exact Computable.snd
+  · -- Convergence bound. `|- ra(n,k) − (- a n)| = |ra(n,k) − a n|`.
+    intro n N k hk
+    have h_eq :
+        (((- ra (n, k) : ℚ) : ℝ)) - (- a n) =
+          - (((ra (n, k) : ℝ)) - a n) := by
+      push_cast
+      ring
+    have h_abs :
+        |(((- ra (n, k) : ℚ) : ℝ)) - (- a n)| = |((ra (n, k) : ℝ)) - a n| := by
+      rw [h_eq, abs_neg]
+    rw [h_abs]
+    have h_pow_le : (2 : ℝ) ^ N ≤ 2 ^ k :=
+      pow_le_pow_right₀ (by norm_num : (1 : ℝ) ≤ 2) hk
+    have hN_pos : (0 : ℝ) < 2 ^ N := by positivity
+    have hk_pos : (0 : ℝ) < 2 ^ k := by positivity
+    have h_inv :
+        (1 : ℝ) / 2 ^ k ≤ (1 : ℝ) / 2 ^ N :=
+      one_div_le_one_div_of_le hN_pos h_pow_le
+    exact le_trans (hra_bnd n k) h_inv
+
+/-- Every computable real sequence has a `Computable` Nat-valued upper bound.
+
+From the `IsComputableSeqRat`-witness `(a_w, b_w, s_w)` of the flattened
+double sequence, the value at `Nat.pair n 0` produces the numerator/
+denominator of the rational approximation `ry(n, 0)` of `y n` to error `≤ 1`.
+Then `|y n| ≤ |ry(n, 0)| + 1 = a_w(Nat.pair n 0)/b_w(Nat.pair n 0) + 1 ≤
+a_w(Nat.pair n 0) + 1 ≤ a_w(Nat.pair n 0) + b_w(Nat.pair n 0) + 1 =: M(n)`,
+with `M` Computable as a Nat-arithmetic composition. -/
+theorem bound {y : ℕ → ℝ} (hy : IsComputableSeqReal y) :
+    ∃ M : ℕ → ℕ, Computable M ∧ ∀ n, |y n| ≤ (M n : ℝ) := by
+  obtain ⟨ry, hry, hry_bnd⟩ := hy
+  obtain ⟨a_w, b_w, s_w, ha_w, hb_w, _hs_w, hne_w, heq_w⟩ := hry
+  -- The Computable indexing `n ↦ Nat.pair n 0`.
+  have hN_comp : Computable (fun n : ℕ => Nat.pair n 0) :=
+    Primrec₂.natPair.to_comp.comp Computable.id (Computable.const 0)
+  refine ⟨fun n => a_w (Nat.pair n 0) + b_w (Nat.pair n 0) + 1, ?_, fun n => ?_⟩
+  · -- `Computable (fun n => a_w (Nat.pair n 0) + b_w (Nat.pair n 0) + 1)`.
+    refine Primrec.nat_add.to_comp.comp ?_ (Computable.const 1)
+    exact Primrec.nat_add.to_comp.comp (ha_w.comp hN_comp) (hb_w.comp hN_comp)
+  · -- Bound: `|y n| ≤ a_w(Nat.pair n 0) + b_w(Nat.pair n 0) + 1`.
+    -- Step (a): `|y n| ≤ |((ry (n, 0) : ℚ) : ℝ)| + 1` (triangle with rational approximant).
+    have h_err : |((ry (n, 0) : ℚ) : ℝ) - y n| ≤ 1 := by
+      have := hry_bnd n 0
+      simpa using this
+    have h_yle : |y n| ≤ |((ry (n, 0) : ℚ) : ℝ)| + 1 := by
+      have h1 : y n = (y n - ((ry (n, 0) : ℚ) : ℝ)) + ((ry (n, 0) : ℚ) : ℝ) := by ring
+      calc |y n|
+          = |(y n - ((ry (n, 0) : ℚ) : ℝ)) + ((ry (n, 0) : ℚ) : ℝ)| := by rw [← h1]
+        _ ≤ |y n - ((ry (n, 0) : ℚ) : ℝ)| + |((ry (n, 0) : ℚ) : ℝ)| := abs_add_le _ _
+        _ = |((ry (n, 0) : ℚ) : ℝ) - y n| + |((ry (n, 0) : ℚ) : ℝ)| := by
+            rw [abs_sub_comm]
+        _ ≤ 1 + |((ry (n, 0) : ℚ) : ℝ)| := by linarith
+        _ = |((ry (n, 0) : ℚ) : ℝ)| + 1 := by ring
+    -- Step (b): `|ry(n, 0)|` as a ℚ reduces to `a_w/b_w` via the witness equation,
+    -- after `Nat.unpair_pair`-eliminating the `Nat.unpair (Nat.pair n 0)` redex.
+    have h_eq : ry (n, 0) = (-1 : ℚ) ^ (s_w (Nat.pair n 0)) *
+        ((a_w (Nat.pair n 0) : ℚ) / (b_w (Nat.pair n 0) : ℚ)) := by
+      have h := heq_w (Nat.pair n 0)
+      simpa [Nat.unpair_pair] using h
+    have h_abs_q : |ry (n, 0)| =
+        ((a_w (Nat.pair n 0) : ℚ) / (b_w (Nat.pair n 0) : ℚ)) := by
+      rw [h_eq, abs_mul, abs_pow,
+          show |(-1 : ℚ)| = 1 from by norm_num, one_pow, one_mul,
+          abs_of_nonneg (div_nonneg (Nat.cast_nonneg _) (Nat.cast_nonneg _))]
+    have h_abs_R : |((ry (n, 0) : ℚ) : ℝ)| =
+        (a_w (Nat.pair n 0) : ℝ) / (b_w (Nat.pair n 0) : ℝ) := by
+      rw [← Rat.cast_abs, h_abs_q]
+      push_cast
+      rfl
+    -- Step (c): `a_w / b_w ≤ a_w` (as ℝ), since `b_w ≥ 1`.
+    have hb_pos : (0 : ℝ) < (b_w (Nat.pair n 0) : ℝ) := by
+      exact_mod_cast Nat.pos_of_ne_zero (hne_w _)
+    have hb_ge : (1 : ℝ) ≤ (b_w (Nat.pair n 0) : ℝ) := by
+      exact_mod_cast Nat.one_le_iff_ne_zero.mpr (hne_w _)
+    have h_div_le : (a_w (Nat.pair n 0) : ℝ) / (b_w (Nat.pair n 0) : ℝ) ≤
+        (a_w (Nat.pair n 0) : ℝ) := by
+      rw [div_le_iff₀ hb_pos]
+      have ha_nn : (0 : ℝ) ≤ (a_w (Nat.pair n 0) : ℝ) := Nat.cast_nonneg _
+      nlinarith
+    -- Step (d): Combine.
+    rw [h_abs_R] at h_yle
+    push_cast
+    linarith
+
+/-- Closure of `IsComputableSeqReal` under pointwise multiplication.
+
+Witness `r(p) := ra(p) * rb(p)` (via `IsComputableSeqRat.mul` on the
+flattened forms), with effective modulus
+`e(n, N) := N + Ma n + Mb n + 1` where `Ma, Mb` are the Nat upper bounds
+from `IsComputableSeqReal.bound`.
+
+**Bound chain.** Decompose
+`|ra(n,k) · rb(n,k) − a n · b n| = |R·(S−b n) + b n·(R−a n)|`
+(where `R := (ra(n,k) : ℝ)`, `S := (rb(n,k) : ℝ)`); by triangle inequality
+and `abs_mul`, this is `≤ |R|·|S−b n| + |b n|·|R−a n| ≤ |R|/2^k + |b n|/2^k`.
+Using `|R| ≤ |R − a n| + |a n| ≤ 1/2^k + Ma n ≤ Ma n + 1` and `|b n| ≤ Mb n`,
+the total is `≤ (Ma n + Mb n + 1)/2^k`. For `k ≥ N + Ma n + Mb n + 1`,
+`2^k ≥ 2^N · 2^(Ma+Mb+1) ≥ 2^N · (Ma + Mb + 1)` (the last step by
+`Nat.lt_two_pow_self`), so the bound lands at `≤ 1/2^N`.
+
+ref: P-R Ch. 0 Proposition 1 (chapt0:246); multiplicative closure implicit. -/
+theorem mul
+    {a b : ℕ → ℝ}
+    (ha : IsComputableSeqReal a) (hb : IsComputableSeqReal b) :
+    IsComputableSeqReal (a * b) := by
+  obtain ⟨Ma, hMa_comp, hMa_bnd⟩ := ha.bound
+  obtain ⟨Mb, hMb_comp, hMb_bnd⟩ := hb.bound
+  obtain ⟨ra, hra, hra_bnd⟩ := ha
+  obtain ⟨rb, hrb, hrb_bnd⟩ := hb
+  refine isComputableSeqReal_of_effectiveConvergence
+    (r := fun p => ra p * rb p) ?_ (e := fun p => p.2 + Ma p.1 + Mb p.1 + 1) ?_ ?_
+  · -- `IsComputableDoubleSeqRat (fun p => ra p * rb p)` via `.mul` on flattened forms.
+    have hra_flat : IsComputableSeqRat (fun n => ra (Nat.unpair n)) := hra
+    have hrb_flat : IsComputableSeqRat (fun n => rb (Nat.unpair n)) := hrb
+    exact hra_flat.mul hrb_flat
+  · -- `Computable (fun p : ℕ × ℕ => p.2 + Ma p.1 + Mb p.1 + 1)`.
+    have h_Ma_fst : Computable (fun p : ℕ × ℕ => Ma p.1) := hMa_comp.comp Computable.fst
+    have h_Mb_fst : Computable (fun p : ℕ × ℕ => Mb p.1) := hMb_comp.comp Computable.fst
+    have h1 : Computable (fun p : ℕ × ℕ => p.2 + Ma p.1) :=
+      Primrec.nat_add.to_comp.comp Computable.snd h_Ma_fst
+    have h2 : Computable (fun p : ℕ × ℕ => p.2 + Ma p.1 + Mb p.1) :=
+      Primrec.nat_add.to_comp.comp h1 h_Mb_fst
+    exact Primrec.nat_add.to_comp.comp h2 (Computable.const 1)
+  · -- Convergence bound.
+    intro n N k hk
+    -- Cast: `((ra(n,k)·rb(n,k) : ℚ) : ℝ) = R · S` where R, S are the ℝ-casts.
+    have h_cast :
+        ((ra (n, k) * rb (n, k) : ℚ) : ℝ) =
+          ((ra (n, k) : ℚ) : ℝ) * ((rb (n, k) : ℚ) : ℝ) := by push_cast; ring
+    rw [h_cast]
+    show |((ra (n, k) : ℚ) : ℝ) * ((rb (n, k) : ℚ) : ℝ) - a n * b n| ≤ 1 / 2 ^ N
+    -- Abbreviations.
+    set R := ((ra (n, k) : ℚ) : ℝ) with hR_def
+    set S := ((rb (n, k) : ℚ) : ℝ) with hS_def
+    -- Decomposition.
+    have h_split :
+        R * S - a n * b n = R * (S - b n) + b n * (R - a n) := by ring
+    have h_tri :
+        |R * S - a n * b n| ≤ |R| * |S - b n| + |b n| * |R - a n| := by
+      rw [h_split]
+      calc |R * (S - b n) + b n * (R - a n)|
+          ≤ |R * (S - b n)| + |b n * (R - a n)| := abs_add_le _ _
+        _ = |R| * |S - b n| + |b n| * |R - a n| := by rw [abs_mul, abs_mul]
+    -- Witness bounds (precision-on-witness).
+    have h_R_err : |R - a n| ≤ (1 : ℝ) / 2 ^ k := hra_bnd n k
+    have h_S_err : |S - b n| ≤ (1 : ℝ) / 2 ^ k := hrb_bnd n k
+    -- Magnitude bounds.
+    have h_b_bnd : |b n| ≤ (Mb n : ℝ) := hMb_bnd n
+    have h_a_bnd : |a n| ≤ (Ma n : ℝ) := hMa_bnd n
+    -- `|R| ≤ Ma n + 1`.
+    have h2k_pos : (0 : ℝ) < 2 ^ k := by positivity
+    have h2N_pos : (0 : ℝ) < 2 ^ N := by positivity
+    have h_inv : (1 : ℝ) / 2 ^ k ≤ 1 := by
+      rw [div_le_one h2k_pos]
+      exact one_le_pow₀ (by norm_num : (1 : ℝ) ≤ 2)
+    have h_R_bnd : |R| ≤ (Ma n : ℝ) + 1 := by
+      have h_R_split : R = (R - a n) + a n := by ring
+      have h_R_le : |R| ≤ |R - a n| + |a n| := by
+        calc |R| = |(R - a n) + a n| := by rw [← h_R_split]
+          _ ≤ |R - a n| + |a n| := abs_add_le _ _
+      linarith
+    -- Total error `≤ (Ma + Mb + 1) / 2^k`.
+    have h_err :
+        |R * S - a n * b n| ≤ ((Ma n : ℝ) + (Mb n : ℝ) + 1) / 2 ^ k := by
+      have h_RS : |R| * |S - b n| ≤ ((Ma n : ℝ) + 1) * (1 / 2 ^ k) :=
+        mul_le_mul h_R_bnd h_S_err (abs_nonneg _) (by linarith)
+      have h_bR : |b n| * |R - a n| ≤ (Mb n : ℝ) * (1 / 2 ^ k) :=
+        mul_le_mul h_b_bnd h_R_err (abs_nonneg _) (Nat.cast_nonneg _)
+      have h_combine :
+          ((Ma n : ℝ) + 1) * (1 / 2 ^ k) + (Mb n : ℝ) * (1 / 2 ^ k) =
+            ((Ma n : ℝ) + (Mb n : ℝ) + 1) / 2 ^ k := by ring
+      linarith
+    -- Final: `(Ma + Mb + 1) / 2^k ≤ 1/2^N`.
+    have h_final :
+        ((Ma n : ℝ) + (Mb n : ℝ) + 1) / 2 ^ k ≤ 1 / 2 ^ N := by
+      rw [div_le_div_iff₀ h2k_pos h2N_pos]
+      have h_pow_le : (2 : ℝ) ^ (N + Ma n + Mb n + 1) ≤ 2 ^ k :=
+        pow_le_pow_right₀ (by norm_num : (1 : ℝ) ≤ 2) hk
+      have h_pow_eq :
+          (2 : ℝ) ^ (N + Ma n + Mb n + 1) = 2 ^ N * 2 ^ (Ma n + Mb n + 1) := by
+        rw [show N + Ma n + Mb n + 1 = N + (Ma n + Mb n + 1) from by ring, pow_add]
+      have h_pow_bnd :
+          ((Ma n : ℝ) + (Mb n : ℝ) + 1) ≤ (2 : ℝ) ^ (Ma n + Mb n + 1) := by
+        have h_nat : Ma n + Mb n + 1 < 2 ^ (Ma n + Mb n + 1) := Nat.lt_two_pow_self
+        have h_nat_le : Ma n + Mb n + 1 ≤ 2 ^ (Ma n + Mb n + 1) := h_nat.le
+        have h_real : ((Ma n + Mb n + 1 : ℕ) : ℝ) ≤
+            ((2 ^ (Ma n + Mb n + 1) : ℕ) : ℝ) := by exact_mod_cast h_nat_le
+        push_cast at h_real
+        linarith
+      have h2N_nn : (0 : ℝ) ≤ 2 ^ N := le_of_lt h2N_pos
+      calc ((Ma n : ℝ) + (Mb n : ℝ) + 1) * 2 ^ N
+          ≤ (2 : ℝ) ^ (Ma n + Mb n + 1) * 2 ^ N :=
+            mul_le_mul_of_nonneg_right h_pow_bnd h2N_nn
+        _ = 2 ^ N * 2 ^ (Ma n + Mb n + 1) := by ring
+        _ ≤ 2 ^ k := by rw [← h_pow_eq]; exact h_pow_le
+        _ = 1 * 2 ^ k := by ring
+    linarith
+
+end IsComputableSeqReal
+
 /-! ## §5 — Computable real points (`IsComputableReal`)
 
 Per **Pour-El & Richards Ch. 0:58, Definition 3** (the actual point

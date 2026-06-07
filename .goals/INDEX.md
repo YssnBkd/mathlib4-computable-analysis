@@ -18,3 +18,4 @@ Registry of all `/goal` rounds. Status is `active`, `success`, `partial`, `aband
 | l2-grzegorczyk-lacombe | success | 2026-06-05 | 2026-06-05 | 10/50 | proof-attempt |
 | l2-mul-smul-sub | success | 2026-06-05 | 2026-06-06 | 10/50 | proof-attempt |
 | pr-coverage-assessment | abandoned | 2026-06-06 | 2026-06-06 | 18/50 | explore |
+| pr-coverage-assessment | active | 2026-06-06 |  | 0/50 | explore |

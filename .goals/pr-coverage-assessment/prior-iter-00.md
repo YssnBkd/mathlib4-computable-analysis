@@ -1,21 +1,16 @@
 # iter-00 — START
 
-timestamp: 2026-06-06T09:14:40Z
+timestamp: 2026-06-06T01:00:00Z
 unmet: [C1, C2, C3, C4, C5, C6, C7]
 mode: explore
 files_changed: []
 note: |
-  Audit round opened fresh after the prior `pr-coverage-assessment` attempt
-  (`.goals/pr-coverage-assessment/prior-{goal,iter-00,final}.md`) was
-  abandoned at iter-18 with no substantive progress. Per `AUDIT.md`: the
-  user explicitly requested a fresh conversation; this is it.
+  Audit round opened after the close of `l2-mul-smul-sub`. Goal: stop and
+  assess where the formalization stands relative to P-R verbatim. No Lean,
+  blueprint, claims, proofs, or intuition writes this round — output is a
+  single deliverable doc at `docs/PR-COVERAGE.md`.
 
-  Goal: stop and assess where the formalization stands relative to P-R
-  verbatim. NO Lean, blueprint, claims, proofs, or intuition writes this
-  round — output is a single deliverable doc at `docs/PR-COVERAGE.md`.
-
-  Recommended workflow (multi-iter; copied verbatim from prior-iter-00.md
-  per AUDIT.md sanction):
+  Recommended workflow (multi-iter):
     - iter-01 — iter-02: read P-R Intro + Prerequisites (small chapters,
       anchor the predicate-first / project-commitment framing).
     - iter-03 — iter-08: P-R Ch. 0 coverage. Densest chapter for our L1/L2
@@ -53,9 +48,3 @@ note: |
   (single file). Do NOT touch blueprint, Lean, claims, proofs, or
   intuition this round. Findings about those go INTO the deliverable
   instead, addressed in follow-up rounds.
-
-  Audit-round behavioural caveat (from AUDIT.md): `ComputableAnalysis/**`
-  and `blueprint/**` are NOT in forbid_writes because the Stop hook
-  tracks session-wide writes and would HALT on residual writes from prior
-  rounds. The "no Lean / blueprint writes in this round" rule is
-  behavioural — must not modify those paths this round.
